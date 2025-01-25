@@ -1,0 +1,10 @@
+﻿{
+    "profiles": {
+      "Hypersonic (Unpackaged)": {
+        "commandName": "Project"
+      },
+      "Hypersonic (Package)": {
+        "commandName": "MsixPackage"
+      }
+    }
+}

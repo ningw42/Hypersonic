@@ -1,0 +1,10 @@
+# Ignore build artifacts
+[Bb]in/
+[Oo]bj/
+
+# Ignore Visual Studio temporary files
+.vs/
+.vscode/
+
+# Ignore TestResults
+TestResults/
