@@ -2,15 +2,59 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Hypersonic"
-    xmlns:controls="using:Hypersonic.Controls">
+    xmlns:controls="using:Hypersonic.Controls"
+    xmlns:converters="using:Hypersonic.Converters">
 
-    <Style TargetType="controls:HypersonicPlayer" >
+    <!-- Converters -->
+    <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    <converters:VolumeToPercentageConverter x:Key="VolumeToPercentageConverter"/><Style TargetType="controls:HypersonicPlayer" >
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="controls:HypersonicPlayer">
-                    <Grid Width="500" Height="500">
-                        <Image Source="{TemplateBinding NowPlayingRecording.}" Height="100" />
-                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="{TemplateBinding Label}"/>
+                    <Grid Width="400" Height="120" Background="{ThemeResource CardBackgroundFillColorDefault}" 
+                          CornerRadius="8" Padding="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- Track Info -->
+                        <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                            <TextBlock Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Title}" 
+                                     FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Artist}" 
+                                     FontSize="14" Opacity="0.8" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Album}" 
+                                     FontSize="12" Opacity="0.6" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                        
+                        <!-- Progress Bar -->
+                        <Slider x:Name="PositionSlider" Grid.Row="1" 
+                                Minimum="0" Maximum="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Duration}"
+                                Value="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Position}"
+                                Margin="0,4"/>
+                        
+                        <!-- Controls -->
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" 
+                                  VerticalAlignment="Center" Spacing="12">
+                            <Button x:Name="PlayButton" Content="▶" FontSize="16" Width="40" Height="40" 
+                                  Visibility="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsPlaying, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=True}"/>
+                            <Button x:Name="PauseButton" Content="⏸" FontSize="16" Width="40" Height="40"
+                                  Visibility="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsPlaying, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                            <Button x:Name="StopButton" Content="⏹" FontSize="16" Width="40" Height="40"/>
+                            
+                            <!-- Volume Control -->
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Text="🔊" FontSize="14"/>
+                                <Slider x:Name="VolumeSlider" Width="60" Minimum="0" Maximum="100" 
+                                      Value="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Volume, Converter={StaticResource VolumeToPercentageConverter}}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        
+                        <!-- Loading Indicator -->
+                        <ProgressRing Grid.RowSpan="3" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    IsActive="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsLoading}"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
