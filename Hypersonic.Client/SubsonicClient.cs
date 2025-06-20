@@ -54,8 +54,10 @@ public interface ISubsonicClient
 
     #region Album/Song lists
 
-    // public Task<GetAlbumListResponse> GetAlbumListAsync(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);
-    //public Task<GetAlbumList2Response> GetAlbumList2Async(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);
+    public Task<GetAlbumListResponse> GetAlbumListAsync(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);
+
+    public Task<GetAlbumList2Response> GetAlbumList2Async(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);
+
     //public Task<GetRandomSongsResponse> GetRandomSongsAsync(int? size = null, string? genre = null, int? fromYear = null, int? toYear = null, string? musicFolderId = null);
     //public Task<GetSongsByGenreResponse> GetSongsByGenreAsync(string genre, int? count = null, int? offset = null, string? musicFolderId = null);
     //public Task<GetNowPlayingResponse> GetNowPlayingAsync();
@@ -90,11 +92,15 @@ public interface ISubsonicClient
 
     public Task<Stream> DownloadAsync(string id);
 
-    //public Task<Stream> GetCoverArtAsync(string id, string? size = null);
-    //public Uri GetCoverArtUri(string id, string? size = null);
-    //public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null);
-    //public Task<Stream> GetAvatarAsync(string username);
-    //public Uri GetAvatarUri(string username);
+    public Task<Stream> GetCoverArtAsync(string id, string? size = null);
+
+    public Uri GetCoverArtUri(string id, string? size = null);
+
+    public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null);
+
+    public Task<Stream> GetAvatarAsync(string username);
+
+    public Uri GetAvatarUri(string username);
 
     #endregion Media Retrieval
 
@@ -282,9 +288,18 @@ public class SubsonicClient : ISubsonicClient
         return await this.MakeSubsonicRequestAsync<GetTopSongsRequest, GetTopSongsResponse>(new GetTopSongsRequest(this.BaseRequest, artist, count));
     }
 
-    #endregion Browsing Endpoints
+    #endregion Browsing Endpoints    #region Album/Song lists
 
-    #region Album/Song lists
+    public async Task<GetAlbumListResponse> GetAlbumListAsync(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetAlbumListRequest, GetAlbumListResponse>(new GetAlbumListRequest(this.BaseRequest, type, size, offset, fromYear, toYear, genre, musicFolderId));
+    }
+
+    public async Task<GetAlbumList2Response> GetAlbumList2Async(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetAlbumList2Request, GetAlbumList2Response>(new GetAlbumList2Request(this.BaseRequest, type, size, offset, fromYear, toYear, genre, musicFolderId));
+    }
+
     #endregion Album/Song lists
 
     #region Searching
@@ -343,6 +358,31 @@ public class SubsonicClient : ISubsonicClient
     public async Task<Stream> DownloadAsync(string id)
     {
         return await this.MakeSubsonicRequestWithoutDeserializationAsync<DownloadRequest>(new DownloadRequest(this.BaseRequest, id));
+    }
+
+    public async Task<Stream> GetCoverArtAsync(string id, string? size = null)
+    {
+        return await this.MakeSubsonicRequestWithoutDeserializationAsync<GetCoverArtRequest>(new GetCoverArtRequest(this.BaseRequest, id, size));
+    }    public Uri GetCoverArtUri(string id, string? size = null)
+    {
+        GetCoverArtRequest request = new GetCoverArtRequest(this.BaseRequest, id, size);
+        return this.GetUri(request);
+    }
+
+    public async Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetLyricsRequest, GetLyricsResponse>(new GetLyricsRequest(this.BaseRequest, artist, title));
+    }
+
+    public async Task<Stream> GetAvatarAsync(string username)
+    {
+        return await this.MakeSubsonicRequestWithoutDeserializationAsync<GetAvatarRequest>(new GetAvatarRequest(this.BaseRequest, username));
+    }
+
+    public Uri GetAvatarUri(string username)
+    {
+        GetAvatarRequest request = new GetAvatarRequest(this.BaseRequest, username);
+        return this.GetUri(request);
     }
 
     #endregion Media Retrieval
