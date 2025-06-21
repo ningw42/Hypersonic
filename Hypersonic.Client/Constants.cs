@@ -49,7 +49,6 @@ public class Constants
 
         #region Searching
         
-        public const string Search = "search.view";
         public const string Search2 = "search2.view";
         public const string Search3 = "search3.view";
 
@@ -73,6 +72,7 @@ public class Constants
         public const string GetCaptions = "getCaptions.view";
         public const string GetCoverArt = "getCoverArt.view";
         public const string GetLyrics = "getLyrics.view";
+        public const string GetLyricsBySongId = "getLyricsBySongId.view";
         public const string GetAvatar = "getAvatar.view";
 
         #endregion Media Retrieval

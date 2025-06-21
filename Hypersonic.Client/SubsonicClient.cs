@@ -8,7 +8,7 @@ namespace Hypersonic.Client;
 
 public interface ISubsonicClient
 {
-    #region System Endpoints
+    #region System
 
     public Task<SubsonicResponse> PingAsync();
 
@@ -16,9 +16,9 @@ public interface ISubsonicClient
 
     public Task<GetOpenSubsonicExtensionsResponse> GetOpenSubsonicExtensions();
 
-    #endregion System Endpoints
+    #endregion System
 
-    #region Browsing Endpoints
+    #region Browsing
 
     public Task<GetMusicFoldersResponse> GetMusicFoldersAsync();
     
@@ -50,37 +50,43 @@ public interface ISubsonicClient
 
     public Task<GetTopSongsResponse> GetTopSongsAsync(string artist, int count = 50);
 
-    #endregion Browsing Endpoints
+    #endregion Browsing
 
-    #region Album/Song lists
+    #region Album/Song Lists
 
-    public Task<GetAlbumListResponse> GetAlbumListAsync(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);
+    public Task<GetAlbumListResponse> GetAlbumListAsync(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);    public Task<GetAlbumList2Response> GetAlbumList2Async(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);
 
-    public Task<GetAlbumList2Response> GetAlbumList2Async(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null);
+    public Task<GetRandomSongsResponse> GetRandomSongsAsync(int? size = null, string? genre = null, int? fromYear = null, int? toYear = null, string? musicFolderId = null);
 
-    //public Task<GetRandomSongsResponse> GetRandomSongsAsync(int? size = null, string? genre = null, int? fromYear = null, int? toYear = null, string? musicFolderId = null);
-    //public Task<GetSongsByGenreResponse> GetSongsByGenreAsync(string genre, int? count = null, int? offset = null, string? musicFolderId = null);
-    //public Task<GetNowPlayingResponse> GetNowPlayingAsync();
-    //public Task<GetStarredResponse> GetStarredAsync(string? musicFolderId = null);
-    //public Task<GetStarred2Response> GetStarred2Async(string? musicFolderId = null);
+    public Task<GetSongsByGenreResponse> GetSongsByGenreAsync(string genre, int? count = null, int? offset = null, string? musicFolderId = null);
 
-    #endregion Album/Song lists
+    public Task<GetNowPlayingResponse> GetNowPlayingAsync();
+
+    public Task<GetStarredResponse> GetStarredAsync(string? musicFolderId = null);
+
+    public Task<GetStarred2Response> GetStarred2Async(string? musicFolderId = null);
+
+    #endregion Album/Song Lists
 
     #region Searching
 
-    //public Task<SearchResponse> SearchAsync(string? artist = null, string? album = null, string? title = null, bool any = false, int? count = null, int? offset = null, ulong? newerThan = null);
-    //public Task<Search2Response> Search2Async(string query, int? artistCount = null, int? artistOffset = null, int? albumCount = null, int? albumOffset = null, int? songCount = null, int? songOffset = null, string? musicFolderId = null);
+    public Task<Search2Response> Search2Async(string query, int? artistCount = null, int? artistOffset = null, int? albumCount = null, int? albumOffset = null, int? songCount = null, int? songOffset = null, string? musicFolderId = null);
+
     public Task<Search3Response> Search3Async(string query, int? artistCount = null, int? artistOffset = null, int? albumCount = null, int? albumOffset = null, int? songCount = null, int? songOffset = null, string? musicFolderId = null);
 
     #endregion Searching
 
     #region Playlists
 
-    //public Task<GetPlaylistsResponse> GetPlaylistsAsync(string? username);
-    //public Task<GetPlaylistResponse> GetPlaylistAsync(string id);
-    //public Task<CreatePlaylistResponse> CreatePlaylistAsync(string playlistId, string name, string? songId);
-    //public Task<UpdatePlaylistResponse> UpdatePlaylistAsync(string playlistId, string? name = null, string? comment = null, bool @public = false, string? songIdToAdd = null, string? songIndexToRemove = null);
-    //public Task<DeletePlaylistResponse> DeletePlaylistAsync(string id);
+    public Task<GetPlaylistsResponse> GetPlaylistsAsync(string? username = null);
+
+    public Task<GetPlaylistResponse> GetPlaylistAsync(string id);
+
+    public Task<SubsonicResponse> CreatePlaylistAsync(string? playlistId = null, string? name = null, string[]? songId = null);
+
+    public Task<SubsonicResponse> UpdatePlaylistAsync(string playlistId, string? name = null, string? comment = null, bool? @public = null, string[]? songIdToAdd = null, int[]? songIndexToRemove = null);
+
+    public Task<SubsonicResponse> DeletePlaylistAsync(string id);
 
     #endregion Playlists
 
@@ -98,6 +104,8 @@ public interface ISubsonicClient
 
     public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null);
 
+    public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id);
+
     public Task<Stream> GetAvatarAsync(string username);
 
     public Uri GetAvatarUri(string username);
@@ -106,10 +114,13 @@ public interface ISubsonicClient
 
     #region Media Annotation
 
-    //public Task<SubsonicResponse> StarAsync(string? id = null, string? albumId = null, string? artistId = null);
-    //public Task<SubsonicResponse> UnstarAsync(string? id = null, string? albumId = null, string? artistId = null);
-    //public Task<SubsonicResponse> SetRatingAsync(string id, int rating);
-    //public Task<SubsonicResponse> ScrobbleAsync(string id, ulong? time = null, bool submission = true);
+    public Task<SubsonicResponse> StarAsync(string? id = null, string? albumId = null, string? artistId = null);
+
+    public Task<SubsonicResponse> UnstarAsync(string? id = null, string? albumId = null, string? artistId = null);
+
+    public Task<SubsonicResponse> SetRatingAsync(string id, int rating);
+
+    public Task<SubsonicResponse> ScrobbleAsync(string id, ulong? time = null, bool submission = true);
 
     #endregion Media Annotation
 
@@ -129,12 +140,20 @@ public interface ISubsonicClient
     #endregion Chat
 
     #region User Management
+
+    public Task<GetUserResponse> GetUserAsync(string username);
+    public Task<GetUsersResponse> GetUsersAsync();
+
     #endregion User Management
 
     #region Bookmarks
     #endregion Bookmarks
 
     #region Media Library Scanning
+
+    public Task<GetScanStatusResponse> GetScanStatusAsync();
+    public Task<StartScanResponse> StartScanAsync();
+
     #endregion Media Library Scanning
 
     #region OpenSubsonic
@@ -288,7 +307,9 @@ public class SubsonicClient : ISubsonicClient
         return await this.MakeSubsonicRequestAsync<GetTopSongsRequest, GetTopSongsResponse>(new GetTopSongsRequest(this.BaseRequest, artist, count));
     }
 
-    #endregion Browsing Endpoints    #region Album/Song lists
+    #endregion Browsing Endpoints
+
+    #region Album/Song lists
 
     public async Task<GetAlbumListResponse> GetAlbumListAsync(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null)
     {
@@ -300,9 +321,38 @@ public class SubsonicClient : ISubsonicClient
         return await this.MakeSubsonicRequestAsync<GetAlbumList2Request, GetAlbumList2Response>(new GetAlbumList2Request(this.BaseRequest, type, size, offset, fromYear, toYear, genre, musicFolderId));
     }
 
+    public async Task<GetRandomSongsResponse> GetRandomSongsAsync(int? size = null, string? genre = null, int? fromYear = null, int? toYear = null, string? musicFolderId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetRandomSongsRequest, GetRandomSongsResponse>(new GetRandomSongsRequest(this.BaseRequest, size, genre, fromYear, toYear, musicFolderId));
+    }
+
+    public async Task<GetSongsByGenreResponse> GetSongsByGenreAsync(string genre, int? count = null, int? offset = null, string? musicFolderId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetSongsByGenreRequest, GetSongsByGenreResponse>(new GetSongsByGenreRequest(this.BaseRequest, genre, count, offset, musicFolderId));
+    }
+
+    public async Task<GetNowPlayingResponse> GetNowPlayingAsync()
+    {
+        return await this.MakeSubsonicRequestAsync<GetNowPlayingRequest, GetNowPlayingResponse>(new GetNowPlayingRequest(this.BaseRequest));
+    }
+
+    public async Task<GetStarredResponse> GetStarredAsync(string? musicFolderId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetStarredRequest, GetStarredResponse>(new GetStarredRequest(this.BaseRequest, musicFolderId));
+    }
+
+    public async Task<GetStarred2Response> GetStarred2Async(string? musicFolderId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetStarred2Request, GetStarred2Response>(new GetStarred2Request(this.BaseRequest, musicFolderId));    }
+
     #endregion Album/Song lists
 
     #region Searching
+
+    public async Task<Search2Response> Search2Async(string query, int? artistCount = null, int? artistOffset = null, int? albumCount = null, int? albumOffset = null, int? songCount = null, int? songOffset = null, string? musicFolderId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<Search2Request, Search2Response>(new Search2Request(this.BaseRequest, query, artistCount, artistOffset, albumCount, albumOffset, songCount, songOffset, musicFolderId));
+    }
 
     public async Task<Search3Response> Search3Async(string query, int? artistCount = null, int? artistOffset = null, int? albumCount = null, int? albumOffset = null, int? songCount = null, int? songOffset = null, string? musicFolderId = null)
     {
@@ -322,6 +372,32 @@ public class SubsonicClient : ISubsonicClient
     #endregion Searching
 
     #region Playlists
+
+    public async Task<GetPlaylistsResponse> GetPlaylistsAsync(string? username = null)
+    {
+        return await this.MakeSubsonicRequestAsync<GetPlaylistsRequest, GetPlaylistsResponse>(new GetPlaylistsRequest(this.BaseRequest, username));
+    }
+
+    public async Task<GetPlaylistResponse> GetPlaylistAsync(string id)
+    {
+        return await this.MakeSubsonicRequestAsync<GetPlaylistRequest, GetPlaylistResponse>(new GetPlaylistRequest(this.BaseRequest, id));
+    }
+
+    public async Task<SubsonicResponse> CreatePlaylistAsync(string? playlistId = null, string? name = null, string[]? songId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<CreatePlaylistRequest, SubsonicResponse>(new CreatePlaylistRequest(this.BaseRequest, playlistId, name, songId));
+    }
+
+    public async Task<SubsonicResponse> UpdatePlaylistAsync(string playlistId, string? name = null, string? comment = null, bool? @public = null, string[]? songIdToAdd = null, int[]? songIndexToRemove = null)
+    {
+        return await this.MakeSubsonicRequestAsync<UpdatePlaylistRequest, SubsonicResponse>(new UpdatePlaylistRequest(this.BaseRequest, playlistId, name, comment, @public, songIdToAdd, songIndexToRemove));
+    }
+
+    public async Task<SubsonicResponse> DeletePlaylistAsync(string id)
+    {
+        return await this.MakeSubsonicRequestAsync<DeletePlaylistRequest, SubsonicResponse>(new DeletePlaylistRequest(this.BaseRequest, id));
+    }
+
     #endregion Playlists
 
     #region Media Retrieval
@@ -363,7 +439,9 @@ public class SubsonicClient : ISubsonicClient
     public async Task<Stream> GetCoverArtAsync(string id, string? size = null)
     {
         return await this.MakeSubsonicRequestWithoutDeserializationAsync<GetCoverArtRequest>(new GetCoverArtRequest(this.BaseRequest, id, size));
-    }    public Uri GetCoverArtUri(string id, string? size = null)
+    }
+
+    public Uri GetCoverArtUri(string id, string? size = null)
     {
         GetCoverArtRequest request = new GetCoverArtRequest(this.BaseRequest, id, size);
         return this.GetUri(request);
@@ -372,6 +450,11 @@ public class SubsonicClient : ISubsonicClient
     public async Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null)
     {
         return await this.MakeSubsonicRequestAsync<GetLyricsRequest, GetLyricsResponse>(new GetLyricsRequest(this.BaseRequest, artist, title));
+    }
+
+    public async Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id)
+    {
+        return await this.MakeSubsonicRequestAsync<GetLyricsBySongIdRequest, GetLyricsBySongIdResponse>(new GetLyricsBySongIdRequest(this.BaseRequest, id));
     }
 
     public async Task<Stream> GetAvatarAsync(string username)
@@ -388,6 +471,27 @@ public class SubsonicClient : ISubsonicClient
     #endregion Media Retrieval
 
     #region Media Annotation
+
+    public async Task<SubsonicResponse> StarAsync(string? id = null, string? albumId = null, string? artistId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<StarRequest, SubsonicResponse>(new StarRequest(this.BaseRequest, id, albumId, artistId));
+    }
+
+    public async Task<SubsonicResponse> UnstarAsync(string? id = null, string? albumId = null, string? artistId = null)
+    {
+        return await this.MakeSubsonicRequestAsync<UnstarRequest, SubsonicResponse>(new UnstarRequest(this.BaseRequest, id, albumId, artistId));
+    }
+
+    public async Task<SubsonicResponse> SetRatingAsync(string id, int rating)
+    {
+        return await this.MakeSubsonicRequestAsync<SetRatingRequest, SubsonicResponse>(new SetRatingRequest(this.BaseRequest, id, rating));
+    }
+
+    public async Task<SubsonicResponse> ScrobbleAsync(string id, ulong? time = null, bool submission = true)
+    {
+        return await this.MakeSubsonicRequestAsync<ScrobbleRequest, SubsonicResponse>(new ScrobbleRequest(this.BaseRequest, id, time, submission));
+    }
+
     #endregion Media Annotation
 
     #region Sharing
@@ -406,12 +510,34 @@ public class SubsonicClient : ISubsonicClient
     #endregion Chat
 
     #region User Management
+
+    public async Task<GetUserResponse> GetUserAsync(string username)
+    {
+        return await this.MakeSubsonicRequestAsync<GetUserRequest, GetUserResponse>(new GetUserRequest(this.BaseRequest, username));
+    }
+
+    public async Task<GetUsersResponse> GetUsersAsync()
+    {
+        return await this.MakeSubsonicRequestAsync<GetUsersRequest, GetUsersResponse>(new GetUsersRequest(this.BaseRequest));
+    }
+
     #endregion User Management
 
     #region Bookmarks
     #endregion Bookmarks
 
     #region Media Library Scanning
+
+    public async Task<GetScanStatusResponse> GetScanStatusAsync()
+    {
+        return await this.MakeSubsonicRequestAsync<GetScanStatusRequest, GetScanStatusResponse>(new GetScanStatusRequest(this.BaseRequest));
+    }
+
+    public async Task<StartScanResponse> StartScanAsync()
+    {
+        return await this.MakeSubsonicRequestAsync<StartScanRequest, StartScanResponse>(new StartScanRequest(this.BaseRequest));
+    }
+
     #endregion Media Library Scanning
 
     #region OpenSubsonic

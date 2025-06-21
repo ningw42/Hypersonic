@@ -19,7 +19,15 @@ public class SongByGenre : Songs
 {
 }
 
+public class RandomSongs : Songs
+{
+}
+
 public class Starred : Songs
+{
+}
+
+public class Starred2 : Songs
 {
 }
 
