@@ -31,7 +31,7 @@ public partial class PlayerViewModel : ObservableRecipient
     private double duration;
 
     [ObservableProperty]
-    private double volume = 1.0;
+    private double volumePercent = 100;
 
     [ObservableProperty]
     private bool hasNext;
@@ -96,9 +96,9 @@ public partial class PlayerViewModel : ObservableRecipient
         _isSeeking = false;
     }
 
-    partial void OnVolumeChanged(double value)
+    partial void OnVolumePercentChanged(double value)
     {
-        _playbackService.Volume = value;
+        _playbackService.Volume = value / 100.0;
     }
 
     private void OnPlaybackStateChanged(object? sender, EventArgs e)
@@ -106,7 +106,7 @@ public partial class PlayerViewModel : ObservableRecipient
         IsPlaying = _playbackService.IsPlaying;
         HasNext = _playbackService.HasNext;
         HasPrevious = _playbackService.HasPrevious;
-        Volume = _playbackService.Volume;
+        VolumePercent = Math.Round(_playbackService.Volume * 100);
         Duration = _playbackService.Duration;
         DurationText = FormatTime(_playbackService.Duration);
     }
