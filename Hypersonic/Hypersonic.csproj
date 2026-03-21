@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>Hypersonic</RootNamespace>
     <ApplicationIcon>Assets/WindowIcon.ico</ApplicationIcon>
@@ -22,12 +22,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.1.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.231008000" />
-    <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="2.0.9" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
-    <PackageReference Include="WinUIEx" Version="2.3.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
+    <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="3.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="WinUIEx" Version="2.9.0" />
   </ItemGroup>
 
   <ItemGroup>
