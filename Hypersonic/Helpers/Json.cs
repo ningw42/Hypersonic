@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 
-namespace Hypersonic.Core.Helpers;
+namespace Hypersonic.Helpers;
 
 public static class Json
 {

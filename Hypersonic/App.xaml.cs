@@ -1,7 +1,5 @@
 ﻿using Hypersonic.Activation;
 using Hypersonic.Contracts.Services;
-using Hypersonic.Core.Contracts.Services;
-using Hypersonic.Core.Services;
 using Hypersonic.Helpers;
 using Hypersonic.Models;
 using Hypersonic.Services;

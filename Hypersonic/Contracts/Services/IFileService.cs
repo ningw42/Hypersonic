@@ -1,4 +1,4 @@
-﻿namespace Hypersonic.Core.Contracts.Services;
+namespace Hypersonic.Contracts.Services;
 
 public interface IFileService
 {

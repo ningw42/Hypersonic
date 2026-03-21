@@ -1,10 +1,10 @@
-﻿using System.Text;
+using System.Text;
 
-using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Contracts.Services;
 
 using Newtonsoft.Json;
 
-namespace Hypersonic.Core.Services;
+namespace Hypersonic.Services;
 
 public class FileService : IFileService
 {
