@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Hypersonic is a WinUI 3 desktop music streaming client for Subsonic/OpenSubsonic-compatible servers (e.g., Navidrome). Built with .NET 8, Windows App SDK 1.4, and MSIX packaging.
+Hypersonic is a WinUI 3 desktop music streaming client for Subsonic/OpenSubsonic-compatible servers (e.g., Navidrome). Built with .NET 10, Windows App SDK 1.8, and MSIX packaging.
 
 ## Build & Test Commands
 
@@ -27,7 +27,7 @@ dotnet test --filter "FullyQualifiedName~TestMethodName"
 dotnet build Hypersonic.sln -p:Platform=x64
 ```
 
-Note: The main WinUI app (`Hypersonic.csproj`) targets `net8.0-windows10.0.19041.0` and requires the Windows App SDK. It cannot be run with `dotnet run`; use Visual Studio (F5) or deploy the MSIX package.
+Note: The main WinUI app (`Hypersonic.csproj`) targets `net10.0-windows10.0.19041.0` and requires the Windows App SDK. It cannot be run with `dotnet run`; use Visual Studio (F5) or deploy the MSIX package. Always specify `-p:Platform=x64` (or x86/arm64) when building the main app.
 
 ## Solution Structure
 
@@ -49,6 +49,7 @@ Note: The main WinUI app (`Hypersonic.csproj`) targets `net8.0-windows10.0.19041
 - **Navigation**: Frame-based. `PageService` maps ViewModel types to Page types by full name. When adding a new page, you must: (1) create the View and ViewModel, (2) register both in `App.xaml.cs`, (3) add the mapping in `PageService.Configure()`.
 - **ViewModel base**: ViewModels extend `ObservableRecipient` (from CommunityToolkit.Mvvm). Use `[ObservableProperty]` and `[RelayCommand]` source generator attributes.
 - **INavigationAware**: ViewModels implement this contract to receive `OnNavigatedTo`/`OnNavigatedFrom` lifecycle callbacks.
+- **Server connection**: `ISubsonicClientService` (singleton) manages the `SubsonicClient` lifecycle. Credentials are persisted via `ILocalSettingsService` under key `"ServerCredential"`. On startup, `DefaultActivationHandler` checks for saved credentials and navigates to `ConnectPage` or `MainPage` accordingly.
 - **Localization**: String resources are in `Strings/en-us/Resources.resw`.
 
 ### Subsonic API Client (`Hypersonic.Client`)
