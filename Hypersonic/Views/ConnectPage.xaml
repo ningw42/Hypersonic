@@ -1,0 +1,70 @@
+<Page
+    x:Class="Hypersonic.Views.ConnectPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid HorizontalAlignment="Center"
+          VerticalAlignment="Center"
+          Width="420">
+        <StackPanel Spacing="16">
+
+            <!-- Title -->
+            <TextBlock x:Uid="Connect_Title"
+                       Style="{StaticResource TitleTextBlockStyle}"
+                       Margin="0,0,0,8"/>
+
+            <!-- Warning InfoBar for invalid saved credentials -->
+            <InfoBar IsOpen="{x:Bind ViewModel.IsInvalidCredentialVisible, Mode=OneWay}"
+                     Severity="Warning"
+                     x:Uid="Connect_InvalidCredential"
+                     Message="{x:Bind ViewModel.InvalidCredentialMessage, Mode=OneWay}"
+                     IsClosable="True"/>
+
+            <!-- Server URL -->
+            <TextBox x:Uid="Connect_ServerUrl"
+                     Text="{x:Bind ViewModel.ServerUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <!-- Username -->
+            <TextBox x:Uid="Connect_Username"
+                     Text="{x:Bind ViewModel.Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <!-- Password -->
+            <PasswordBox x:Uid="Connect_Password"
+                         Password="{x:Bind ViewModel.Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <!-- Test result InfoBar -->
+            <InfoBar IsOpen="{x:Bind ViewModel.IsTestResultVisible, Mode=OneWay}"
+                     Severity="{x:Bind ViewModel.TestResultSeverity, Mode=OneWay}"
+                     Message="{x:Bind ViewModel.TestResultMessage, Mode=OneWay}"
+                     IsClosable="True"/>
+
+            <!-- Buttons -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <ProgressRing Grid.Column="0"
+                              IsActive="{x:Bind ViewModel.IsTestingConnection, Mode=OneWay}"
+                              Width="24" Height="24"
+                              HorizontalAlignment="Left"
+                              Visibility="{x:Bind ViewModel.IsTestingConnection, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                <Button Grid.Column="1"
+                        x:Uid="Connect_TestConnection"
+                        Command="{x:Bind ViewModel.TestConnectionCommand}"
+                        Margin="0,0,8,0"/>
+
+                <Button Grid.Column="2"
+                        x:Uid="Connect_Connect"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Command="{x:Bind ViewModel.ConnectCommand}"/>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Page>

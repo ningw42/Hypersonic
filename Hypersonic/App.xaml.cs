@@ -61,14 +61,19 @@ public partial class App : Application
 
             services.AddSingleton<IActivationService, ActivationService>();
             services.AddSingleton<IPageService, PageService>();
-            services.AddSingleton<INavigationService, NavigationService>();            // Core Services
-            services.AddSingleton<IFileService, FileService>();// Views and ViewModels
+            services.AddSingleton<INavigationService, NavigationService>();
+            services.AddSingleton<IFileService, FileService>();
+            services.AddSingleton<ISubsonicClientService, SubsonicClientService>();
+
+            // Views and ViewModels
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<SettingsPage>();
             services.AddTransient<MainViewModel>();
             services.AddTransient<MainPage>();
             services.AddTransient<AlbumsViewModel>();
             services.AddTransient<AlbumsPage>();
+            services.AddTransient<ConnectViewModel>();
+            services.AddTransient<ConnectPage>();
             services.AddTransient<ShellPage>();
             services.AddTransient<ShellViewModel>();
 

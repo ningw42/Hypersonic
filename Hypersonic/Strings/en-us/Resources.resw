@@ -96,4 +96,28 @@
   <data name="SettingsPage_PrivacyTermsLink.NavigateUri" xml:space="preserve">
     <value>https://YourPrivacyUrlGoesHere/</value>
   </data>
+  <data name="Connect_Title.Text" xml:space="preserve">
+    <value>Connect to Server</value>
+  </data>
+  <data name="Connect_InvalidCredential.Title" xml:space="preserve">
+    <value>Connection Failed</value>
+  </data>
+  <data name="Connect_ServerUrl.Header" xml:space="preserve">
+    <value>Server URL</value>
+  </data>
+  <data name="Connect_ServerUrl.PlaceholderText" xml:space="preserve">
+    <value>https://your-server.com/rest</value>
+  </data>
+  <data name="Connect_Username.Header" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="Connect_Password.Header" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Connect_TestConnection.Content" xml:space="preserve">
+    <value>Test Connection</value>
+  </data>
+  <data name="Connect_Connect.Content" xml:space="preserve">
+    <value>Connect</value>
+  </data>
 </root>

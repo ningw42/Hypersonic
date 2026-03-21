@@ -1,4 +1,4 @@
-﻿using Hypersonic.Contracts.Services;
+using Hypersonic.Contracts.Services;
 using Hypersonic.ViewModels;
 
 using Microsoft.UI.Xaml;
