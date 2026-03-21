@@ -1,0 +1,130 @@
+<Page
+    x:Class="Hypersonic.Views.AlbumsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    NavigationCacheMode="Required">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            
+            <TextBlock Grid.Column="0" 
+                       Text="Albums" 
+                       Style="{StaticResource TitleTextBlockStyle}" 
+                       VerticalAlignment="Center"/>
+            
+            <Button Grid.Column="1" 
+                    Content="Refresh" 
+                    Command="{x:Bind ViewModel.RefreshCommand}"
+                    Style="{StaticResource AccentButtonStyle}"/>
+        </Grid>
+
+        <!-- Content -->
+        <Grid Grid.Row="1">
+            <!-- Loading indicator -->
+            <StackPanel Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center">
+                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" 
+                              Width="50" 
+                              Height="50"/>
+                <TextBlock Text="Loading albums..." 
+                           HorizontalAlignment="Center" 
+                           Margin="0,16,0,0"/>
+            </StackPanel>
+
+            <!-- Error message -->
+            <InfoBar Grid.Row="1"
+                     IsOpen="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, Converter={StaticResource StringToBoolConverter}}"
+                     Severity="Error"
+                     Title="Error loading albums"
+                     Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                     Margin="0,0,0,16"/>
+
+            <!-- Albums grid -->
+            <ScrollViewer Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                <GridView ItemsSource="{x:Bind ViewModel.Albums, Mode=OneWay}"
+                          Margin="0,16,0,0"
+                          SelectionMode="Single">
+                    <GridView.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Width="200"
+                                    Height="240"
+                                    Margin="8">
+                                <Grid Padding="12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Album cover placeholder -->
+                                    <Rectangle Grid.Row="0"
+                                               Fill="{ThemeResource AccentFillColorDefaultBrush}"
+                                               Opacity="0.3"
+                                               RadiusX="4"
+                                               RadiusY="4"
+                                               Height="120"/>
+                                    
+                                    <FontIcon Grid.Row="0"
+                                              Glyph="&#xE8D6;"
+                                              FontSize="32"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+
+                                    <!-- Album name -->
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Name}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="1"
+                                               Margin="0,8,0,4"/>
+
+                                    <!-- Artist name -->
+                                    <TextBlock Grid.Row="2"
+                                               Text="{Binding Artist}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="1"
+                                               Margin="0,0,0,4"/>
+
+                                    <!-- Year -->
+                                    <TextBlock Grid.Row="3"
+                                               Text="{Binding Year}"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                               FontSize="12"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </GridView.ItemTemplate>
+                    <GridView.ItemContainerStyle>
+                        <Style TargetType="GridViewItem">
+                            <Setter Property="Margin" Value="4"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </GridView.ItemContainerStyle>
+                </GridView>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>

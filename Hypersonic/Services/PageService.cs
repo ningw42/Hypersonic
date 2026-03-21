@@ -10,11 +10,12 @@ namespace Hypersonic.Services;
 
 public class PageService : IPageService
 {
-    private readonly Dictionary<string, Type> _pages = new();
+    private readonly Dictionary<string, Type> _pages = new();    
 
     public PageService()
     {
         Configure<MainViewModel, MainPage>();
+        Configure<AlbumsViewModel, AlbumsPage>();
         Configure<SettingsViewModel, SettingsPage>();
     }
 

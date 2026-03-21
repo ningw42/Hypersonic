@@ -3,10 +3,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Hypersonic"
     xmlns:controls="using:Hypersonic.Controls"
-    xmlns:converters="using:Hypersonic.Converters">
-
-    <!-- Converters -->
+    xmlns:converters="using:Hypersonic.Converters">    <!-- Converters -->
     <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+    <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
     <converters:VolumeToPercentageConverter x:Key="VolumeToPercentageConverter"/><Style TargetType="controls:HypersonicPlayer" >
         <Setter Property="Template">
             <Setter.Value>
