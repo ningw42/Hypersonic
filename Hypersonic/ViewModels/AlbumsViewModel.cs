@@ -13,7 +13,6 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
     private const int PageSize = 50;
 
     private readonly ISubsonicClientService _subsonicClientService;
-    private readonly IPlaybackService _playbackService;
     private int _offset;
 
     [ObservableProperty]
@@ -35,10 +34,9 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
         "Album Artist",
     ];
 
-    public AlbumsViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService)
+    public AlbumsViewModel(ISubsonicClientService subsonicClientService)
     {
         _subsonicClientService = subsonicClientService;
-        _playbackService = playbackService;
         Albums = new IncrementalAlbumCollection(LoadMoreAlbumsAsync);
     }
 
@@ -151,55 +149,5 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
             3 => ("alphabeticalByArtist", null, null),
             _ => ("newest", null, null),          // Added Date desc (default)
         };
-    }
-
-    [RelayCommand]
-    private async Task PlayAlbumAsync(AlbumInfo? album)
-    {
-        if (album == null)
-        {
-            return;
-        }
-
-        var client = _subsonicClientService.Client;
-        if (client == null)
-        {
-            return;
-        }
-
-        try
-        {
-            var response = await client.GetAlbumAsync(album.Id);
-            var songs = response.Album?.Song;
-            if (songs == null || songs.Length == 0)
-            {
-                return;
-            }
-
-            var tracks = new List<PlaybackTrack>(songs.Length);
-            foreach (var song in songs)
-            {
-                tracks.Add(new PlaybackTrack
-                {
-                    Id = song.Id,
-                    Title = song.Title,
-                    Artist = song.Artist,
-                    Album = album.Name,
-                    Duration = song.Duration,
-                    TrackNumber = song.Track,
-                    DiscNumber = song.DiscNumber,
-                    CoverArtUri = !string.IsNullOrEmpty(song.CoverArt)
-                        ? client.GetCoverArtUri(song.CoverArt, "300")
-                        : (album.CoverArtUrl != null ? new Uri(album.CoverArtUrl) : null),
-                    StreamUri = client.GetStreamUri(song.Id),
-                });
-            }
-
-            _playbackService.PlayQueue(tracks);
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = ex.Message;
-        }
     }
 }

@@ -1,3 +1,4 @@
+using Hypersonic.Contracts.Services;
 using Hypersonic.Models;
 using Hypersonic.ViewModels;
 
@@ -22,7 +23,8 @@ public sealed partial class AlbumsPage : Page
     {
         if (e.ClickedItem is AlbumInfo album)
         {
-            ViewModel.PlayAlbumCommand.Execute(album);
+            var navigationService = App.GetService<INavigationService>();
+            navigationService.NavigateTo(typeof(AlbumDetailViewModel).FullName!, album.Id);
         }
     }
 }

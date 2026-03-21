@@ -74,6 +74,8 @@ public partial class App : Application
             services.AddTransient<MainPage>();
             services.AddTransient<AlbumsViewModel>();
             services.AddTransient<AlbumsPage>();
+            services.AddTransient<AlbumDetailViewModel>();
+            services.AddTransient<AlbumDetailPage>();
             services.AddTransient<ConnectViewModel>();
             services.AddTransient<ConnectPage>();
             services.AddTransient<ShellPage>();

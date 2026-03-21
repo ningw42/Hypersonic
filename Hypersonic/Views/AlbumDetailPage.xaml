@@ -1,0 +1,182 @@
+<Page
+    x:Class="Hypersonic.Views.AlbumDetailPage"
+    x:Name="PageRoot"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:Hypersonic.Models"
+    xmlns:helpers="using:Hypersonic.Helpers"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <helpers:TrackListTemplateSelector x:Key="TrackListTemplateSelector">
+            <helpers:TrackListTemplateSelector.DiscHeaderTemplate>
+                <DataTemplate x:DataType="models:DiscHeaderItem">
+                    <Grid Padding="0,16,0,8">
+                        <TextBlock Text="{x:Bind Title}"
+                                   Style="{StaticResource BodyStrongTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </Grid>
+                </DataTemplate>
+            </helpers:TrackListTemplateSelector.DiscHeaderTemplate>
+            <helpers:TrackListTemplateSelector.TrackTemplate>
+                <DataTemplate x:DataType="models:SongInfo">
+                    <Grid ColumnSpacing="12" Padding="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="60"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="{x:Bind TrackNumber}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{x:Bind Title}"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxLines="1"
+                                   VerticalAlignment="Center"
+                                   ToolTipService.ToolTip="{x:Bind Title}"/>
+
+                        <TextBlock Grid.Column="2"
+                                   Text="{x:Bind Duration, Converter={StaticResource SecondsToTimeConverter}}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </Grid>
+                </DataTemplate>
+            </helpers:TrackListTemplateSelector.TrackTemplate>
+        </helpers:TrackListTemplateSelector>
+    </Page.Resources>
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Padding="0,0,0,24">
+
+                <!-- Album header -->
+                <Grid Margin="0,0,0,24" ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Cover art -->
+                    <Grid Grid.Column="0"
+                          Width="200" Height="200"
+                          CornerRadius="8">
+                        <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
+                        <FontIcon Glyph="&#xE8D6;"
+                                  FontSize="48"
+                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                        <Image Source="{Binding ViewModel.CoverArtUrl, ElementName=PageRoot}"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Metadata -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                        <TextBlock Text="{x:Bind ViewModel.AlbumName, Mode=OneWay}"
+                                   Style="{StaticResource TitleTextBlockStyle}"
+                                   TextWrapping="WrapWholeWords"
+                                   MaxLines="2"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                        <TextBlock Text="{x:Bind ViewModel.AlbumArtist, Mode=OneWay}"
+                                   Style="{StaticResource SubtitleTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxLines="1"/>
+
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="{x:Bind ViewModel.ReleaseDateGenre, Mode=OneWay}"/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Foreground="{ThemeResource TextFillColorTertiaryBrush}">
+                                <Run Text="{x:Bind ViewModel.SongCount, Mode=OneWay}"/>
+                                <Run Text="songs"/>
+                            </TextBlock>
+                            <TextBlock Text="·"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                            <TextBlock Text="{x:Bind ViewModel.TotalDuration, Mode=OneWay}"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                        </StackPanel>
+
+                        <Button Command="{x:Bind ViewModel.PlayAlbumCommand}"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Margin="0,8,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE768;" FontSize="16"/>
+                                <TextBlock x:Uid="AlbumDetail_Play"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Error message -->
+                <InfoBar IsOpen="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, Converter={StaticResource StringToBoolConverter}}"
+                         Severity="Error"
+                         x:Uid="AlbumDetail_Error"
+                         Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                         Margin="0,0,0,8"/>
+
+                <!-- Track list column headers -->
+                <Grid ColumnSpacing="12"
+                      Padding="12,8,12,4"
+                      BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                      BorderThickness="0,0,0,1"
+                      Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="#"
+                               HorizontalAlignment="Right"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="12"/>
+                    <TextBlock Grid.Column="1"
+                               Text="Title"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="12"/>
+                    <TextBlock Grid.Column="2"
+                               Text="Duration"
+                               HorizontalAlignment="Right"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="12"/>
+                </Grid>
+
+                <!-- Track list -->
+                <ListView ItemsSource="{x:Bind ViewModel.TrackListItems, Mode=OneWay}"
+                          ItemTemplateSelector="{StaticResource TrackListTemplateSelector}"
+                          SelectionMode="None"
+                          IsItemClickEnabled="True"
+                          ItemClick="TrackList_ItemClick">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Padding" Value="12,0"/>
+                            <Setter Property="MinHeight" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                </ListView>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Loading indicator -->
+        <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                      Width="40" Height="40"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+    </Grid>
+</Page>

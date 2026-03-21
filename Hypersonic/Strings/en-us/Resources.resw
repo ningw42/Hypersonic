@@ -129,4 +129,10 @@
   <data name="Albums_Error.Title" xml:space="preserve">
     <value>Error loading albums</value>
   </data>
+  <data name="AlbumDetail_Play.Text" xml:space="preserve">
+    <value>Play</value>
+  </data>
+  <data name="AlbumDetail_Error.Title" xml:space="preserve">
+    <value>Error loading album</value>
+  </data>
 </root>

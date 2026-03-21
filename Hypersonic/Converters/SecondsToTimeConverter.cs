@@ -6,15 +6,25 @@ public class SecondsToTimeConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
     {
-        if (value is double seconds)
+        double seconds;
+
+        if (value is double d)
         {
-            var ts = TimeSpan.FromSeconds(Math.Max(0, seconds));
-            return ts.Hours > 0
-                ? ts.ToString(@"h\:mm\:ss")
-                : ts.ToString(@"m\:ss");
+            seconds = d;
+        }
+        else if (value is int i)
+        {
+            seconds = i;
+        }
+        else
+        {
+            return "0:00";
         }
 
-        return "0:00";
+        var ts = TimeSpan.FromSeconds(Math.Max(0, seconds));
+        return ts.Hours > 0
+            ? ts.ToString(@"h\:mm\:ss")
+            : ts.ToString(@"m\:ss");
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
