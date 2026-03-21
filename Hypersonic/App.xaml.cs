@@ -64,8 +64,10 @@ public partial class App : Application
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IFileService, FileService>();
             services.AddSingleton<ISubsonicClientService, SubsonicClientService>();
+            services.AddSingleton<IPlaybackService, PlaybackService>();
 
             // Views and ViewModels
+            services.AddSingleton<PlayerViewModel>();
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<SettingsPage>();
             services.AddTransient<MainViewModel>();
@@ -87,8 +89,9 @@ public partial class App : Application
 
     private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        // TODO: Log and handle exceptions as appropriate.
-        // https://docs.microsoft.com/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.application.unhandledexception.
+        System.Diagnostics.Debug.WriteLine($"UNHANDLED EXCEPTION: {e.Exception}");
+        System.Diagnostics.Debug.WriteLine($"Message: {e.Message}");
+        System.Diagnostics.Debug.WriteLine($"StackTrace: {e.Exception.StackTrace}");
     }
 
     protected async override void OnLaunched(LaunchActivatedEventArgs args)

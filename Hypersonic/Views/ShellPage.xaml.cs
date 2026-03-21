@@ -1,4 +1,4 @@
-﻿using Hypersonic.Contracts.Services;
+using Hypersonic.Contracts.Services;
 using Hypersonic.Helpers;
 using Hypersonic.ViewModels;
 
@@ -11,7 +11,6 @@ using Windows.System;
 
 namespace Hypersonic.Views;
 
-// TODO: Update NavigationViewItem titles and icons in ShellPage.xaml.
 public sealed partial class ShellPage : Page
 {
     public ShellViewModel ViewModel
@@ -19,21 +18,38 @@ public sealed partial class ShellPage : Page
         get;
     }
 
+    public PlayerViewModel Player
+    {
+        get;
+    }
+
     public ShellPage(ShellViewModel viewModel)
     {
         ViewModel = viewModel;
+        Player = App.GetService<PlayerViewModel>();
         InitializeComponent();
 
         ViewModel.NavigationService.Frame = NavigationFrame;
         ViewModel.NavigationViewService.Initialize(NavigationViewControl);
 
-        // TODO: Set the title bar icon by updating /Assets/WindowIcon.ico.
-        // A custom title bar is required for full window theme and Mica support.
-        // https://docs.microsoft.com/windows/apps/develop/title-bar?tabs=winui3#full-customization
         App.MainWindow.ExtendsContentIntoTitleBar = true;
         App.MainWindow.SetTitleBar(AppTitleBar);
         App.MainWindow.Activated += MainWindow_Activated;
         AppTitleBarText.Text = "AppDisplayName".GetLocalized();
+
+        Player.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(Player.IsPlaying))
+            {
+                PlayPauseIcon.Glyph = Player.IsPlaying ? "\uE769" : "\uE768";
+            }
+            else if (e.PropertyName == nameof(Player.CoverArtUrl))
+            {
+                PlayerCoverArt.Source = !string.IsNullOrEmpty(Player.CoverArtUrl)
+                    ? new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Player.CoverArtUrl))
+                    : null;
+            }
+        };
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -58,6 +74,14 @@ public sealed partial class ShellPage : Page
             Right = AppTitleBar.Margin.Right,
             Bottom = AppTitleBar.Margin.Bottom
         };
+    }
+
+    private void PositionSlider_ManipulationCompleted(object sender, ManipulationCompletedRoutedEventArgs e)
+    {
+        if (sender is Slider slider)
+        {
+            Player.OnPositionSliderChanged(slider.Value);
+        }
     }
 
     private static KeyboardAccelerator BuildKeyboardAccelerator(VirtualKey key, VirtualKeyModifiers? modifiers = null)

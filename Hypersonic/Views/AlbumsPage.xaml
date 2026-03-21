@@ -53,7 +53,8 @@
                   IncrementalLoadingTrigger="Edge"
                   DataFetchSize="2"
                   SelectionMode="None"
-                  IsItemClickEnabled="False">
+                  IsItemClickEnabled="True"
+                  ItemClick="AlbumsGrid_ItemClick">
             <GridView.ItemTemplate>
                 <DataTemplate>
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -80,7 +81,7 @@
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
                                 <!-- Actual cover art -->
-                                <Image Source="{Binding CoverArtUri}"
+                                <Image Source="{Binding CoverArtUrl}"
                                        Stretch="UniformToFill"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"/>
