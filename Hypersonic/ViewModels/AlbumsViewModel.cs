@@ -1,94 +1,92 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+
+using Hypersonic.Collections;
+using Hypersonic.Contracts.Services;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Models;
-using System.Collections.ObjectModel;
 
 namespace Hypersonic.ViewModels;
 
 public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
 {
+    private const int PageSize = 50;
+
+    private readonly ISubsonicClientService _subsonicClientService;
+    private int _offset;
+
     [ObservableProperty]
     private bool isLoading;
 
     [ObservableProperty]
     private string? errorMessage;
 
-    public ObservableCollection<AlbumInfo> Albums { get; } = new();
+    [ObservableProperty]
+    private int selectedSortIndex;
 
-    public AlbumsViewModel()
+    public IncrementalAlbumCollection Albums { get; }
+
+    public List<string> SortOptions { get; } =
+    [
+        "Added Date",
+        "Release Date",
+        "Name",
+        "Album Artist",
+    ];
+
+    public AlbumsViewModel(ISubsonicClientService subsonicClientService)
     {
-        // Load sample data on initialization
-        LoadSampleData();
-    }
-
-    private void LoadSampleData()
-    {
-        Albums.Clear();
-        
-        var sampleAlbums = new[]
-        {
-            new AlbumInfo { Id = "1", Name = "Dark Side of the Moon", Artist = "Pink Floyd", Year = 1973, SongCount = 9 },
-            new AlbumInfo { Id = "2", Name = "Abbey Road", Artist = "The Beatles", Year = 1969, SongCount = 17 },
-            new AlbumInfo { Id = "3", Name = "Random Access Memories", Artist = "Daft Punk", Year = 2013, SongCount = 13 },
-            new AlbumInfo { Id = "4", Name = "OK Computer", Artist = "Radiohead", Year = 1997, SongCount = 12 },
-            new AlbumInfo { Id = "5", Name = "The Wall", Artist = "Pink Floyd", Year = 1979, SongCount = 26 },
-            new AlbumInfo { Id = "6", Name = "Rumours", Artist = "Fleetwood Mac", Year = 1977, SongCount = 11 },
-            new AlbumInfo { Id = "7", Name = "Thriller", Artist = "Michael Jackson", Year = 1982, SongCount = 9 },
-            new AlbumInfo { Id = "8", Name = "The Joshua Tree", Artist = "U2", Year = 1987, SongCount = 11 },
-            new AlbumInfo { Id = "9", Name = "Back in Black", Artist = "AC/DC", Year = 1980, SongCount = 10 },
-            new AlbumInfo { Id = "10", Name = "Hotel California", Artist = "Eagles", Year = 1976, SongCount = 9 },
-            new AlbumInfo { Id = "11", Name = "Led Zeppelin IV", Artist = "Led Zeppelin", Year = 1971, SongCount = 8 },
-            new AlbumInfo { Id = "12", Name = "Nevermind", Artist = "Nirvana", Year = 1991, SongCount = 12 }
-        };
-
-        foreach (var album in sampleAlbums)
-        {
-            Albums.Add(album);
-        }
+        _subsonicClientService = subsonicClientService;
+        Albums = new IncrementalAlbumCollection(LoadMoreAlbumsAsync);
     }
 
     public async void OnNavigatedTo(object parameter)
     {
-        await LoadAlbumsAsync();
+        if (Albums.Count == 0)
+        {
+            await LoadAlbumsAsync(reset: true);
+        }
     }
 
     public void OnNavigatedFrom()
     {
-        // Clean up if needed
+    }
+
+    partial void OnSelectedSortIndexChanged(int value)
+    {
+        _ = LoadAlbumsAsync(reset: true);
     }
 
     [RelayCommand]
-    private async Task LoadAlbumsAsync()
+    private async Task RefreshAsync()
     {
+        await LoadAlbumsAsync(reset: true);
+    }
+
+    private async Task LoadAlbumsAsync(bool reset)
+    {
+        if (reset)
+        {
+            _offset = 0;
+            Albums.Clear();
+            Albums.ResetHasMore();
+        }
+
+        IsLoading = true;
+        ErrorMessage = null;
+
         try
         {
-            IsLoading = true;
-            ErrorMessage = null;
-            
-            // Simulate loading delay
-            await Task.Delay(1000);
-            
-            // For now, just reload sample data
-            // TODO: Replace with actual SubsonicClient call
-            // var response = await _subsonicClient.GetAlbumList2Async("newest", 50);
-            // Albums.Clear();
-            // foreach (var album in response.AlbumList2.Album)
-            // {
-            //     Albums.Add(new AlbumInfo 
-            //     { 
-            //         Id = album.Id, 
-            //         Name = album.Name, 
-            //         Artist = album.Artist, 
-            //         Year = album.Year ?? 0 
-            //     });
-            // }
-            
-            LoadSampleData();
+            var items = await LoadMoreAlbumsAsync(PageSize);
+
+            foreach (var item in items)
+            {
+                Albums.Add(item);
+            }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load albums: {ex.Message}";
+            ErrorMessage = ex.Message;
         }
         finally
         {
@@ -96,19 +94,60 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
         }
     }
 
-    [RelayCommand]
-    private async Task RefreshAsync()
+    private async Task<IList<AlbumInfo>> LoadMoreAlbumsAsync(uint count)
     {
-        await LoadAlbumsAsync();
+        var client = _subsonicClientService.Client;
+        if (client == null)
+        {
+            return [];
+        }
+
+        var (type, fromYear, toYear) = GetSortParameters();
+
+        var response = await client.GetAlbumList2Async(
+            type,
+            size: (int)count,
+            offset: _offset,
+            fromYear: fromYear,
+            toYear: toYear);
+
+        var albums = response.AlbumList2?.Album;
+        if (albums == null || albums.Length == 0)
+        {
+            return [];
+        }
+
+        _offset += albums.Length;
+
+        var result = new List<AlbumInfo>(albums.Length);
+        foreach (var album in albums)
+        {
+            result.Add(new AlbumInfo
+            {
+                Id = album.Id,
+                Name = album.Name,
+                Artist = album.Artist,
+                Year = album.Year,
+                CoverArt = album.CoverArt,
+                CoverArtUri = !string.IsNullOrEmpty(album.CoverArt)
+                    ? client.GetCoverArtUri(album.CoverArt, "300")
+                    : null,
+                SongCount = album.SongCount,
+                Duration = TimeSpan.FromSeconds(album.Duration),
+            });
+        }
+
+        return result;
     }
 
-    [RelayCommand]
-    private void SelectAlbum(AlbumInfo? album)
+    private (string type, int? fromYear, int? toYear) GetSortParameters()
     {
-        if (album != null)
+        return SelectedSortIndex switch
         {
-            // TODO: Navigate to album details or play album
-            // This would typically navigate to an album details page
-        }
+            1 => ("byYear", 9999, 0),           // Release Date desc
+            2 => ("alphabeticalByName", null, null),
+            3 => ("alphabeticalByArtist", null, null),
+            _ => ("newest", null, null),          // Added Date desc (default)
+        };
     }
 }

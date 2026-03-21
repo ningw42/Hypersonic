@@ -7,6 +7,7 @@ public class AlbumInfo
     public string Artist { get; set; } = string.Empty;
     public int Year { get; set; }
     public string? CoverArt { get; set; }
+    public Uri? CoverArtUri { get; set; }
     public int? SongCount { get; set; }
     public TimeSpan? Duration { get; set; }
 }
