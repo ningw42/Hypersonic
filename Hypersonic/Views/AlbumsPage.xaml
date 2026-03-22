@@ -4,8 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:behaviors="using:Hypersonic.Behaviors"
     mc:Ignorable="d"
-    NavigationCacheMode="Required">
+    NavigationCacheMode="Required"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -30,13 +32,18 @@
             <ComboBox Grid.Column="1"
                       ItemsSource="{x:Bind ViewModel.SortOptions}"
                       SelectedIndex="{x:Bind ViewModel.SelectedSortIndex, Mode=TwoWay}"
+                      VerticalAlignment="Center"
                       Margin="0,0,8,0"
                       MinWidth="150"/>
 
             <Button Grid.Column="2"
-                    x:Uid="Albums_Refresh"
-                    Command="{x:Bind ViewModel.RefreshCommand}"
-                    Style="{StaticResource AccentButtonStyle}"/>
+                    Command="{x:Bind ViewModel.ToggleSortOrderCommand}"
+                    IsEnabled="{x:Bind ViewModel.IsSortOrderSupported, Mode=OneWay}"
+                    VerticalAlignment="Center"
+                    Width="32" Height="32" Padding="0"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.SortOrderTooltip, Mode=OneWay}">
+                <FontIcon Glyph="{x:Bind ViewModel.SortOrderGlyph, Mode=OneWay}" FontSize="16"/>
+            </Button>
         </Grid>
 
         <!-- Error message -->

@@ -22,7 +22,23 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
     private string? errorMessage;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSortOrderSupported))]
+    [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
     private int selectedSortIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SortOrderGlyph))]
+    [NotifyPropertyChangedFor(nameof(IsSortOrderSupported))]
+    [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
+    private bool isSortDescending = true;
+
+    public string SortOrderGlyph => IsSortDescending ? "\uE74B" : "\uE74A";
+
+    public bool IsSortOrderSupported => SelectedSortIndex == 1; // Only Release Date supports both orders
+
+    public string SortOrderTooltip => IsSortOrderSupported
+        ? (IsSortDescending ? "Sort descending" : "Sort ascending")
+        : "Sort order not supported for this sort type";
 
     public IncrementalAlbumCollection Albums { get; }
 
@@ -57,10 +73,15 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
         _ = LoadAlbumsAsync(reset: true);
     }
 
-    [RelayCommand]
-    private async Task RefreshAsync()
+    partial void OnIsSortDescendingChanged(bool value)
     {
-        await LoadAlbumsAsync(reset: true);
+        _ = LoadAlbumsAsync(reset: true);
+    }
+
+    [RelayCommand]
+    private void ToggleSortOrder()
+    {
+        IsSortDescending = !IsSortDescending;
     }
 
     private async Task LoadAlbumsAsync(bool reset)
@@ -144,10 +165,12 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
     {
         return SelectedSortIndex switch
         {
-            1 => ("byYear", 9999, 0),           // Release Date desc
+            1 => IsSortDescending
+                ? ("byYear", 9999, 0)
+                : ("byYear", 0, 9999),
             2 => ("alphabeticalByName", null, null),
             3 => ("alphabeticalByArtist", null, null),
-            _ => ("newest", null, null),          // Added Date desc (default)
+            _ => ("newest", null, null),
         };
     }
 }
