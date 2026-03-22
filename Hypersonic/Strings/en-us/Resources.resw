@@ -126,6 +126,9 @@
   <data name="Shell_Artists.Content" xml:space="preserve">
     <value>Artists</value>
   </data>
+  <data name="Shell_Playlists.Content" xml:space="preserve">
+    <value>Playlists</value>
+  </data>
   <data name="Artists_Title.Text" xml:space="preserve">
     <value>Artists</value>
   </data>
@@ -152,5 +155,17 @@
   </data>
   <data name="ArtistDetail_SimilarArtists.Text" xml:space="preserve">
     <value>Similar Artists</value>
+  </data>
+  <data name="Playlists_Title.Text" xml:space="preserve">
+    <value>Playlists</value>
+  </data>
+  <data name="Playlists_Error.Title" xml:space="preserve">
+    <value>Error loading playlists</value>
+  </data>
+  <data name="PlaylistDetail_Play.Text" xml:space="preserve">
+    <value>Play</value>
+  </data>
+  <data name="PlaylistDetail_Error.Title" xml:space="preserve">
+    <value>Error loading playlist</value>
   </data>
 </root>

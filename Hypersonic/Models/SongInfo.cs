@@ -7,6 +7,7 @@ public partial class SongInfo : ObservableObject
     // Displayed in track list
     public string Id { get; set; } = string.Empty;
     public int TrackNumber { get; set; }
+    public int PositionNumber { get; set; }
     public string Title { get; set; } = string.Empty;
     public int Duration { get; set; }
     public int DiscNumber { get; set; }

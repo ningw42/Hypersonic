@@ -64,6 +64,11 @@
                             <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE77B;"/>
                         </NavigationViewItem.Icon>
                     </NavigationViewItem>
+                    <NavigationViewItem x:Uid="Shell_Playlists" helpers:NavigationHelper.NavigateTo="Hypersonic.ViewModels.PlaylistsViewModel">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8FD;"/>
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
                 </NavigationView.MenuItems>
                 <NavigationView.HeaderTemplate>
                     <DataTemplate>

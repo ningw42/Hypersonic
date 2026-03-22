@@ -1,0 +1,252 @@
+<Page
+    x:Class="Hypersonic.Views.PlaylistDetailPage"
+    x:Name="PageRoot"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:Hypersonic.Models"
+    xmlns:behaviors="using:Hypersonic.Behaviors"
+    mc:Ignorable="d"
+    behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Padding="0,0,0,24">
+
+                <!-- Playlist header -->
+                <Grid Margin="0,0,0,24" ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Cover art -->
+                    <Grid Grid.Column="0"
+                          Width="200" Height="200"
+                          CornerRadius="8">
+                        <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
+                        <FontIcon Glyph="&#xE8D6;"
+                                  FontSize="48"
+                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                        <Image Source="{Binding ViewModel.CoverArtUrl, ElementName=PageRoot}"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Metadata -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                        <TextBlock Text="{x:Bind ViewModel.PlaylistName, Mode=OneWay}"
+                                   Style="{StaticResource HeaderTextBlockStyle}"
+                                   FontWeight="Bold"
+                                   TextWrapping="WrapWholeWords"
+                                   MaxLines="2"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run Text="by"/>
+                            <Run Text="{x:Bind ViewModel.Owner, Mode=OneWay}"/>
+                        </TextBlock>
+
+                        <TextBlock Text="{x:Bind ViewModel.Comment, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="WrapWholeWords"
+                                   MaxLines="2"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{x:Bind ViewModel.IsCommentVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Foreground="{ThemeResource TextFillColorTertiaryBrush}">
+                                <Run Text="{x:Bind ViewModel.SongCount, Mode=OneWay}"/>
+                                <Run Text="songs"/>
+                            </TextBlock>
+                            <TextBlock Text="·"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                            <TextBlock Text="{x:Bind ViewModel.TotalDuration, Mode=OneWay}"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                        </StackPanel>
+
+                        <Button Command="{x:Bind ViewModel.PlayPlaylistCommand}"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Margin="0,8,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE768;" FontSize="16"/>
+                                <TextBlock x:Uid="PlaylistDetail_Play"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Error message -->
+                <InfoBar IsOpen="{x:Bind ViewModel.ErrorMessage, Mode=OneWay, Converter={StaticResource StringToBoolConverter}}"
+                         Severity="Error"
+                         x:Uid="PlaylistDetail_Error"
+                         Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                         Margin="0,0,0,8"/>
+
+                <!-- Track list column headers -->
+                <Grid ColumnSpacing="12"
+                      Padding="12,8,12,4"
+                      BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                      BorderThickness="0,0,0,1"
+                      Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="36"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="#"
+                               HorizontalAlignment="Right"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="1"
+                               Text="Title"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="2"
+                               Text="Duration"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="3"
+                               Text="Codec"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="4"
+                               Text="Bitrate"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="5"
+                               Text="Plays"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="6"
+                               Text="BPM"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <FontIcon Grid.Column="7"
+                              Glyph="&#xEB51;"
+                              FontSize="12"
+                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                              HorizontalAlignment="Center"/>
+                </Grid>
+
+                <!-- Track list -->
+                <ListView ItemsSource="{x:Bind ViewModel.TrackListItems, Mode=OneWay}"
+                          SelectionMode="None"
+                          IsItemClickEnabled="True"
+                          ItemClick="TrackList_ItemClick">
+                    <ListView.ItemContainerTransitions>
+                        <TransitionCollection>
+                            <RepositionThemeTransition/>
+                        </TransitionCollection>
+                    </ListView.ItemContainerTransitions>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Padding" Value="12,2"/>
+                            <Setter Property="MinHeight" Value="36"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:SongInfo">
+                            <Grid ColumnSpacing="12" Padding="0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="60"/>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="60"/>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="36"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Position # -->
+                                <TextBlock Grid.Column="0"
+                                           Text="{x:Bind PositionNumber}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                <!-- Title -->
+                                <TextBlock Grid.Column="1"
+                                           Text="{x:Bind Title}"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxLines="1"
+                                           VerticalAlignment="Center"
+                                           ToolTipService.ToolTip="{x:Bind Title}"/>
+
+                                <!-- Duration -->
+                                <TextBlock Grid.Column="2"
+                                           Text="{x:Bind Duration, Converter={StaticResource SecondsToTimeConverter}}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                <!-- Codec -->
+                                <TextBlock Grid.Column="3"
+                                           Text="{x:Bind Suffix}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                <!-- Bitrate -->
+                                <TextBlock Grid.Column="4"
+                                           Text="{x:Bind BitRateDisplay}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                <!-- Play count -->
+                                <TextBlock Grid.Column="5"
+                                           Text="{x:Bind PlayCount}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                <!-- BPM -->
+                                <TextBlock Grid.Column="6"
+                                           Text="{x:Bind BPMDisplay}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                <!-- Favorite -->
+                                <ToggleButton Grid.Column="7"
+                                              IsChecked="{x:Bind IsStarred, Mode=OneWay}"
+                                              Padding="0"
+                                              Width="32" Height="32"
+                                              VerticalAlignment="Center"
+                                              BorderThickness="0"
+                                              Background="Transparent"
+                                              Style="{StaticResource FavoriteToggleButtonStyle}"
+                                              Command="{Binding ViewModel.ToggleStarCommand, ElementName=PageRoot}"
+                                              CommandParameter="{x:Bind}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Loading indicator -->
+        <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                      Width="40" Height="40"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+    </Grid>
+</Page>
