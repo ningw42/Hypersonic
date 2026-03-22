@@ -64,7 +64,7 @@
 	<data name="AppDescription" xml:space="preserve">
 		<value>Hypersonic</value>
   	</data>  <data name="Shell_Main.Content" xml:space="preserve">
-    <value>Main</value>
+    <value>Home</value>
   </data>
   <data name="Shell_Albums.Content" xml:space="preserve">
     <value>Albums</value>

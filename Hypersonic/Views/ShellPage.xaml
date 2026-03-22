@@ -44,13 +44,14 @@
                 IsBackEnabled="{x:Bind ViewModel.IsBackEnabled, Mode=OneWay}"
                 SelectedItem="{x:Bind ViewModel.Selected, Mode=OneWay}"
                 IsSettingsVisible="True"
+                IsPaneOpen="False"
                 ExpandedModeThresholdWidth="1280"
                 DisplayModeChanged="NavigationViewControl_DisplayModeChanged"
                 Header="{x:Bind ((ContentControl)ViewModel.Selected).Content, Mode=OneWay}">
                 <NavigationView.MenuItems>
                     <NavigationViewItem x:Uid="Shell_Main" helpers:NavigationHelper.NavigateTo="Hypersonic.ViewModels.MainViewModel">
                         <NavigationViewItem.Icon>
-                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE7C3;"/>
+                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE80F;"/>
                         </NavigationViewItem.Icon>
                     </NavigationViewItem>
                     <NavigationViewItem x:Uid="Shell_Albums" helpers:NavigationHelper.NavigateTo="Hypersonic.ViewModels.AlbumsViewModel">
