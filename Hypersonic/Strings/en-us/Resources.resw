@@ -144,4 +144,13 @@
   <data name="AlbumDetail_Error.Title" xml:space="preserve">
     <value>Error loading album</value>
   </data>
+  <data name="ArtistDetail_Error.Title" xml:space="preserve">
+    <value>Error loading artist</value>
+  </data>
+  <data name="ArtistDetail_Discography.Text" xml:space="preserve">
+    <value>Discography</value>
+  </data>
+  <data name="ArtistDetail_SimilarArtists.Text" xml:space="preserve">
+    <value>Similar Artists</value>
+  </data>
 </root>

@@ -29,6 +29,15 @@ public sealed partial class AlbumsPage : Page
         }
     }
 
+    private void ArtistLink_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is HyperlinkButton link && link.DataContext is AlbumInfo album && !string.IsNullOrEmpty(album.ArtistId))
+        {
+            var navigationService = App.GetService<INavigationService>();
+            navigationService.NavigateTo(typeof(ArtistDetailViewModel).FullName!, album.ArtistId);
+        }
+    }
+
     private async void AlbumsScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
     {
         if (e.IsIntermediate)

@@ -139,16 +139,36 @@
                     <!-- Metadata -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                         <TextBlock Text="{x:Bind ViewModel.AlbumName, Mode=OneWay}"
-                                   Style="{StaticResource TitleTextBlockStyle}"
+                                   Style="{StaticResource HeaderTextBlockStyle}"
+                                   FontWeight="Bold"
                                    TextWrapping="WrapWholeWords"
                                    MaxLines="2"
                                    TextTrimming="CharacterEllipsis"/>
 
-                        <TextBlock Text="{x:Bind ViewModel.AlbumArtist, Mode=OneWay}"
-                                   Style="{StaticResource SubtitleTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                   TextTrimming="CharacterEllipsis"
-                                   MaxLines="1"/>
+                        <HyperlinkButton Command="{x:Bind ViewModel.NavigateToArtistCommand}"
+                                         Padding="0" Margin="0">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Grid Width="28" Height="28" CornerRadius="14">
+                                    <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                               RadiusX="14" RadiusY="14"/>
+                                    <FontIcon Glyph="&#xE77B;"
+                                              FontSize="12"
+                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                                    <Image Source="{Binding ViewModel.AlbumArtistImageUrl, ElementName=PageRoot}"
+                                           Stretch="UniformToFill"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock Text="{x:Bind ViewModel.AlbumArtist, Mode=OneWay}"
+                                           Style="{StaticResource SubtitleTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxLines="1"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </HyperlinkButton>
 
                         <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    Text="{x:Bind ViewModel.ReleaseDateGenre, Mode=OneWay}"/>

@@ -13,6 +13,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly IPlaybackService _playbackService;
+    private readonly INavigationService _navigationService;
     private List<SongInfo> _allSongs = [];
 
     [ObservableProperty]
@@ -20,6 +21,12 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     [ObservableProperty]
     private string albumArtist = string.Empty;
+
+    [ObservableProperty]
+    private string? albumArtistId;
+
+    [ObservableProperty]
+    private string? albumArtistImageUrl;
 
     [ObservableProperty]
     private string? coverArtUrl;
@@ -61,10 +68,11 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     public ObservableCollection<object> TrackListItems { get; } = [];
 
-    public AlbumDetailViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService)
+    public AlbumDetailViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService, INavigationService navigationService)
     {
         _subsonicClientService = subsonicClientService;
         _playbackService = playbackService;
+        _navigationService = navigationService;
     }
 
     public async void OnNavigatedTo(object parameter)
@@ -102,11 +110,18 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
             AlbumName = album.Name ?? string.Empty;
             AlbumArtist = album.DisplayArtist ?? album.Artist ?? string.Empty;
+            AlbumArtistId = album.ArtistId;
             Genre = album.Genre;
             SongCount = album.SongCount;
             CoverArtUrl = !string.IsNullOrEmpty(album.CoverArt)
                 ? client.GetCoverArtUri(album.CoverArt, "600").ToString()
                 : null;
+
+            // Load artist image in background (best-effort)
+            if (!string.IsNullOrEmpty(album.ArtistId))
+            {
+                _ = LoadArtistImageAsync(client, album.ArtistId);
+            }
 
             ReleaseDate = FormatReleaseDate(album.ReleaseDate, album.OriginalReleaseDate, album.Year);
             TotalDuration = FormatDuration(album.Duration);
@@ -243,6 +258,36 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
         catch
         {
             song.IsStarred = wasStarred;
+        }
+    }
+
+    [RelayCommand]
+    private void NavigateToArtist()
+    {
+        if (!string.IsNullOrEmpty(AlbumArtistId))
+        {
+            _navigationService.NavigateTo(typeof(ArtistDetailViewModel).FullName!, AlbumArtistId);
+        }
+    }
+
+    private async Task LoadArtistImageAsync(Client.ISubsonicClient client, string artistId)
+    {
+        try
+        {
+            var response = await client.GetArtistAsync(artistId);
+            var artist = response.Artist;
+            if (artist != null)
+            {
+                AlbumArtistImageUrl = !string.IsNullOrEmpty(artist.ArtistImageUrl)
+                    ? artist.ArtistImageUrl
+                    : !string.IsNullOrEmpty(artist.CoverArt)
+                        ? client.GetCoverArtUri(artist.CoverArt, "100").ToString()
+                        : null;
+            }
+        }
+        catch
+        {
+            // Best-effort; artist image is non-critical
         }
     }
 

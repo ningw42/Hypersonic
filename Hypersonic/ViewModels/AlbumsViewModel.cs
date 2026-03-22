@@ -148,6 +148,7 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
                 Id = album.Id,
                 Name = album.Name,
                 Artist = album.Artist,
+                ArtistId = album.ArtistId,
                 Year = album.Year,
                 CoverArt = album.CoverArt,
                 CoverArtUrl = !string.IsNullOrEmpty(album.CoverArt)

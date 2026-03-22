@@ -1,3 +1,5 @@
+using Hypersonic.Contracts.Services;
+using Hypersonic.Models;
 using Hypersonic.ViewModels;
 
 using Microsoft.UI.Xaml;
@@ -17,6 +19,10 @@ public sealed partial class ArtistsPage : Page
 
     private void ArtistCard_Click(object sender, RoutedEventArgs e)
     {
-        // Future: navigate to ArtistDetailPage
+        if (sender is Button button && button.DataContext is ArtistInfo artist)
+        {
+            var navigationService = App.GetService<INavigationService>();
+            navigationService.NavigateTo(typeof(ArtistDetailViewModel).FullName!, artist.Id);
+        }
     }
 }
