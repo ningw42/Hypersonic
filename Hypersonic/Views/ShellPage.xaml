@@ -6,8 +6,13 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:helpers="using:Hypersonic.Helpers"
     xmlns:behaviors="using:Hypersonic.Behaviors"
+    xmlns:converters="using:Hypersonic.Converters"
     xmlns:i="using:Microsoft.Xaml.Interactivity"
     Loaded="OnLoaded">
+
+    <Page.Resources>
+        <converters:SecondsToTimeConverter x:Key="SecondsToTimeConverter"/>
+    </Page.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -89,8 +94,7 @@
               BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
               BorderThickness="0,1,0,0"
               Padding="16,8"
-              x:Name="PlayerBar"
-              x:Load="{x:Bind Player.HasTrack, Mode=OneWay}">
+              x:Name="PlayerBar">
             <Grid Height="64">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -152,7 +156,8 @@
 
                     <Slider Grid.Column="4" Minimum="0"
                             Maximum="{x:Bind Player.Duration, Mode=OneWay}"
-                            Value="{x:Bind Player.Position, Mode=OneWay}"
+                            Value="{x:Bind Player.Position, Mode=TwoWay}"
+                            ThumbToolTipValueConverter="{StaticResource SecondsToTimeConverter}"
                             VerticalAlignment="Center"/>
 
                     <TextBlock Grid.Column="5" Text="{x:Bind Player.DurationText, Mode=OneWay}"
@@ -162,8 +167,12 @@
 
                 <!-- Volume -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4" Margin="16,0,0,0">
-                    <FontIcon Glyph="&#xE767;" FontSize="14"
-                              Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    <Button Command="{x:Bind Player.ToggleMuteCommand}"
+                            Width="32" Height="32" Padding="0"
+                            Background="Transparent" BorderThickness="0" VerticalAlignment="Center">
+                        <FontIcon Glyph="{x:Bind Player.VolumeGlyph, Mode=OneWay}" FontSize="14"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </Button>
                     <Slider Width="100" Minimum="0" Maximum="100" StepFrequency="1"
                             Value="{x:Bind Player.VolumePercent, Mode=TwoWay}" VerticalAlignment="Center"/>
                 </StackPanel>

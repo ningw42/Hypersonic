@@ -48,7 +48,14 @@ public partial class PlayerViewModel : ObservableRecipient
     [ObservableProperty]
     private string durationText = "0:00";
 
-    private bool _isSeeking;
+    [ObservableProperty]
+    private bool isMuted;
+
+    [ObservableProperty]
+    private string volumeGlyph = "\uE767";
+
+    private bool _isExternalUpdate;
+    private double _volumeBeforeMute = 100;
 
     public PlayerViewModel(IPlaybackService playbackService)
     {
@@ -89,16 +96,49 @@ public partial class PlayerViewModel : ObservableRecipient
         _playbackService.PreviousTrack();
     }
 
-    public void OnPositionSliderChanged(double newPosition)
+    [RelayCommand]
+    private void ToggleMute()
     {
-        _isSeeking = true;
-        _playbackService.Seek(newPosition);
-        _isSeeking = false;
+        if (IsMuted)
+        {
+            VolumePercent = _volumeBeforeMute;
+            IsMuted = false;
+        }
+        else
+        {
+            _volumeBeforeMute = VolumePercent;
+            VolumePercent = 0;
+            IsMuted = true;
+        }
+    }
+
+    partial void OnPositionChanged(double value)
+    {
+        if (!_isExternalUpdate)
+        {
+            _playbackService.Seek(value);
+        }
     }
 
     partial void OnVolumePercentChanged(double value)
     {
         _playbackService.Volume = value / 100.0;
+        UpdateVolumeGlyph();
+        if (value > 0 && IsMuted)
+        {
+            IsMuted = false;
+        }
+    }
+
+    private void UpdateVolumeGlyph()
+    {
+        VolumeGlyph = VolumePercent switch
+        {
+            0 => "\uE74F",    // Mute
+            < 34 => "\uE993",  // Volume0
+            < 67 => "\uE994",  // Volume1
+            _ => "\uE767"      // Volume3
+        };
     }
 
     private void OnPlaybackStateChanged(object? sender, EventArgs e)
@@ -121,7 +161,9 @@ public partial class PlayerViewModel : ObservableRecipient
         CoverArtUrl = track?.CoverArtUri?.ToString();
         Duration = track?.Duration ?? 0;
         DurationText = FormatTime(track?.Duration ?? 0);
+        _isExternalUpdate = true;
         Position = 0;
+        _isExternalUpdate = false;
         PositionText = "0:00";
         HasNext = _playbackService.HasNext;
         HasPrevious = _playbackService.HasPrevious;
@@ -129,11 +171,10 @@ public partial class PlayerViewModel : ObservableRecipient
 
     private void OnPositionChanged(object? sender, EventArgs e)
     {
-        if (!_isSeeking)
-        {
-            Position = _playbackService.Position;
-            PositionText = FormatTime(_playbackService.Position);
-        }
+        _isExternalUpdate = true;
+        Position = _playbackService.Position;
+        _isExternalUpdate = false;
+        PositionText = FormatTime(_playbackService.Position);
     }
 
     private static string FormatTime(double totalSeconds)

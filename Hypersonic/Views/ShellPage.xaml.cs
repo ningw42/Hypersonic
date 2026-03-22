@@ -76,14 +76,6 @@ public sealed partial class ShellPage : Page
         };
     }
 
-    private void PositionSlider_ManipulationCompleted(object sender, ManipulationCompletedRoutedEventArgs e)
-    {
-        if (sender is Slider slider)
-        {
-            Player.OnPositionSliderChanged(slider.Value);
-        }
-    }
-
     private static KeyboardAccelerator BuildKeyboardAccelerator(VirtualKey key, VirtualKeyModifiers? modifiers = null)
     {
         var keyboardAccelerator = new KeyboardAccelerator() { Key = key };
