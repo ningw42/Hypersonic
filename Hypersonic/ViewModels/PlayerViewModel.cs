@@ -8,6 +8,7 @@ namespace Hypersonic.ViewModels;
 public partial class PlayerViewModel : ObservableRecipient
 {
     private readonly IPlaybackService _playbackService;
+    private readonly INavigationService _navigationService;
 
     [ObservableProperty]
     private string trackTitle = string.Empty;
@@ -17,6 +18,12 @@ public partial class PlayerViewModel : ObservableRecipient
 
     [ObservableProperty]
     private string albumName = string.Empty;
+
+    [ObservableProperty]
+    private string? artistId;
+
+    [ObservableProperty]
+    private string? albumId;
 
     [ObservableProperty]
     private string? coverArtUrl;
@@ -57,9 +64,10 @@ public partial class PlayerViewModel : ObservableRecipient
     private bool _isExternalUpdate;
     private double _volumeBeforeMute = 100;
 
-    public PlayerViewModel(IPlaybackService playbackService)
+    public PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService)
     {
         _playbackService = playbackService;
+        _navigationService = navigationService;
         _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
         _playbackService.TrackChanged += OnTrackChanged;
         _playbackService.PositionChanged += OnPositionChanged;
@@ -112,6 +120,24 @@ public partial class PlayerViewModel : ObservableRecipient
         }
     }
 
+    [RelayCommand]
+    private void NavigateToArtist()
+    {
+        if (!string.IsNullOrEmpty(ArtistId))
+        {
+            _navigationService.NavigateTo(typeof(ArtistDetailViewModel).FullName!, ArtistId);
+        }
+    }
+
+    [RelayCommand]
+    private void NavigateToAlbum()
+    {
+        if (!string.IsNullOrEmpty(AlbumId))
+        {
+            _navigationService.NavigateTo(typeof(AlbumDetailViewModel).FullName!, AlbumId);
+        }
+    }
+
     partial void OnPositionChanged(double value)
     {
         if (!_isExternalUpdate)
@@ -158,6 +184,8 @@ public partial class PlayerViewModel : ObservableRecipient
         TrackTitle = track?.Title ?? string.Empty;
         ArtistName = track?.Artist ?? string.Empty;
         AlbumName = track?.Album ?? string.Empty;
+        ArtistId = track?.ArtistId;
+        AlbumId = track?.AlbumId;
         CoverArtUrl = track?.CoverArtUri?.ToString();
         Duration = track?.Duration ?? 0;
         DurationText = FormatTime(track?.Duration ?? 0);
