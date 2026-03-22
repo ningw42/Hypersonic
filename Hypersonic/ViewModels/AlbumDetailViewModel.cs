@@ -133,7 +133,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                         ? $"Disc {discNumber} \u2014 {discTitle}"
                         : $"Disc {discNumber}";
 
-                    TrackListItems.Add(new DiscHeaderItem { Title = headerText });
+                    TrackListItems.Add(new DiscHeaderItem { Title = headerText, DiscNumber = discNumber });
 
                     foreach (var song in _allSongs.Where(s => s.DiscNumber == discNumber))
                     {
@@ -183,6 +183,69 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
         _playbackService.PlayQueue(tracks, index >= 0 ? index : 0);
     }
 
+    [RelayCommand]
+    private void ToggleDiscExpansion(DiscHeaderItem? header)
+    {
+        if (header == null)
+        {
+            return;
+        }
+
+        header.IsExpanded = !header.IsExpanded;
+
+        if (header.IsExpanded)
+        {
+            var headerIndex = TrackListItems.IndexOf(header);
+            var songsForDisc = _allSongs.Where(s => s.DiscNumber == header.DiscNumber).ToList();
+            for (var i = 0; i < songsForDisc.Count; i++)
+            {
+                TrackListItems.Insert(headerIndex + 1 + i, songsForDisc[i]);
+            }
+        }
+        else
+        {
+            var songsToRemove = _allSongs.Where(s => s.DiscNumber == header.DiscNumber).ToList();
+            foreach (var song in songsToRemove)
+            {
+                TrackListItems.Remove(song);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task ToggleStarAsync(SongInfo? song)
+    {
+        if (song == null)
+        {
+            return;
+        }
+
+        var client = _subsonicClientService.Client;
+        if (client == null)
+        {
+            return;
+        }
+
+        var wasStarred = song.IsStarred;
+        song.IsStarred = !wasStarred;
+
+        try
+        {
+            if (wasStarred)
+            {
+                await client.UnstarAsync(id: song.Id);
+            }
+            else
+            {
+                await client.StarAsync(id: song.Id);
+            }
+        }
+        catch
+        {
+            song.IsStarred = wasStarred;
+        }
+    }
+
     private List<PlaybackTrack> BuildPlaybackTracks()
     {
         return _allSongs.Select(s => new PlaybackTrack
@@ -229,6 +292,9 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
             CoverArtUri = !string.IsNullOrEmpty(song.CoverArt)
                 ? client.GetCoverArtUri(song.CoverArt, "300")
                 : null,
+            PlayCount = song.PlayCount,
+            BPM = song.BPM,
+            IsStarred = !string.IsNullOrEmpty(song.Starred),
         };
     }
 

@@ -1,6 +1,8 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Hypersonic.Models;
 
-public class SongInfo
+public partial class SongInfo : ObservableObject
 {
     // Displayed in track list
     public string Id { get; set; } = string.Empty;
@@ -27,4 +29,16 @@ public class SongInfo
     public string? DisplayArtist { get; set; }
     public Uri? StreamUri { get; set; }
     public Uri? CoverArtUri { get; set; }
+
+    // Additional metadata columns
+    public long PlayCount { get; set; }
+    public int BPM { get; set; }
+
+    // Observable for UI toggle
+    [ObservableProperty]
+    private bool isStarred;
+
+    // Display helpers for zero-suppression
+    public string BitRateDisplay => BitRate > 0 ? $"{BitRate}" : "";
+    public string BPMDisplay => BPM > 0 ? BPM.ToString() : "";
 }

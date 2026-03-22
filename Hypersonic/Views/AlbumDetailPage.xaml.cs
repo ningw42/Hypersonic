@@ -21,5 +21,9 @@ public sealed partial class AlbumDetailPage : Page
         {
             ViewModel.PlayFromTrackCommand.Execute(song);
         }
+        else if (e.ClickedItem is DiscHeaderItem header)
+        {
+            ViewModel.ToggleDiscExpansionCommand.Execute(header);
+        }
     }
 }

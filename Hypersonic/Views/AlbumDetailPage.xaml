@@ -15,8 +15,19 @@
         <helpers:TrackListTemplateSelector x:Key="TrackListTemplateSelector">
             <helpers:TrackListTemplateSelector.DiscHeaderTemplate>
                 <DataTemplate x:DataType="models:DiscHeaderItem">
-                    <Grid Padding="0,16,0,8">
-                        <TextBlock Text="{x:Bind Title}"
+                    <Grid Padding="0,12,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Grid.Column="0"
+                                  Glyph="{x:Bind IsExpanded, Mode=OneWay, Converter={StaticResource BoolToGlyphConverter}, ConverterParameter='&#xE70D;|&#xE76C;'}"
+                                  FontSize="12"
+                                  Margin="0,0,8,0"
+                                  VerticalAlignment="Center"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{x:Bind Title}"
                                    Style="{StaticResource BodyStrongTextBlockStyle}"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </Grid>
@@ -24,19 +35,26 @@
             </helpers:TrackListTemplateSelector.DiscHeaderTemplate>
             <helpers:TrackListTemplateSelector.TrackTemplate>
                 <DataTemplate x:DataType="models:SongInfo">
-                    <Grid ColumnSpacing="12" Padding="0,2">
+                    <Grid ColumnSpacing="12" Padding="0,6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="40"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="36"/>
                         </Grid.ColumnDefinitions>
 
+                        <!-- Track # -->
                         <TextBlock Grid.Column="0"
                                    Text="{x:Bind TrackNumber}"
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Center"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
+                        <!-- Title -->
                         <TextBlock Grid.Column="1"
                                    Text="{x:Bind Title}"
                                    TextTrimming="CharacterEllipsis"
@@ -44,11 +62,47 @@
                                    VerticalAlignment="Center"
                                    ToolTipService.ToolTip="{x:Bind Title}"/>
 
+                        <!-- Duration -->
                         <TextBlock Grid.Column="2"
                                    Text="{x:Bind Duration, Converter={StaticResource SecondsToTimeConverter}}"
-                                   HorizontalAlignment="Right"
                                    VerticalAlignment="Center"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- Codec -->
+                        <TextBlock Grid.Column="3"
+                                   Text="{x:Bind Suffix}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- Bitrate -->
+                        <TextBlock Grid.Column="4"
+                                   Text="{x:Bind BitRateDisplay}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- Play count -->
+                        <TextBlock Grid.Column="5"
+                                   Text="{x:Bind PlayCount}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- BPM -->
+                        <TextBlock Grid.Column="6"
+                                   Text="{x:Bind BPMDisplay}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- Favorite -->
+                        <ToggleButton Grid.Column="7"
+                                      IsChecked="{x:Bind IsStarred, Mode=OneWay}"
+                                      Padding="0"
+                                      Width="32" Height="32"
+                                      VerticalAlignment="Center"
+                                      BorderThickness="0"
+                                      Background="Transparent"
+                                      Style="{StaticResource FavoriteToggleButtonStyle}"
+                                      Command="{Binding ViewModel.ToggleStarCommand, ElementName=PageRoot}"
+                                      CommandParameter="{x:Bind}"/>
                     </Grid>
                 </DataTemplate>
             </helpers:TrackListTemplateSelector.TrackTemplate>
@@ -138,22 +192,54 @@
                         <ColumnDefinition Width="40"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="36"/>
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Column="0"
                                Text="#"
                                HorizontalAlignment="Right"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                               FontSize="12"/>
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="1"
                                Text="Title"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                               FontSize="12"/>
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="2"
                                Text="Duration"
-                               HorizontalAlignment="Right"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                               FontSize="12"/>
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="3"
+                               Text="Codec"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="4"
+                               Text="Bitrate"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="5"
+                               Text="Plays"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="6"
+                               Text="BPM"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <FontIcon Grid.Column="7"
+                              Glyph="&#xEB51;"
+                              FontSize="12"
+                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                              HorizontalAlignment="Center"/>
                 </Grid>
 
                 <!-- Track list -->
@@ -162,10 +248,15 @@
                           SelectionMode="None"
                           IsItemClickEnabled="True"
                           ItemClick="TrackList_ItemClick">
+                    <ListView.ItemContainerTransitions>
+                        <TransitionCollection>
+                            <RepositionThemeTransition/>
+                        </TransitionCollection>
+                    </ListView.ItemContainerTransitions>
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
-                            <Setter Property="Padding" Value="12,0"/>
-                            <Setter Property="MinHeight" Value="0"/>
+                            <Setter Property="Padding" Value="12,2"/>
+                            <Setter Property="MinHeight" Value="36"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         </Style>
                     </ListView.ItemContainerStyle>
