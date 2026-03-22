@@ -123,6 +123,15 @@
   <data name="Albums_Title.Text" xml:space="preserve">
     <value>Albums</value>
   </data>
+  <data name="Shell_Artists.Content" xml:space="preserve">
+    <value>Artists</value>
+  </data>
+  <data name="Artists_Title.Text" xml:space="preserve">
+    <value>Artists</value>
+  </data>
+  <data name="Artists_Error.Title" xml:space="preserve">
+    <value>Error loading artists</value>
+  </data>
   <data name="Albums_Refresh.Content" xml:space="preserve">
     <value>Refresh</value>
   </data>
