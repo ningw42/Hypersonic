@@ -65,6 +65,7 @@ public partial class App : Application
             services.AddSingleton<IFileService, FileService>();
             services.AddSingleton<ISubsonicClientService, SubsonicClientService>();
             services.AddSingleton<IPlaybackService, PlaybackService>();
+            services.AddSingleton<ITaskbarService, TaskbarService>();
 
             // Views and ViewModels
             services.AddSingleton<PlayerViewModel>();

@@ -73,6 +73,10 @@ public class ActivationService : IActivationService
         // Activate the MainWindow.
         App.MainWindow.Activate();
 
+        // Initialize taskbar integration after window is activated.
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+        App.GetService<ITaskbarService>().Initialize(hwnd);
+
         // Execute tasks after activation.
         await StartupAsync();
     }

@@ -1,4 +1,5 @@
-﻿using Hypersonic.Helpers;
+﻿using Hypersonic.Contracts.Services;
+using Hypersonic.Helpers;
 
 using Windows.UI.ViewManagement;
 
@@ -32,6 +33,7 @@ public sealed partial class MainWindow : WindowEx
         dispatcherQueue.TryEnqueue(() =>
         {
             TitleBarHelper.ApplySystemThemeToCaptionButtons();
+            App.GetService<ITaskbarService>().OnSystemThemeChanged();
         });
     }
 }
