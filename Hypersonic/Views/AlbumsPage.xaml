@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:behaviors="using:Hypersonic.Behaviors"
+    xmlns:controls="using:Hypersonic.Controls"
     mc:Ignorable="d"
     NavigationCacheMode="Required"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
@@ -55,80 +56,103 @@
                  Margin="0,0,0,8"/>
 
         <!-- Albums grid -->
-        <GridView Grid.Row="2"
-                  ItemsSource="{x:Bind ViewModel.Albums, Mode=OneWay}"
-                  IncrementalLoadingTrigger="Edge"
-                  DataFetchSize="2"
-                  SelectionMode="None"
-                  IsItemClickEnabled="True"
-                  ItemClick="AlbumsGrid_ItemClick">
-            <GridView.ItemTemplate>
-                <DataTemplate>
-                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Width="200"
-                            Margin="4">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="200"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="2"
+                      x:Name="AlbumsScrollViewer"
+                      ViewChanged="AlbumsScrollViewer_ViewChanged">
+            <ItemsRepeater ItemsSource="{x:Bind ViewModel.Albums, Mode=OneWay}">
+                <ItemsRepeater.Layout>
+                    <UniformGridLayout MinItemWidth="200"
+                                       MinColumnSpacing="0"
+                                       MinRowSpacing="0"
+                                       ItemsStretch="Fill"
+                                       ItemsJustification="Start"/>
+                </ItemsRepeater.Layout>
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate>
+                        <Button Click="AlbumCard_Click"
+                                Padding="4"
+                                BorderThickness="0"
+                                CornerRadius="12"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch"
+                                Style="{StaticResource SubtleButtonStyle}">
+                            <Button.Resources>
+                                <ResourceDictionary>
+                                    <ResourceDictionary.ThemeDictionaries>
+                                        <ResourceDictionary x:Key="Light">
+                                            <SolidColorBrush x:Key="SubtleButtonBackgroundPointerOver" Color="#1A000000"/>
+                                            <SolidColorBrush x:Key="SubtleButtonBackgroundPressed" Color="#25000000"/>
+                                        </ResourceDictionary>
+                                        <ResourceDictionary x:Key="Dark">
+                                            <SolidColorBrush x:Key="SubtleButtonBackgroundPointerOver" Color="#1AFFFFFF"/>
+                                            <SolidColorBrush x:Key="SubtleButtonBackgroundPressed" Color="#25FFFFFF"/>
+                                        </ResourceDictionary>
+                                    </ResourceDictionary.ThemeDictionaries>
+                                </ResourceDictionary>
+                            </Button.Resources>
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
 
-                            <!-- Album cover art -->
-                            <Grid Grid.Row="0" CornerRadius="8,8,0,0">
-                                <!-- Placeholder -->
-                                <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
-                                <FontIcon Glyph="&#xE8D6;"
-                                          FontSize="48"
-                                          Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
-                                <!-- Actual cover art -->
-                                <Image Source="{Binding CoverArtUrl}"
-                                       Stretch="UniformToFill"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"/>
-                            </Grid>
+                                    <!-- Album cover art (square via SquarePanel) -->
+                                    <controls:SquarePanel Grid.Row="0">
+                                        <Grid CornerRadius="8,8,0,0">
+                                            <!-- Placeholder -->
+                                            <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
+                                            <FontIcon Glyph="&#xE8D6;"
+                                                      FontSize="48"
+                                                      Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                            <!-- Actual cover art -->
+                                            <Image Source="{Binding CoverArtUrl}"
+                                                   Stretch="UniformToFill"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </controls:SquarePanel>
 
-                            <!-- Album name -->
-                            <TextBlock Grid.Row="1"
-                                       Text="{Binding Name}"
-                                       FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis"
-                                       MaxLines="1"
-                                       ToolTipService.ToolTip="{Binding Name}"
-                                       Margin="12,8,12,2"/>
+                                    <!-- Album name -->
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Name}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="1"
+                                               ToolTipService.ToolTip="{Binding Name}"
+                                               Margin="12,8,12,2"/>
 
-                            <!-- Artist name -->
-                            <TextBlock Grid.Row="2"
-                                       Text="{Binding Artist}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       TextTrimming="CharacterEllipsis"
-                                       MaxLines="1"
-                                       ToolTipService.ToolTip="{Binding Artist}"
-                                       Margin="12,0,12,2"/>
+                                    <!-- Artist name -->
+                                    <TextBlock Grid.Row="2"
+                                               Text="{Binding Artist}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="1"
+                                               ToolTipService.ToolTip="{Binding Artist}"
+                                               Margin="12,0,12,2"/>
 
-                            <!-- Year -->
-                            <TextBlock Grid.Row="3"
-                                       Text="{Binding Year}"
-                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                       FontSize="12"
-                                       Margin="12,0,12,12"/>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </GridView.ItemTemplate>
-            <GridView.ItemContainerStyle>
-                <Style TargetType="GridViewItem">
-                    <Setter Property="Margin" Value="4"/>
-                    <Setter Property="Padding" Value="0"/>
-                </Style>
-            </GridView.ItemContainerStyle>
-        </GridView>
+                                    <!-- Year -->
+                                    <TextBlock Grid.Row="3"
+                                               Text="{Binding Year}"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                               FontSize="12"
+                                               Margin="12,0,12,12"/>
+                                </Grid>
+                            </Border>
+                        </Button>
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+            </ItemsRepeater>
+        </ScrollViewer>
 
         <!-- Loading indicator overlay -->
         <ProgressRing Grid.Row="2"

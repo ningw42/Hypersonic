@@ -2,6 +2,7 @@ using Hypersonic.Contracts.Services;
 using Hypersonic.Models;
 using Hypersonic.ViewModels;
 
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Hypersonic.Views;
@@ -19,12 +20,29 @@ public sealed partial class AlbumsPage : Page
         InitializeComponent();
     }
 
-    private void AlbumsGrid_ItemClick(object sender, ItemClickEventArgs e)
+    private void AlbumCard_Click(object sender, RoutedEventArgs e)
     {
-        if (e.ClickedItem is AlbumInfo album)
+        if (sender is Button button && button.DataContext is AlbumInfo album)
         {
             var navigationService = App.GetService<INavigationService>();
             navigationService.NavigateTo(typeof(AlbumDetailViewModel).FullName!, album.Id);
+        }
+    }
+
+    private async void AlbumsScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (e.IsIntermediate)
+        {
+            return;
+        }
+
+        var scrollViewer = (ScrollViewer)sender;
+        var distanceToEnd = scrollViewer.ExtentHeight - (scrollViewer.VerticalOffset + scrollViewer.ViewportHeight);
+
+        if (distanceToEnd <= 2.0 * scrollViewer.ViewportHeight &&
+            ViewModel.Albums.HasMoreItems)
+        {
+            await ViewModel.Albums.LoadMoreItemsAsync(50);
         }
     }
 }
