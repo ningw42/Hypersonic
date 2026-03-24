@@ -15,17 +15,54 @@ public class PlaybackService : IPlaybackService, IDisposable
     private readonly MediaPlayer _mediaPlayer;
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly DispatcherQueueTimer _positionTimer;
-    private List<PlaybackTrack> _queue = [];
-    private int _queueIndex;
+    private readonly PlaybackQueue _playbackQueue = new();
+    private QueueSource? _source;
 
-    public PlaybackTrack? NowPlaying => _queueIndex >= 0 && _queueIndex < _queue.Count ? _queue[_queueIndex] : null;
-    public IReadOnlyList<PlaybackTrack> Queue => _queue;
-    public int QueueIndex => _queueIndex;
+    public PlaybackTrack? NowPlaying => _playbackQueue.CurrentTrack;
+    public IReadOnlyList<PlaybackTrack> Queue => _playbackQueue.Tracks;
+    public int QueueIndex => _playbackQueue.CurrentIndex;
+    public int EffectiveQueueIndex => _playbackQueue.EffectiveIndex;
     public bool IsPlaying { get; private set; }
     public double Position { get; private set; }
     public double Duration { get; private set; }
-    public bool HasNext => _queueIndex < _queue.Count - 1;
-    public bool HasPrevious => _queueIndex > 0;
+    public bool HasNext => _playbackQueue.HasNext;
+    public bool HasPrevious => _playbackQueue.HasPrevious;
+    public QueueSource? Source => _source;
+    public IReadOnlyList<PlaybackTrack> History => _playbackQueue.History;
+
+    public bool ShuffleEnabled
+    {
+        get => _playbackQueue.ShuffleEnabled;
+        set
+        {
+            if (_playbackQueue.ShuffleEnabled == value)
+            {
+                return;
+            }
+
+            _playbackQueue.SetShuffle(value);
+            QueueChanged?.Invoke(this, EventArgs.Empty);
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+            UpdateSmtcState();
+        }
+    }
+
+    public RepeatMode RepeatMode
+    {
+        get => _playbackQueue.RepeatMode;
+        set
+        {
+            if (_playbackQueue.RepeatMode == value)
+            {
+                return; // Idempotent.
+            }
+
+            _playbackQueue.RepeatMode = value;
+            // Always fire PlaybackStateChanged on repeat mode change per design.
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+            UpdateSmtcState();
+        }
+    }
 
     public double Volume
     {
@@ -40,6 +77,7 @@ public class PlaybackService : IPlaybackService, IDisposable
     public event EventHandler? PlaybackStateChanged;
     public event EventHandler? TrackChanged;
     public event EventHandler? PositionChanged;
+    public event EventHandler? QueueChanged;
 
     public PlaybackService()
     {
@@ -69,11 +107,25 @@ public class PlaybackService : IPlaybackService, IDisposable
         smtc.ButtonPressed += OnSmtcButtonPressed;
     }
 
-    public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0)
+    public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null)
     {
-        _queue = new List<PlaybackTrack>(tracks);
-        _queueIndex = startIndex;
-        PlayCurrent();
+        _source = source;
+        _playbackQueue.SetQueue(tracks, startIndex);
+
+        if (NowPlaying?.StreamUri != null)
+        {
+            PlayCurrent();
+        }
+        else
+        {
+            // NowPlaying changed but track can't be played — still notify consumers.
+            Duration = NowPlaying?.Duration ?? 0;
+            Position = 0;
+            TrackChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        QueueChanged?.Invoke(this, EventArgs.Empty);
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         UpdateSmtcState();
     }
 
@@ -95,31 +147,47 @@ public class PlaybackService : IPlaybackService, IDisposable
         _mediaPlayer.Pause();
         _mediaPlayer.Position = TimeSpan.Zero;
         Position = 0;
+        IsPlaying = false;
         PositionChanged?.Invoke(this, EventArgs.Empty);
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         UpdateSmtcState();
     }
 
     public void NextTrack()
     {
-        if (HasNext)
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        var next = _playbackQueue.AdvanceManual();
+        if (next != null)
         {
-            _queueIndex++;
             PlayCurrent();
         }
+        // If null: at end of queue, no movement happened, no state to clean up.
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
     }
 
     public void PreviousTrack()
     {
-        // If more than 3 seconds in, restart current track; otherwise go to previous
-        if (Position > 3 || !HasPrevious)
+        // If more than 3 seconds in, restart current track.
+        if (Position > 3)
         {
             Seek(0);
+            return;
+        }
+
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        var previous = _playbackQueue.GoBack();
+        if (previous != null)
+        {
+            PlayCurrent();
         }
         else
         {
-            _queueIndex--;
-            PlayCurrent();
+            // Nothing to go back to — restart current track.
+            Seek(0);
         }
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
     }
 
     public void Seek(double positionSeconds)
@@ -128,6 +196,104 @@ public class PlaybackService : IPlaybackService, IDisposable
         Position = positionSeconds;
         PositionChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    public void AddNext(IList<PlaybackTrack> tracks)
+    {
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        _playbackQueue.AddNext(tracks);
+        QueueChanged?.Invoke(this, EventArgs.Empty);
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
+    }
+
+    public void AddToEnd(IList<PlaybackTrack> tracks)
+    {
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        _playbackQueue.AddToEnd(tracks);
+        QueueChanged?.Invoke(this, EventArgs.Empty);
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
+    }
+
+    public void RemoveAt(int index)
+    {
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        var newCurrent = _playbackQueue.RemoveAt(index);
+
+        QueueChanged?.Invoke(this, EventArgs.Empty);
+
+        if (newCurrent != null)
+        {
+            // Current track was removed and we advanced to next.
+            if (newCurrent.StreamUri != null)
+            {
+                PlayCurrent();
+            }
+            else
+            {
+                // New current track exists but can't be played — still notify consumers.
+                Duration = newCurrent.Duration;
+                Position = 0;
+                TrackChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        else if (_playbackQueue.CurrentTrack == null && _playbackQueue.Tracks.Count == 0)
+        {
+            // Queue is empty after removal — full teardown.
+            _mediaPlayer.Pause();
+            _mediaPlayer.Source = null;
+            IsPlaying = false;
+            Position = 0;
+            Duration = 0;
+            _source = null;
+            ClearSmtcDisplay();
+            TrackChanged?.Invoke(this, EventArgs.Empty);
+            PositionChanged?.Invoke(this, EventArgs.Empty);
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+            UpdateSmtcState();
+            return;
+        }
+
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
+    }
+
+    public void MoveTrack(int fromIndex, int toIndex)
+    {
+        var moved = _playbackQueue.MoveTrack(fromIndex, toIndex);
+        if (moved)
+        {
+            QueueChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public void ClearUpcoming()
+    {
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        _playbackQueue.ClearUpcoming();
+        QueueChanged?.Invoke(this, EventArgs.Empty);
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
+    }
+
+    public void ClearAll()
+    {
+        _mediaPlayer.Pause();
+        _mediaPlayer.Source = null;
+        _source = null;
+        _playbackQueue.ClearAll();
+        IsPlaying = false;
+        Position = 0;
+        Duration = 0;
+        ClearSmtcDisplay();
+        QueueChanged?.Invoke(this, EventArgs.Empty);
+        TrackChanged?.Invoke(this, EventArgs.Empty);
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+        PositionChanged?.Invoke(this, EventArgs.Empty);
+        UpdateSmtcState();
+    }
+
+    public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => _playbackQueue.GetEffectiveQueue();
 
     private void PlayCurrent()
     {
@@ -139,7 +305,6 @@ public class PlaybackService : IPlaybackService, IDisposable
 
         Duration = track.Duration;
         Position = 0;
-        TrackChanged?.Invoke(this, EventArgs.Empty);
 
         var source = MediaSource.CreateFromUri(track.StreamUri);
         var playbackItem = new MediaPlaybackItem(source);
@@ -157,6 +322,9 @@ public class PlaybackService : IPlaybackService, IDisposable
 
         _mediaPlayer.Source = playbackItem;
         _mediaPlayer.Play();
+
+        // Fire TrackChanged after source is set — consumers can read NowPlaying.
+        TrackChanged?.Invoke(this, EventArgs.Empty);
 
         // Update SMTC display manually since CommandManager is disabled
         var smtc = _mediaPlayer.SystemMediaTransportControls;
@@ -180,6 +348,24 @@ public class PlaybackService : IPlaybackService, IDisposable
         var smtc = _mediaPlayer.SystemMediaTransportControls;
         smtc.IsNextEnabled = HasNext;
         smtc.IsPreviousEnabled = HasPrevious;
+    }
+
+    private void ClearSmtcDisplay()
+    {
+        var smtc = _mediaPlayer.SystemMediaTransportControls;
+        smtc.PlaybackStatus = MediaPlaybackStatus.Closed;
+        var updater = smtc.DisplayUpdater;
+        updater.ClearAll();
+        updater.Update();
+    }
+
+    private void FirePlaybackStateChangedIfHasChanged(bool prevHasNext, bool prevHasPrevious)
+    {
+        if (HasNext != prevHasNext || HasPrevious != prevHasPrevious)
+        {
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+            UpdateSmtcState();
+        }
     }
 
     private void OnSmtcButtonPressed(SystemMediaTransportControls sender, SystemMediaTransportControlsButtonPressedEventArgs args)
@@ -220,15 +406,22 @@ public class PlaybackService : IPlaybackService, IDisposable
     {
         _dispatcherQueue.TryEnqueue(() =>
         {
-            if (HasNext)
+            var prevHasNext = HasNext;
+            var prevHasPrevious = HasPrevious;
+            var next = _playbackQueue.Advance();
+
+            if (next != null)
             {
-                _queueIndex++;
                 PlayCurrent();
+                FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
             }
             else
             {
+                // End of queue — stop playback, reset position and duration.
+                // NowPlaying remains set so the UI shows what was last playing.
                 IsPlaying = false;
                 Position = 0;
+                Duration = 0;
                 PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
                 PositionChanged?.Invoke(this, EventArgs.Empty);
                 UpdateSmtcState();
@@ -287,6 +480,11 @@ public class PlaybackService : IPlaybackService, IDisposable
     public void Dispose()
     {
         _positionTimer.Stop();
+        _mediaPlayer.MediaOpened -= OnMediaOpened;
+        _mediaPlayer.MediaEnded -= OnMediaEnded;
+        _mediaPlayer.MediaFailed -= OnMediaFailed;
+        _mediaPlayer.CurrentStateChanged -= OnCurrentStateChanged;
+        _mediaPlayer.SystemMediaTransportControls.ButtonPressed -= OnSmtcButtonPressed;
         _mediaPlayer.Dispose();
     }
 }
