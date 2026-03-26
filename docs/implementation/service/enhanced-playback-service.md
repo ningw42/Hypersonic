@@ -1,6 +1,6 @@
 # Enhanced Playback Service — Implementation Details
 
-Companion to [docs/design/enhanced-playback-service.md](../design/enhanced-playback-service.md). This document records what was actually built, key decisions made during implementation, and deviations from the original design.
+Companion to [docs/design/service/enhanced-playback-service.md](../../design/service/enhanced-playback-service.md). This document records what was actually built, key decisions made during implementation, and deviations from the original design.
 
 ---
 

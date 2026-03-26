@@ -1,6 +1,6 @@
 # Queue Flyout UI — Implementation Details
 
-Companion to [docs/design/queue-flyout-ui.md](../design/queue-flyout-ui.md). This document records what was actually built and implementation specifics not covered in the design doc.
+Companion to [docs/design/ui/queue-flyout-ui.md](../../design/ui/queue-flyout-ui.md). This document records what was actually built and implementation specifics not covered in the design doc.
 
 ---
 
