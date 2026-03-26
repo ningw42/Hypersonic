@@ -90,7 +90,7 @@ void JumpToTrack(string trackId);
 
 | File | Purpose |
 |---|---|
-| `Hypersonic/Models/QueueItem.cs` | Plain data object wrapping `PlaybackTrack` with `IsCurrent` for queue display |
+| `Hypersonic/Models/QueueItem.cs` | Observable model wrapping `PlaybackTrack` with mutable `IsCurrent` for queue display |
 
 ---
 
@@ -101,14 +101,18 @@ File: `Hypersonic/Models/QueueItem.cs`
 ```csharp
 namespace Hypersonic.Models;
 
-public class QueueItem
+public partial class QueueItem : ObservableObject
 {
     public PlaybackTrack Track { get; init; } = null!;
-    public bool IsCurrent { get; init; }
+
+    [ObservableProperty]
+    private bool isCurrent;
 }
 ```
 
-This is a plain data object, not an observable ViewModel. The list is rebuilt wholesale on `QueueChanged`/`TrackChanged`, so per-property notification is unnecessary.
+`QueueItem` extends `ObservableObject` with a mutable, observable `IsCurrent` property. This enables in-place updates when the cursor moves within the same queue — `RefreshQueue()` can toggle `IsCurrent` on existing items without replacing the `ItemsSource`, which preserves the ListView's scroll position (see Section 5).
+
+**Why observable (not plain data object):** The original design used a plain `init`-only `IsCurrent` and rebuilt the list on every state change. This caused the ListView to reset its scroll position on double-click-to-jump, because replacing `ItemsSource` resets the `ScrollViewer`. Making `IsCurrent` observable allows the common case (cursor moved, queue unchanged) to update in-place without a list rebuild.
 
 **Why this exists** (instead of binding raw `PlaybackTrack`):
 - `IsCurrent` is a view-display concern that does not belong on the service-layer `PlaybackTrack` model.
@@ -133,12 +137,18 @@ Col 6: Queue toggle button (NEW — Auto width)
 ```
 
 Queue toggle button:
-- 32x32, transparent background, no border (matches prev/next button style)
+- `ToggleButton` (not `Button`), 32x32, no border
+- `IsChecked` bound two-way to `Player.IsQueueOpen`
 - Glyph: `\uEA37` (Segoe MDL2 "BulletedList" / queue icon)
 - Margin: `8,0,0,0` to separate from duration text
-- When popup is open, foreground switches to `SystemAccentColor` (driven by `Player.IsQueueOpen`)
+- When checked (popup open), the built-in `ToggleButton` visual states provide accent background and contrasting foreground — no imperative code-behind color manipulation needed
+- When unchecked (popup closed), reverts to the default subtle style automatically
+
+**Why ToggleButton over Button:** A `Button` with manual foreground color changes (setting `Foreground` to accent on open, resetting on close) is fragile — setting `Foreground` to `null` to "revert" actually removes the brush entirely, making the icon invisible. A `ToggleButton` with a two-way `IsChecked` binding expresses the open/closed state declaratively and delegates visual feedback to the control's built-in visual state manager, which correctly handles both foreground and background across all states (normal, hover, pressed, checked).
 
 Positioned inside the Controls+progress area (Column 2 of the outer player bar grid) — to the left of volume (Column 3).
+
+**What this replaces:** The `ToggleQueueCommand` relay command is no longer needed — the two-way `IsChecked` binding toggles `IsQueueOpen` directly. The `PropertyChanged` handler still reacts to open/close the popup. Light dismiss sets `Player.IsQueueOpen = false`, which unchecks the button automatically.
 
 ---
 
@@ -176,11 +186,20 @@ Use a `Popup` element (same pattern as the search results popup).
             <ListView x:Name="QueueListView" Grid.Row="1"
                       ItemsSource="{x:Bind Player.QueueItems, Mode=OneWay}"
                       SelectionMode="None"
+                      IsItemClickEnabled="True"
                       Padding="4,0,4,4"
                       MaxHeight="440"
                       DoubleTapped="QueueList_DoubleTapped"
                       Visibility="{x:Bind Player.IsQueueEmpty, Mode=OneWay,
                                    Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="MinHeight" Value="0"/>
+                        <Setter Property="CornerRadius" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:QueueItem">
                         <!-- see Section 4 -->
@@ -207,6 +226,15 @@ Use a `Popup` element (same pattern as the search results popup).
 - **Max height**: 500px (60px header + 440px list area). Internal `ListView` handles scrolling via its built-in `ScrollViewer`.
 - **No minimum height**: if few tracks, the popup sizes to content.
 
+### ListView item container
+
+The `ItemContainerStyle` overrides are necessary for the desired visual behavior:
+
+- **`IsItemClickEnabled="True"`**: Required to activate the `ListViewItem` PointerOver visual states. Without this, WinUI 3 `ListViewItem` containers show no hover highlight at all — even with `SelectionMode="None"`. This is a WinUI 3 behavior: the PointerOver visual state group is only active when the item is clickable. The same pattern is used on album and playlist track lists elsewhere in the app.
+- **`CornerRadius="0"`**: The default `ListViewItem` container has rounded corners on its hover/pressed highlight. For a queue list the highlight should be a full-width square rectangle, edge to edge.
+- **`Padding="0"` / `MinHeight="0"`**: Removes default container padding so the item template controls its own spacing.
+- **`HorizontalContentAlignment="Stretch"`**: Ensures the item template fills the full container width.
+
 ### Positioning
 
 The popup is positioned **every time it opens** (recalculated on each toggle), anchored to the queue toggle button. A two-pass layout is used: the popup is opened off-screen, its `ActualHeight` is measured after layout, and then the offset is set so the popup's bottom edge sits flush above the player bar.
@@ -229,7 +257,7 @@ private void OpenQueuePopup()
     var actualHeight = QueuePopupBorder.ActualHeight;
     QueuePopup.VerticalOffset = -(actualHeight + 8);
 
-    AnimateQueuePopup(isOpening: true);
+    AnimateQueuePopup();
 
     // Auto-scroll to current track
     if (Player.EffectiveQueueIndex >= 0 && Player.EffectiveQueueIndex < Player.QueueItems.Count)
@@ -264,7 +292,7 @@ Each row: cover art (32x32), track title + "artist — album", duration. Now-pla
 ```xml
 <DataTemplate x:DataType="models:QueueItem">
     <Grid Padding="8,4" ColumnSpacing="10" Height="40"
-          Background="{x:Bind IsCurrent, Converter={StaticResource BoolToHighlightBrushConverter}}">
+          Background="{x:Bind IsCurrent, Mode=OneWay, Converter={StaticResource BoolToHighlightBrushConverter}}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
@@ -278,7 +306,7 @@ Each row: cover art (32x32), track title + "artist — album", duration. Now-pla
                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
-            <Image Source="{x:Bind Track.CoverArtUri}" Stretch="UniformToFill"
+            <Image Source="{Binding Track.CoverArtUri}" Stretch="UniformToFill"
                    Width="32" Height="32"/>
         </Grid>
 
@@ -286,12 +314,12 @@ Each row: cover art (32x32), track title + "artist — album", duration. Now-pla
         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="0">
             <TextBlock Text="{x:Bind Track.Title}" FontSize="13" MaxLines="1"
                        TextTrimming="CharacterEllipsis"
-                       FontWeight="{x:Bind IsCurrent, Converter={StaticResource BoolToFontWeightConverter}}"/>
+                       FontWeight="{x:Bind IsCurrent, Mode=OneWay, Converter={StaticResource BoolToFontWeightConverter}}"/>
             <TextBlock FontSize="11" MaxLines="1" TextTrimming="CharacterEllipsis"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                <Run Text="{x:Bind Track.Artist}"/>
+                <Run Text="{Binding Track.Artist}"/>
                 <Run Text=" — " Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                <Run Text="{x:Bind Track.Album}"/>
+                <Run Text="{Binding Track.Album}"/>
             </TextBlock>
         </StackPanel>
 
@@ -304,13 +332,25 @@ Each row: cover art (32x32), track title + "artist — album", duration. Now-pla
 </DataTemplate>
 ```
 
+### Binding modes
+
+`IsCurrent` bindings use `Mode=OneWay` because `QueueItem.IsCurrent` is an observable property that changes in-place (see Section 1). Without `OneWay`, the binding would be one-time and would not reflect cursor changes.
+
+### WinUI 3 binding constraints
+
+`Image.Source` and `Run.Text` use `{Binding}` (classic binding) rather than `{x:Bind}`:
+- **`Run.Text`**: WinUI 3's `x:Bind` does not support `Run.Text` — the XAML compiler crashes without a useful error.
+- **`Image.Source`**: The `Uri` → `ImageSource` automatic type conversion only works with `{Binding}`, not `x:Bind`. With `x:Bind`, the compiler cannot resolve the type coercion.
+
+All other bindings use `x:Bind` for compile-time safety and performance.
+
 ### Now-playing highlight (data-driven)
 
 `IsCurrent` on `QueueItem` drives two visual cues:
-- **Background**: Subtle highlight via `BoolToHighlightBrushConverter` — returns `SubtleFillColorSecondaryBrush` when true, `Transparent` when false.
+- **Background**: Accent-tinted highlight via `BoolToHighlightBrushConverter` — returns `SystemAccentColorLight2` at 20% opacity when true, `null` when false (see Section 8 for rationale).
 - **Font weight**: Track title is `SemiBold` when current, `Normal` otherwise.
 
-No imperative code-behind container manipulation. The list is rebuilt on state changes, so `IsCurrent` is always consistent.
+No imperative code-behind container manipulation. `IsCurrent` is updated in-place by `RefreshQueue()` (see Section 5), so the highlight follows the cursor without rebuilding the list.
 
 ---
 
@@ -339,13 +379,7 @@ private string queueCountText = string.Empty;
 
 ### New commands
 
-```csharp
-[RelayCommand]
-private void ToggleQueue()
-{
-    IsQueueOpen = !IsQueueOpen;
-}
-```
+No new commands are needed. The `ToggleButton` two-way binding on `IsQueueOpen` (see Section 2) handles toggling directly — a `ToggleQueueCommand` relay command is unnecessary.
 
 ### Event subscriptions
 
@@ -370,12 +404,50 @@ Also call `RefreshQueue()` from the existing `OnTrackChanged` handler (to update
 
 This method is **public** because the code-behind calls it when the popup opens to guarantee fresh data before display. It is also called internally from event handlers.
 
+`RefreshQueue` uses a **two-path strategy** to balance correctness with scroll preservation:
+
+1. **In-place update (common case):** If the queue contents are unchanged (same tracks in the same order, just a different cursor position), update `IsCurrent` on the existing `QueueItem` objects without replacing `ItemsSource`. Because `QueueItem.IsCurrent` is observable (Section 1), the bindings update automatically. This preserves the ListView's scroll position.
+
+2. **Full rebuild (queue mutation):** If the queue contents changed (different tracks or different order — e.g. shuffle toggled, tracks added/removed), rebuild the entire list and assign it to `QueueItems`.
+
+The comparison is by track ID at each position, not by reference equality — this correctly detects reordering.
+
 ```csharp
 public void RefreshQueue()
 {
     var effective = _playbackService.GetEffectiveQueue();
     var currentIndex = _playbackService.EffectiveQueueIndex;
 
+    // Path 1: In-place update if queue contents unchanged
+    var existing = QueueItems;
+    if (existing.Count == effective.Count)
+    {
+        var match = true;
+        for (var i = 0; i < effective.Count; i++)
+        {
+            if (existing[i].Track.Id != effective[i].Id)
+            {
+                match = false;
+                break;
+            }
+        }
+
+        if (match)
+        {
+            for (var i = 0; i < existing.Count; i++)
+            {
+                existing[i].IsCurrent = i == currentIndex;
+            }
+
+            EffectiveQueueIndex = currentIndex;
+            QueueCountText = existing.Count > 0
+                ? $"{currentIndex + 1} / {existing.Count}"
+                : string.Empty;
+            return;
+        }
+    }
+
+    // Path 2: Queue contents changed — rebuild
     var items = new List<QueueItem>(effective.Count);
     for (var i = 0; i < effective.Count; i++)
     {
@@ -394,6 +466,8 @@ public void RefreshQueue()
         : string.Empty;
 }
 ```
+
+**Why this matters:** Without the in-place path, double-clicking a track to jump replaces `QueueItems`, which causes the ListView to reset its `ScrollViewer` to the top. For long queues this is disorienting — the user expects the scroll position to stay put and only the highlight to move.
 
 ### Queue count text semantics
 
@@ -442,7 +516,7 @@ Player.PropertyChanged += (_, e) =>
 Open animation only (manual toggle). Light-dismiss close is instant — P0 simplification that avoids intercepting native dismiss for animation sequencing.
 
 ```csharp
-private void AnimateQueuePopup(bool isOpening)
+private void AnimateQueuePopup()
 {
     var visual = ElementCompositionPreview.GetElementVisual(QueuePopupBorder);
     var compositor = visual.Compositor;
@@ -492,9 +566,10 @@ private void QueueList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e
 | Case | Behavior |
 |---|---|
 | **Empty queue** | Toggle button always visible. ListView hidden via `IsQueueEmpty` + `InverseBoolToVisibilityConverter`. "Queue is empty" text shown via `IsQueueEmpty` + `BoolToVisibilityConverter`. |
-| **Queue changes while open** | `QueueItems` is an `[ObservableProperty]`; ListView re-binds automatically. `IsCurrent` on each row is correct because `RefreshQueue()` rebuilds the list. |
-| **Track ends while open** | `TrackChanged` → `RefreshQueue()` → `IsCurrent` moves to new track. |
-| **Shuffle toggled while open** | `QueueChanged` → `RefreshQueue()` → list order changes to reflect new effective order. |
+| **Queue changes while open** | `QueueItems` is an `[ObservableProperty]`; ListView re-binds automatically. If only the cursor moved (same tracks, same order), `IsCurrent` is updated in-place without replacing the list — preserving scroll position. If contents changed, the list is rebuilt. |
+| **Track ends while open** | `TrackChanged` → `RefreshQueue()` → `IsCurrent` moves to new track via in-place update (scroll preserved). |
+| **Shuffle toggled while open** | `QueueChanged` → `RefreshQueue()` → list order changes; full rebuild (scroll resets — expected, since the list order itself changed). |
+| **Double-click to jump (scroll preservation)** | Jump triggers `TrackChanged` → `RefreshQueue()`. Queue contents are unchanged (only cursor moved), so `RefreshQueue` takes the in-place update path: `IsCurrent` toggles on existing items, `ItemsSource` is not replaced, ListView scroll position is preserved. The highlight moves to the new track without the list jumping to the top. |
 | **Double-click current track** | **Explicit product choice: no-op.** `JumpToTrack` returns null when the target is the current track, so no history push, no restart, no state change. Rationale: users double-clicking the already-playing row most likely did so unintentionally or to confirm it's playing; restarting the track would be surprising. If a user wants to restart the current track, the seek bar (drag to 0) or the Previous button (within 3 seconds) already serve that purpose. |
 | **Window resize while open** | Light-dismiss closes popup. Reopening recalculates position. |
 
@@ -506,8 +581,13 @@ Two new converter classes in `Hypersonic/Converters/`, registered in `ShellPage.
 
 | File | Converter | Input | Output |
 |---|---|---|---|
-| `Converters/BoolToHighlightBrushConverter.cs` | `BoolToHighlightBrushConverter` | `bool` | `SubtleFillColorSecondaryBrush` if true, `Transparent` if false |
+| `Converters/BoolToHighlightBrushConverter.cs` | `BoolToHighlightBrushConverter` | `bool` | `SystemAccentColorLight2` at 20% opacity if true, `null` if false |
 | `Converters/BoolToFontWeightConverter.cs` | `BoolToFontWeightConverter` | `bool` | `SemiBold` if true, `Normal` if false |
+
+### BoolToHighlightBrushConverter design decisions
+
+- **Accent color over theme brush:** The original design used `SubtleFillColorSecondaryBrush`, but this was too subtle to visually distinguish the now-playing track. `SystemAccentColorLight2` at 20% opacity provides a clear, user-personalized highlight that adapts to the system accent color.
+- **`null` over `Transparent` for the false case:** Returning `Transparent` creates a `SolidColorBrush` that occupies the `Background` property, which occludes the `ListViewItem` container's built-in PointerOver (hover) highlight. Returning `null` leaves the `Background` property unset, allowing the container's visual states to show through. This is critical for hover feedback on non-current items.
 
 Registration in `ShellPage.xaml`:
 ```xml

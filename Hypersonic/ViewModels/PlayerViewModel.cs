@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Hypersonic.Contracts.Services;
+using Hypersonic.Models;
 
 namespace Hypersonic.ViewModels;
 
@@ -61,6 +62,21 @@ public partial class PlayerViewModel : ObservableRecipient
     [ObservableProperty]
     private string volumeGlyph = "\uE767";
 
+    [ObservableProperty]
+    private IReadOnlyList<QueueItem> queueItems = Array.Empty<QueueItem>();
+
+    [ObservableProperty]
+    private int effectiveQueueIndex = -1;
+
+    [ObservableProperty]
+    private bool isQueueOpen;
+
+    [ObservableProperty]
+    private bool isQueueEmpty = true;
+
+    [ObservableProperty]
+    private string queueCountText = string.Empty;
+
     private bool _isExternalUpdate;
     private double _volumeBeforeMute = 100;
 
@@ -71,6 +87,7 @@ public partial class PlayerViewModel : ObservableRecipient
         _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
         _playbackService.TrackChanged += OnTrackChanged;
         _playbackService.PositionChanged += OnPositionChanged;
+        _playbackService.QueueChanged += OnQueueChanged;
     }
 
     [RelayCommand]
@@ -138,6 +155,65 @@ public partial class PlayerViewModel : ObservableRecipient
         }
     }
 
+    public void RefreshQueue()
+    {
+        var effective = _playbackService.GetEffectiveQueue();
+        var currentIndex = _playbackService.EffectiveQueueIndex;
+
+        // Check if the queue contents match the existing list (same tracks, same order).
+        // If so, update IsCurrent in-place to avoid replacing the ItemsSource and resetting scroll.
+        var existing = QueueItems;
+        if (existing.Count == effective.Count)
+        {
+            var match = true;
+            for (var i = 0; i < effective.Count; i++)
+            {
+                if (existing[i].Track.Id != effective[i].Id)
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                for (var i = 0; i < existing.Count; i++)
+                {
+                    existing[i].IsCurrent = i == currentIndex;
+                }
+
+                EffectiveQueueIndex = currentIndex;
+                QueueCountText = existing.Count > 0
+                    ? $"{currentIndex + 1} / {existing.Count}"
+                    : string.Empty;
+                return;
+            }
+        }
+
+        // Queue contents changed — rebuild the list.
+        var items = new List<QueueItem>(effective.Count);
+        for (var i = 0; i < effective.Count; i++)
+        {
+            items.Add(new QueueItem
+            {
+                Track = effective[i],
+                IsCurrent = i == currentIndex,
+            });
+        }
+
+        QueueItems = items;
+        EffectiveQueueIndex = currentIndex;
+        IsQueueEmpty = items.Count == 0;
+        QueueCountText = items.Count > 0
+            ? $"{currentIndex + 1} / {items.Count}"
+            : string.Empty;
+    }
+
+    public void JumpToQueueTrack(QueueItem item)
+    {
+        _playbackService.JumpToTrack(item.Track.Id);
+    }
+
     partial void OnPositionChanged(double value)
     {
         if (!_isExternalUpdate)
@@ -195,6 +271,12 @@ public partial class PlayerViewModel : ObservableRecipient
         PositionText = "0:00";
         HasNext = _playbackService.HasNext;
         HasPrevious = _playbackService.HasPrevious;
+        RefreshQueue();
+    }
+
+    private void OnQueueChanged(object? sender, EventArgs e)
+    {
+        RefreshQueue();
     }
 
     private void OnPositionChanged(object? sender, EventArgs e)

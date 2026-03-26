@@ -54,6 +54,23 @@ public sealed partial class ShellPage : Page
                     ? new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Player.CoverArtUrl))
                     : null;
             }
+            else if (e.PropertyName == nameof(Player.IsQueueOpen))
+            {
+                if (Player.IsQueueOpen)
+                {
+                    Player.RefreshQueue();
+                    OpenQueuePopup();
+                }
+                else if (QueuePopup.IsOpen)
+                {
+                    QueuePopup.IsOpen = false;
+                }
+            }
+        };
+
+        QueuePopup.Closed += (_, _) =>
+        {
+            Player.IsQueueOpen = false;
         };
     }
 
@@ -91,6 +108,76 @@ public sealed partial class ShellPage : Page
 
     private bool _isClosingPopup;
     private bool _popupAnimationInitialized;
+    private bool _queuePopupAnimationInitialized;
+
+    private void OpenQueuePopup()
+    {
+        if (!_queuePopupAnimationInitialized)
+        {
+            _queuePopupAnimationInitialized = true;
+            ElementCompositionPreview.SetIsTranslationEnabled(QueuePopupBorder, true);
+        }
+
+        var transform = QueueToggleButton.TransformToVisual(this);
+        var buttonPos = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
+
+        // Right-align popup to button
+        QueuePopup.HorizontalOffset = buttonPos.X - 400 + QueueToggleButton.ActualWidth;
+
+        // First open: place off-screen to measure actual height
+        QueuePopup.VerticalOffset = -10000;
+        QueuePopup.IsOpen = true;
+
+        // After layout, reposition using measured height
+        QueuePopupBorder.UpdateLayout();
+        var actualHeight = QueuePopupBorder.ActualHeight;
+        QueuePopup.VerticalOffset = -(actualHeight + 8);
+
+        AnimateQueuePopup();
+
+        // Auto-scroll to current track
+        if (Player.EffectiveQueueIndex >= 0 && Player.EffectiveQueueIndex < Player.QueueItems.Count)
+        {
+            QueueListView.ScrollIntoView(Player.QueueItems[Player.EffectiveQueueIndex],
+                ScrollIntoViewAlignment.Leading);
+        }
+    }
+
+    private void AnimateQueuePopup()
+    {
+        var visual = ElementCompositionPreview.GetElementVisual(QueuePopupBorder);
+        var compositor = visual.Compositor;
+        var duration = TimeSpan.FromMilliseconds(200);
+        var easing = compositor.CreateCubicBezierEasingFunction(
+            new Vector2(0.1f, 0.9f), new Vector2(0.2f, 1f));
+
+        var fadeAnimation = compositor.CreateScalarKeyFrameAnimation();
+        fadeAnimation.InsertKeyFrame(0f, 0f);
+        fadeAnimation.InsertKeyFrame(1f, 1f, easing);
+        fadeAnimation.Duration = duration;
+
+        var slideAnimation = compositor.CreateScalarKeyFrameAnimation();
+        slideAnimation.InsertKeyFrame(0f, 8f);
+        slideAnimation.InsertKeyFrame(1f, 0f, easing);
+        slideAnimation.Duration = duration;
+
+        visual.StartAnimation("Opacity", fadeAnimation);
+        visual.StartAnimation("Translation.Y", slideAnimation);
+    }
+
+    private void QueueList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        var element = e.OriginalSource as FrameworkElement;
+        while (element != null && element.DataContext is not Models.QueueItem)
+        {
+            element = VisualTreeHelper.GetParent(element) as FrameworkElement;
+        }
+
+        if (element?.DataContext is Models.QueueItem item)
+        {
+            Player.JumpToQueueTrack(item);
+        }
+    }
 
     private async void SearchBox_TextChanged(object sender, TextChangedEventArgs args)
     {

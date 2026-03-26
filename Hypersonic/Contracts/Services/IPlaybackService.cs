@@ -37,5 +37,6 @@ public interface IPlaybackService
     void MoveTrack(int fromIndex, int toIndex);
     void ClearUpcoming();
     void ClearAll();
+    void JumpToTrack(string trackId);
     IReadOnlyList<PlaybackTrack> GetEffectiveQueue();
 }

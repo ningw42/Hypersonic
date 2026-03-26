@@ -423,6 +423,40 @@ public class PlaybackQueue
         return null;
     }
 
+    /// <summary>
+    /// Jump to a specific track by ID within the existing queue session.
+    /// Pushes current track to navigation and play history before jumping.
+    /// Returns the new current track, or null if not found or already current.
+    /// </summary>
+    public PlaybackTrack? JumpToTrack(string trackId)
+    {
+        var foundIndex = _tracks.FindIndex(t => t.Id == trackId);
+        if (foundIndex < 0)
+        {
+            return null;
+        }
+
+        if (foundIndex == _currentIndex)
+        {
+            return null;
+        }
+
+        PushCurrentToHistory();
+
+        _currentIndex = foundIndex;
+
+        if (_shuffleEnabled)
+        {
+            var pos = _shuffleOrder.IndexOf(_currentIndex);
+            if (pos >= 0)
+            {
+                _shufflePosition = pos;
+            }
+        }
+
+        return CurrentTrack;
+    }
+
     public void SetShuffle(bool enabled)
     {
         if (_shuffleEnabled == enabled)

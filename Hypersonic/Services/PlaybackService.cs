@@ -295,6 +295,20 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => _playbackQueue.GetEffectiveQueue();
 
+    public void JumpToTrack(string trackId)
+    {
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        var result = _playbackQueue.JumpToTrack(trackId);
+        if (result == null)
+        {
+            return;
+        }
+
+        PlayCurrent();
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
+    }
+
     private void PlayCurrent()
     {
         var track = NowPlaying;

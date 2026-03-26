@@ -775,6 +775,89 @@ public class PlaybackQueueTests
         Assert.AreEqual(0, queue.History.Count);
     }
 
+    // ── JumpToTrack ────────────────────────────────────────────────
+
+    [TestMethod]
+    public void JumpToTrack_MovesToCorrectTrack()
+    {
+        var queue = new PlaybackQueue();
+        queue.SetQueue(MakeTracks(5), 0);
+
+        var result = queue.JumpToTrack("track-3");
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual("track-3", result!.Id);
+        Assert.AreEqual("track-3", queue.CurrentTrack!.Id);
+    }
+
+    [TestMethod]
+    public void JumpToTrack_PushesHistoryEntry()
+    {
+        var queue = new PlaybackQueue();
+        queue.SetQueue(MakeTracks(5), 0);
+
+        queue.JumpToTrack("track-3");
+
+        Assert.IsTrue(queue.HasPrevious);
+        Assert.AreEqual(1, queue.History.Count);
+        Assert.AreEqual("track-0", queue.History[0].Id);
+    }
+
+    [TestMethod]
+    public void JumpToTrack_PreservesShuffleOrder()
+    {
+        var queue = new PlaybackQueue();
+        queue.SetQueue(MakeTracks(5), 0);
+        queue.SetShuffle(true);
+
+        var effectiveBefore = queue.GetEffectiveQueue().Select(t => t.Id).ToList();
+
+        queue.JumpToTrack("track-2");
+
+        var effectiveAfter = queue.GetEffectiveQueue().Select(t => t.Id).ToList();
+        CollectionAssert.AreEqual(effectiveBefore, effectiveAfter);
+        Assert.AreEqual("track-2", queue.CurrentTrack!.Id);
+    }
+
+    [TestMethod]
+    public void JumpToTrack_InvalidId_NoOp()
+    {
+        var queue = new PlaybackQueue();
+        queue.SetQueue(MakeTracks(5), 2);
+
+        var result = queue.JumpToTrack("nonexistent");
+
+        Assert.IsNull(result);
+        Assert.AreEqual("track-2", queue.CurrentTrack!.Id);
+        Assert.IsFalse(queue.HasPrevious);
+    }
+
+    [TestMethod]
+    public void JumpToTrack_SameTrack_NoOp()
+    {
+        var queue = new PlaybackQueue();
+        queue.SetQueue(MakeTracks(5), 2);
+
+        var result = queue.JumpToTrack("track-2");
+
+        Assert.IsNull(result);
+        Assert.IsFalse(queue.HasPrevious);
+        Assert.AreEqual(0, queue.History.Count);
+    }
+
+    [TestMethod]
+    public void JumpToTrack_GoBackReturnsToPreJump()
+    {
+        var queue = new PlaybackQueue();
+        queue.SetQueue(MakeTracks(5), 1);
+
+        queue.JumpToTrack("track-4");
+        Assert.AreEqual("track-4", queue.CurrentTrack!.Id);
+
+        var prev = queue.GoBack();
+        Assert.AreEqual("track-1", prev!.Id);
+    }
+
     // ── SetShuffle(false) on empty queue ────────────────────────────
 
     [TestMethod]
