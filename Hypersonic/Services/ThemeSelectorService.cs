@@ -41,7 +41,9 @@ public class ThemeSelectorService : IThemeSelectorService
             TitleBarHelper.UpdateTitleBar(Theme);
         }
 
-        await Task.CompletedTask;
+        // Re-apply backdrop in case it's set to None — its solid background
+        // depends on the current theme and must be refreshed.
+        await App.GetService<IBackdropSelectorService>().SetRequestedBackdropAsync();
     }
 
     private async Task<ElementTheme> LoadThemeFromSettingsAsync()

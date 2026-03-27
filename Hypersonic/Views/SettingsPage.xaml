@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:helpers="using:Hypersonic.Helpers"
+    xmlns:models="using:Hypersonic.Models"
     xmlns:xaml="using:Microsoft.UI.Xaml"
     mc:Ignorable="d">
     <Page.Resources>
@@ -46,6 +47,53 @@
                         GroupName="AppTheme">
                         <RadioButton.CommandParameter>
                             <xaml:ElementTheme>Default</xaml:ElementTheme>
+                        </RadioButton.CommandParameter>
+                    </RadioButton>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Margin="{StaticResource SmallTopBottomMargin}">
+                <TextBlock x:Uid="Settings_Backdrop" />
+
+                <StackPanel Margin="{StaticResource XSmallTopMargin}">
+                    <RadioButton
+                        x:Uid="Settings_Backdrop_Mica"
+                        Command="{x:Bind ViewModel.SwitchBackdropCommand}"
+                        IsChecked="{x:Bind ViewModel.BackdropType, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Mica, Mode=OneWay}"
+                        FontSize="15"
+                        GroupName="AppBackdrop">
+                        <RadioButton.CommandParameter>
+                            <models:BackdropType>Mica</models:BackdropType>
+                        </RadioButton.CommandParameter>
+                    </RadioButton>
+                    <RadioButton
+                        x:Uid="Settings_Backdrop_MicaAlt"
+                        Command="{x:Bind ViewModel.SwitchBackdropCommand}"
+                        IsChecked="{x:Bind ViewModel.BackdropType, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=MicaAlt, Mode=OneWay}"
+                        FontSize="15"
+                        GroupName="AppBackdrop">
+                        <RadioButton.CommandParameter>
+                            <models:BackdropType>MicaAlt</models:BackdropType>
+                        </RadioButton.CommandParameter>
+                    </RadioButton>
+                    <RadioButton
+                        x:Uid="Settings_Backdrop_Acrylic"
+                        Command="{x:Bind ViewModel.SwitchBackdropCommand}"
+                        IsChecked="{x:Bind ViewModel.BackdropType, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Acrylic, Mode=OneWay}"
+                        FontSize="15"
+                        GroupName="AppBackdrop">
+                        <RadioButton.CommandParameter>
+                            <models:BackdropType>Acrylic</models:BackdropType>
+                        </RadioButton.CommandParameter>
+                    </RadioButton>
+                    <RadioButton
+                        x:Uid="Settings_Backdrop_None"
+                        Command="{x:Bind ViewModel.SwitchBackdropCommand}"
+                        IsChecked="{x:Bind ViewModel.BackdropType, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=None, Mode=OneWay}"
+                        FontSize="15"
+                        GroupName="AppBackdrop">
+                        <RadioButton.CommandParameter>
+                            <models:BackdropType>None</models:BackdropType>
                         </RadioButton.CommandParameter>
                     </RadioButton>
                 </StackPanel>
