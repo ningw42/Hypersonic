@@ -92,19 +92,11 @@ public class PlaybackService : IPlaybackService, IDisposable
         _mediaPlayer.MediaFailed += OnMediaFailed;
         _mediaPlayer.CurrentStateChanged += OnCurrentStateChanged;
 
-        // Disable the automatic CommandManager so SMTC doesn't add its own
-        // taskbar thumbnail buttons (we use ITaskbarList3 for those instead).
-        // We manage SMTC metadata manually via MediaPlaybackItem display properties.
-        _mediaPlayer.CommandManager.IsEnabled = false;
-
-        // Wire up SMTC transport controls directly for media key support.
-        var smtc = _mediaPlayer.SystemMediaTransportControls;
-        smtc.IsEnabled = true;
-        smtc.IsPlayEnabled = true;
-        smtc.IsPauseEnabled = true;
-        smtc.IsNextEnabled = false;
-        smtc.IsPreviousEnabled = false;
-        smtc.ButtonPressed += OnSmtcButtonPressed;
+        // Hook CommandManager for next/previous so they route through PlaybackQueue.
+        // Play/pause and playback status are managed automatically by CommandManager.
+        var cmd = _mediaPlayer.CommandManager;
+        cmd.NextReceived += OnCommandManagerNextReceived;
+        cmd.PreviousReceived += OnCommandManagerPreviousReceived;
     }
 
     public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null)
@@ -340,35 +332,23 @@ public class PlaybackService : IPlaybackService, IDisposable
         // Fire TrackChanged after source is set — consumers can read NowPlaying.
         TrackChanged?.Invoke(this, EventArgs.Empty);
 
-        // Update SMTC display manually since CommandManager is disabled
-        var smtc = _mediaPlayer.SystemMediaTransportControls;
-        smtc.PlaybackStatus = MediaPlaybackStatus.Playing;
-        var updater = smtc.DisplayUpdater;
-        updater.Type = MediaPlaybackType.Music;
-        updater.MusicProperties.Title = track.Title ?? string.Empty;
-        updater.MusicProperties.Artist = track.Artist ?? string.Empty;
-        updater.MusicProperties.AlbumTitle = track.Album ?? string.Empty;
-        if (track.CoverArtUri != null)
-        {
-            updater.Thumbnail = RandomAccessStreamReference.CreateFromUri(track.CoverArtUri);
-        }
-        updater.Update();
-
         UpdateSmtcState();
     }
 
     private void UpdateSmtcState()
     {
-        var smtc = _mediaPlayer.SystemMediaTransportControls;
-        smtc.IsNextEnabled = HasNext;
-        smtc.IsPreviousEnabled = HasPrevious;
+        var cmd = _mediaPlayer.CommandManager;
+        cmd.NextBehavior.EnablingRule = HasNext
+            ? MediaCommandEnablingRule.Always
+            : MediaCommandEnablingRule.Never;
+        cmd.PreviousBehavior.EnablingRule = HasPrevious
+            ? MediaCommandEnablingRule.Always
+            : MediaCommandEnablingRule.Never;
     }
 
     private void ClearSmtcDisplay()
     {
-        var smtc = _mediaPlayer.SystemMediaTransportControls;
-        smtc.PlaybackStatus = MediaPlaybackStatus.Closed;
-        var updater = smtc.DisplayUpdater;
+        var updater = _mediaPlayer.SystemMediaTransportControls.DisplayUpdater;
         updater.ClearAll();
         updater.Update();
     }
@@ -382,26 +362,38 @@ public class PlaybackService : IPlaybackService, IDisposable
         }
     }
 
-    private void OnSmtcButtonPressed(SystemMediaTransportControls sender, SystemMediaTransportControlsButtonPressedEventArgs args)
+    private void OnCommandManagerNextReceived(MediaPlaybackCommandManager sender,
+        MediaPlaybackCommandManagerNextReceivedEventArgs args)
     {
-        _dispatcherQueue.TryEnqueue(() =>
+        var deferral = args.GetDeferral();
+        var enqueued = _dispatcherQueue.TryEnqueue(() =>
         {
-            switch (args.Button)
-            {
-                case SystemMediaTransportControlsButton.Play:
-                    Resume();
-                    break;
-                case SystemMediaTransportControlsButton.Pause:
-                    Pause();
-                    break;
-                case SystemMediaTransportControlsButton.Next:
-                    NextTrack();
-                    break;
-                case SystemMediaTransportControlsButton.Previous:
-                    PreviousTrack();
-                    break;
-            }
+            args.Handled = true;
+            NextTrack();
+            deferral.Complete();
         });
+
+        if (!enqueued)
+        {
+            deferral.Complete();
+        }
+    }
+
+    private void OnCommandManagerPreviousReceived(MediaPlaybackCommandManager sender,
+        MediaPlaybackCommandManagerPreviousReceivedEventArgs args)
+    {
+        var deferral = args.GetDeferral();
+        var enqueued = _dispatcherQueue.TryEnqueue(() =>
+        {
+            args.Handled = true;
+            PreviousTrack();
+            deferral.Complete();
+        });
+
+        if (!enqueued)
+        {
+            deferral.Complete();
+        }
     }
 
     private void OnMediaOpened(MediaPlayer sender, object args)
@@ -469,15 +461,6 @@ public class PlaybackService : IPlaybackService, IDisposable
                 _positionTimer.Stop();
             }
 
-            // Keep SMTC playback status in sync
-            _mediaPlayer.SystemMediaTransportControls.PlaybackStatus = sender.CurrentState switch
-            {
-                MediaPlayerState.Playing => MediaPlaybackStatus.Playing,
-                MediaPlayerState.Paused => MediaPlaybackStatus.Paused,
-                MediaPlayerState.Stopped => MediaPlaybackStatus.Stopped,
-                _ => MediaPlaybackStatus.Closed,
-            };
-
             if (wasPlaying != IsPlaying)
             {
                 PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
@@ -498,7 +481,8 @@ public class PlaybackService : IPlaybackService, IDisposable
         _mediaPlayer.MediaEnded -= OnMediaEnded;
         _mediaPlayer.MediaFailed -= OnMediaFailed;
         _mediaPlayer.CurrentStateChanged -= OnCurrentStateChanged;
-        _mediaPlayer.SystemMediaTransportControls.ButtonPressed -= OnSmtcButtonPressed;
+        _mediaPlayer.CommandManager.NextReceived -= OnCommandManagerNextReceived;
+        _mediaPlayer.CommandManager.PreviousReceived -= OnCommandManagerPreviousReceived;
         _mediaPlayer.Dispose();
     }
 }
