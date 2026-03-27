@@ -1,6 +1,8 @@
 ﻿using Hypersonic.Contracts.Services;
 using Hypersonic.Helpers;
+using Hypersonic.Services;
 
+using Microsoft.UI.Xaml;
 using Windows.UI.ViewManagement;
 
 namespace Hypersonic;
@@ -23,6 +25,16 @@ public sealed partial class MainWindow : WindowEx
         dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         settings = new UISettings();
         settings.ColorValuesChanged += Settings_ColorValuesChanged; // cannot use FrameworkElement.ActualThemeChanged event
+
+        Closed += MainWindow_Closed;
+    }
+
+    private void MainWindow_Closed(object sender, WindowEventArgs args)
+    {
+        if (App.GetService<ILoggingService>() is LoggingService loggingService)
+        {
+            loggingService.Dispose();
+        }
     }
 
     // this handles updating the caption button colors correctly when indows system theme is changed

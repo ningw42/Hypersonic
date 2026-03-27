@@ -16,6 +16,7 @@ public class PlaybackService : IPlaybackService, IDisposable
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly DispatcherQueueTimer _positionTimer;
     private readonly PlaybackQueue _playbackQueue = new();
+    private readonly ILogger _log;
     private QueueSource? _source;
 
     public PlaybackTrack? NowPlaying => _playbackQueue.CurrentTrack;
@@ -79,8 +80,9 @@ public class PlaybackService : IPlaybackService, IDisposable
     public event EventHandler? PositionChanged;
     public event EventHandler? QueueChanged;
 
-    public PlaybackService()
+    public PlaybackService(ILoggingService logService)
     {
+        _log = logService.GetLogger(nameof(PlaybackService));
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _positionTimer = _dispatcherQueue.CreateTimer();
         _positionTimer.Interval = TimeSpan.FromMilliseconds(500);
@@ -441,7 +443,12 @@ public class PlaybackService : IPlaybackService, IDisposable
         {
             IsPlaying = false;
             PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
-            System.Diagnostics.Debug.WriteLine($"Media failed: {args.ErrorMessage}");
+            _log.Error("Media playback failed", new
+            {
+                ErrorCode = args.ExtendedErrorCode.HResult,
+                ErrorMessage = args.ErrorMessage,
+                TrackId = NowPlaying?.Id,
+            });
         });
     }
 

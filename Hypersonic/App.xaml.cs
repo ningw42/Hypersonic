@@ -3,12 +3,15 @@ using Hypersonic.Contracts.Services;
 using Hypersonic.Helpers;
 using Hypersonic.Models;
 using Hypersonic.Services;
+using Hypersonic.Services.Logging;
 using Hypersonic.ViewModels;
 using Hypersonic.Views;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
+
+using Windows.Storage;
 
 namespace Hypersonic;
 
@@ -53,6 +56,33 @@ public partial class App : Application
             services.AddTransient<ActivationHandler<LaunchActivatedEventArgs>, DefaultActivationHandler>();
 
             // Other Activation Handlers
+
+            // Logging
+            services.AddSingleton<ILoggingService>(sp =>
+            {
+                var service = new LoggingService();
+                service.AddSink(new DebugSink(), LogLevel.Debug);
+
+                try
+                {
+                    var logDir = RuntimeHelper.IsMSIX
+                        ? Path.Combine(ApplicationData.Current.LocalFolder.Path, "Logs")
+                        : Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "Hypersonic", "Logs");
+                    service.AddSink(new FileSink(logDir), LogLevel.Info);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LoggingService] FileSink creation failed: {ex}");
+                }
+
+#if !DEBUG
+                service.MinimumLevel = LogLevel.Info;
+#endif
+
+                return service;
+            });
 
             // Services
             services.AddSingleton<ILocalSettingsService, LocalSettingsService>();
@@ -101,9 +131,8 @@ public partial class App : Application
 
     private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        System.Diagnostics.Debug.WriteLine($"UNHANDLED EXCEPTION: {e.Exception}");
-        System.Diagnostics.Debug.WriteLine($"Message: {e.Message}");
-        System.Diagnostics.Debug.WriteLine($"StackTrace: {e.Exception.StackTrace}");
+        var log = App.GetService<ILoggingService>().GetLogger(nameof(App));
+        log.Error("Unhandled exception", new { e.Message }, e.Exception);
     }
 
     protected async override void OnLaunched(LaunchActivatedEventArgs args)
