@@ -16,15 +16,18 @@ public class BackdropSelectorService : IBackdropSelectorService
     public BackdropType Backdrop { get; set; } = BackdropType.Mica;
 
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly ILogger _log;
 
-    public BackdropSelectorService(ILocalSettingsService localSettingsService)
+    public BackdropSelectorService(ILocalSettingsService localSettingsService, ILoggingService logService)
     {
         _localSettingsService = localSettingsService;
+        _log = logService.GetLogger(nameof(BackdropSelectorService));
     }
 
     public async Task InitializeAsync()
     {
         Backdrop = await LoadBackdropFromSettingsAsync();
+        _log.Info("Backdrop loaded", new { Backdrop });
         await Task.CompletedTask;
     }
 

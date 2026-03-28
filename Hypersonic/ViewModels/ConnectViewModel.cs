@@ -14,6 +14,7 @@ public partial class ConnectViewModel : ObservableRecipient
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly ILogger _log;
 
     [ObservableProperty]
     private string serverUrl = string.Empty;
@@ -47,10 +48,12 @@ public partial class ConnectViewModel : ObservableRecipient
 
     public ConnectViewModel(
         ISubsonicClientService subsonicClientService,
-        ILocalSettingsService localSettingsService)
+        ILocalSettingsService localSettingsService,
+        ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
         _localSettingsService = localSettingsService;
+        _log = logService.GetLogger(nameof(ConnectViewModel));
     }
 
     public async Task LoadSavedCredentialsAsync()
@@ -96,23 +99,27 @@ public partial class ConnectViewModel : ObservableRecipient
                     : $"Subsonic API {result.Response.Version}";
                 TestResultMessage = $"Connected successfully to {serverInfo}";
                 TestResultSeverity = InfoBarSeverity.Success;
+                _log.Info("Test connection succeeded", new { ServerUrl = ServerUrl, ServerInfo = serverInfo });
             }
             else
             {
                 var errorDetail = result.Response.Error?.Message ?? "Unknown error";
                 TestResultMessage = $"Server returned error: {errorDetail}";
                 TestResultSeverity = InfoBarSeverity.Error;
+                _log.Warning("Test connection returned error", new { ServerUrl = ServerUrl, Error = errorDetail });
             }
         }
         catch (HttpRequestException ex)
         {
             TestResultMessage = $"Connection failed: {ex.Message}";
             TestResultSeverity = InfoBarSeverity.Error;
+            _log.Warning("Test connection failed", new { ServerUrl = ServerUrl }, ex);
         }
         catch (Exception ex)
         {
             TestResultMessage = $"Unexpected error: {ex.Message}";
             TestResultSeverity = InfoBarSeverity.Error;
+            _log.Error("Test connection unexpected error", new { ServerUrl = ServerUrl }, ex);
         }
         finally
         {
@@ -159,6 +166,7 @@ public partial class ConnectViewModel : ObservableRecipient
             credential.ServerUrl = result.ResolvedUrl;
             await _localSettingsService.SaveSettingAsync("ServerCredential", credential);
             _subsonicClientService.CreateClient(credential);
+            _log.Info("Connected and credentials saved", new { ResolvedUrl = result.ResolvedUrl, credential.Username });
 
             // Swap to the shell with navigation
             var shell = App.GetService<ShellPage>();
@@ -171,12 +179,14 @@ public partial class ConnectViewModel : ObservableRecipient
             TestResultMessage = $"Connection failed: {ex.Message}";
             TestResultSeverity = InfoBarSeverity.Error;
             IsTestResultVisible = true;
+            _log.Warning("Connect failed", new { ServerUrl = ServerUrl }, ex);
         }
         catch (Exception ex)
         {
             TestResultMessage = $"Unexpected error: {ex.Message}";
             TestResultSeverity = InfoBarSeverity.Error;
             IsTestResultVisible = true;
+            _log.Error("Connect unexpected error", new { ServerUrl = ServerUrl }, ex);
         }
         finally
         {

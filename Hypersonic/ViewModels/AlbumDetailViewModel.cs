@@ -14,6 +14,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly IPlaybackService _playbackService;
     private readonly INavigationService _navigationService;
+    private readonly ILogger _log;
     private List<SongInfo> _allSongs = [];
 
     [ObservableProperty]
@@ -68,11 +69,12 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     public ObservableCollection<object> TrackListItems { get; } = [];
 
-    public AlbumDetailViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService, INavigationService navigationService)
+    public AlbumDetailViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService, INavigationService navigationService, ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
         _playbackService = playbackService;
         _navigationService = navigationService;
+        _log = logService.GetLogger(nameof(AlbumDetailViewModel));
     }
 
     public async void OnNavigatedTo(object parameter)
@@ -107,6 +109,8 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                 ErrorMessage = "Album not found.";
                 return;
             }
+
+            _log.Info("Album fetched", new { AlbumId = albumId, album.Name, SongCount = album.SongCount });
 
             AlbumName = album.Name ?? string.Empty;
             AlbumArtist = album.DisplayArtist ?? album.Artist ?? string.Empty;
@@ -167,6 +171,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            _log.Error("Failed to load album", new { AlbumId = albumId }, ex);
         }
         finally
         {
@@ -182,6 +187,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
             return;
         }
 
+        _log.Info("Playing album", new { Album = AlbumName, SongCount = _allSongs.Count });
         _playbackService.PlayQueue(BuildPlaybackTracks(), 0);
     }
 
@@ -195,6 +201,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
         var tracks = BuildPlaybackTracks();
         var index = _allSongs.IndexOf(song);
+        _log.Info("Playing album from track", new { Album = AlbumName, TrackId = song.Id, song.Title, Index = index });
         _playbackService.PlayQueue(tracks, index >= 0 ? index : 0);
     }
 
@@ -255,9 +262,10 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                 await client.StarAsync(id: song.Id);
             }
         }
-        catch
+        catch (Exception ex)
         {
             song.IsStarred = wasStarred;
+            _log.Warning("Failed to toggle star", new { SongId = song.Id, wasStarred }, ex);
         }
     }
 
@@ -285,8 +293,9 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                         : null;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            _log.Debug("Failed to load artist image", new { ArtistId = artistId });
             // Best-effort; artist image is non-critical
         }
     }

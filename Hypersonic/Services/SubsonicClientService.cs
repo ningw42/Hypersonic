@@ -11,7 +11,14 @@ public class SubsonicClientService : ISubsonicClientService
     private const string ClientId = "Hypersonic";
     private const string RestPath = "/rest";
 
+    private readonly ILogger _log;
+
     public ISubsonicClient? Client { get; private set; }
+
+    public SubsonicClientService(ILoggingService logService)
+    {
+        _log = logService.GetLogger(nameof(SubsonicClientService));
+    }
 
     public void CreateClient(ServerCredential credential)
     {
@@ -22,16 +29,21 @@ public class SubsonicClientService : ISubsonicClientService
             credential.Password,
             ClientVersion,
             ClientId);
+
+        _log.Info("Client created", new { credential.ServerUrl, credential.Username });
     }
 
     public async Task<ConnectionTestResult> TestConnectionAsync(ServerCredential credential)
     {
         var urls = ResolveServerUrls(credential.ServerUrl);
+        _log.Info("Testing connection", new { Input = credential.ServerUrl, CandidateUrls = urls });
 
         foreach (var url in urls)
         {
             try
             {
+                _log.Debug("Pinging server", new { Url = url });
+
                 var client = new SubsonicClient(
                     new HttpClient(),
                     url,
@@ -41,13 +53,21 @@ public class SubsonicClientService : ISubsonicClientService
                     ClientId);
 
                 var response = await client.PingAsync();
+
+                _log.Info("Connection test succeeded", new { Url = url, response.Status });
                 return new ConnectionTestResult(response, url);
             }
-            catch (HttpRequestException) when (urls.Length > 1 && url != urls[^1])
+            catch (HttpRequestException ex) when (urls.Length > 1 && url != urls[^1])
             {
                 // If there are multiple URLs to try and this isn't the last one,
                 // swallow HTTP errors and try the next URL.
+                _log.Warning("Connection attempt failed, trying next URL", new { Url = url }, ex);
                 continue;
+            }
+            catch (HttpRequestException ex)
+            {
+                _log.Error("Connection test failed on final URL", new { Url = url }, ex);
+                throw;
             }
         }
 

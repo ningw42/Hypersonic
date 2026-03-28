@@ -16,6 +16,7 @@ public class ActivationService : IActivationService
     private readonly IBackdropSelectorService _backdropSelectorService;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ISubsonicClientService _subsonicClientService;
+    private readonly ILogger _log;
 
     public ActivationService(
         ActivationHandler<LaunchActivatedEventArgs> defaultHandler,
@@ -23,7 +24,8 @@ public class ActivationService : IActivationService
         IThemeSelectorService themeSelectorService,
         IBackdropSelectorService backdropSelectorService,
         ILocalSettingsService localSettingsService,
-        ISubsonicClientService subsonicClientService)
+        ISubsonicClientService subsonicClientService,
+        ILoggingService logService)
     {
         _defaultHandler = defaultHandler;
         _activationHandlers = activationHandlers;
@@ -31,10 +33,13 @@ public class ActivationService : IActivationService
         _backdropSelectorService = backdropSelectorService;
         _localSettingsService = localSettingsService;
         _subsonicClientService = subsonicClientService;
+        _log = logService.GetLogger(nameof(ActivationService));
     }
 
     public async Task ActivateAsync(object activationArgs)
     {
+        _log.Info("Activation started");
+
         // Execute tasks before activation.
         await InitializeAsync();
 
@@ -45,6 +50,8 @@ public class ActivationService : IActivationService
 
             if (credential != null && !string.IsNullOrWhiteSpace(credential.ServerUrl))
             {
+                _log.Info("Saved credential found", new { credential.ServerUrl, credential.Username });
+
                 // Try saved credentials
                 try
                 {
@@ -54,21 +61,25 @@ public class ActivationService : IActivationService
                     {
                         credential.ServerUrl = result.ResolvedUrl;
                         _subsonicClientService.CreateClient(credential);
+                        _log.Info("Auto-connect succeeded, showing shell");
                         ShowShell(activationArgs);
                     }
                     else
                     {
                         var errorDetail = result.Response.Error?.Message ?? "Server returned an error";
+                        _log.Warning("Auto-connect returned error", new { Error = errorDetail });
                         ShowConnectPage(errorDetail);
                     }
                 }
                 catch (Exception ex)
                 {
+                    _log.Warning("Auto-connect failed", exception: ex);
                     ShowConnectPage($"Could not connect: {ex.Message}");
                 }
             }
             else
             {
+                _log.Info("No saved credential, showing connect page");
                 ShowConnectPage();
             }
         }
@@ -82,6 +93,8 @@ public class ActivationService : IActivationService
 
         // Execute tasks after activation.
         await StartupAsync();
+
+        _log.Info("Activation completed");
     }
 
     private void ShowShell(object activationArgs)
@@ -122,6 +135,7 @@ public class ActivationService : IActivationService
 
     private async Task InitializeAsync()
     {
+        _log.Debug("Initializing theme and backdrop");
         await _themeSelectorService.InitializeAsync().ConfigureAwait(false);
         await _backdropSelectorService.InitializeAsync().ConfigureAwait(false);
         await Task.CompletedTask;

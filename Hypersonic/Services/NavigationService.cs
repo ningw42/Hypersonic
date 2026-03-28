@@ -14,6 +14,7 @@ namespace Hypersonic.Services;
 public class NavigationService : INavigationService
 {
     private readonly IPageService _pageService;
+    private readonly ILogger _log;
     private object? _lastParameterUsed;
     private Frame? _frame;
 
@@ -43,9 +44,10 @@ public class NavigationService : INavigationService
     [MemberNotNullWhen(true, nameof(Frame), nameof(_frame))]
     public bool CanGoBack => Frame != null && Frame.CanGoBack;
 
-    public NavigationService(IPageService pageService)
+    public NavigationService(IPageService pageService, ILoggingService logService)
     {
         _pageService = pageService;
+        _log = logService.GetLogger(nameof(NavigationService));
     }
 
     private void RegisterFrameEvents()
@@ -70,6 +72,7 @@ public class NavigationService : INavigationService
         {
             var vmBeforeNavigation = _frame.GetPageViewModel();
             _frame.GoBack();
+            _log.Info("Navigated back", new { Page = _frame.Content?.GetType().Name });
             if (vmBeforeNavigation is INavigationAware navigationAware)
             {
                 navigationAware.OnNavigatedFrom();
@@ -93,6 +96,7 @@ public class NavigationService : INavigationService
             if (navigated)
             {
                 _lastParameterUsed = parameter;
+                _log.Info("Navigated", new { Page = pageType?.Name, Parameter = parameter });
                 if (vmBeforeNavigation is INavigationAware navigationAware)
                 {
                     navigationAware.OnNavigatedFrom();

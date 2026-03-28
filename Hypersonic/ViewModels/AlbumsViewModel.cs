@@ -13,6 +13,7 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
     private const int PageSize = 50;
 
     private readonly ISubsonicClientService _subsonicClientService;
+    private readonly ILogger _log;
     private int _offset;
 
     [ObservableProperty]
@@ -50,9 +51,10 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
         "Album Artist",
     ];
 
-    public AlbumsViewModel(ISubsonicClientService subsonicClientService)
+    public AlbumsViewModel(ISubsonicClientService subsonicClientService, ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
+        _log = logService.GetLogger(nameof(AlbumsViewModel));
         Albums = new IncrementalAlbumCollection(LoadMoreAlbumsAsync);
     }
 
@@ -108,6 +110,7 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            _log.Error("Failed to load albums", exception: ex);
         }
         finally
         {
@@ -125,6 +128,8 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
 
         var (type, fromYear, toYear) = GetSortParameters();
 
+        _log.Debug("Fetching albums", new { SortType = type, Offset = _offset, Count = count });
+
         var response = await client.GetAlbumList2Async(
             type,
             size: (int)count,
@@ -139,6 +144,8 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
         }
 
         _offset += albums.Length;
+
+        _log.Info("Albums fetched", new { Count = albums.Length, TotalOffset = _offset });
 
         var result = new List<AlbumInfo>(albums.Length);
         foreach (var album in albums)

@@ -14,6 +14,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly INavigationService _navigationService;
+    private readonly ILogger _log;
     private List<AlbumInfo> _allAlbums = [];
 
     [ObservableProperty]
@@ -81,10 +82,11 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
         "Name",
     ];
 
-    public ArtistDetailViewModel(ISubsonicClientService subsonicClientService, INavigationService navigationService)
+    public ArtistDetailViewModel(ISubsonicClientService subsonicClientService, INavigationService navigationService, ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
         _navigationService = navigationService;
+        _log = logService.GetLogger(nameof(ArtistDetailViewModel));
     }
 
     public async void OnNavigatedTo(object parameter)
@@ -168,6 +170,8 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 return;
             }
 
+            _log.Info("Artist fetched", new { ArtistId = artistId, artist.Name, artist.AlbumCount });
+
             ArtistName = artist.Name ?? string.Empty;
             AlbumCount = artist.AlbumCount;
 
@@ -234,9 +238,10 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // GetArtistInfo2 may not be supported; page still works without it
+                _log.Debug("GetArtistInfo2 unavailable");
             }
 
             ApplySorting();
@@ -244,6 +249,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            _log.Error("Failed to load artist", new { ArtistId = artistId }, ex);
         }
         finally
         {

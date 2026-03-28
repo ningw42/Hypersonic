@@ -16,6 +16,7 @@ public class LocalSettingsService : ILocalSettingsService
 
     private readonly IFileService _fileService;
     private readonly LocalSettingsOptions _options;
+    private readonly ILogger _log;
 
     private readonly string _localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
     private readonly string _applicationDataFolder;
@@ -25,15 +26,23 @@ public class LocalSettingsService : ILocalSettingsService
 
     private bool _isInitialized;
 
-    public LocalSettingsService(IFileService fileService, IOptions<LocalSettingsOptions> options)
+    public LocalSettingsService(IFileService fileService, IOptions<LocalSettingsOptions> options, ILoggingService logService)
     {
         _fileService = fileService;
         _options = options.Value;
+        _log = logService.GetLogger(nameof(LocalSettingsService));
 
         _applicationDataFolder = Path.Combine(_localApplicationData, _options.ApplicationDataFolder ?? _defaultApplicationDataFolder);
         _localsettingsFile = _options.LocalSettingsFile ?? _defaultLocalSettingsFile;
 
         _settings = new Dictionary<string, object>();
+
+        _log.Info("Settings initialized", new
+        {
+            IsMSIX = RuntimeHelper.IsMSIX,
+            DataFolder = _applicationDataFolder,
+            SettingsFile = _localsettingsFile,
+        });
     }
 
     private async Task InitializeAsync()
@@ -42,6 +51,7 @@ public class LocalSettingsService : ILocalSettingsService
         {
             _settings = await Task.Run(() => _fileService.Read<IDictionary<string, object>>(_applicationDataFolder, _localsettingsFile)) ?? new Dictionary<string, object>();
 
+            _log.Debug("Settings file loaded", new { KeyCount = _settings.Count });
             _isInitialized = true;
         }
     }
@@ -52,6 +62,7 @@ public class LocalSettingsService : ILocalSettingsService
         {
             if (ApplicationData.Current.LocalSettings.Values.TryGetValue(key, out var obj))
             {
+                _log.Debug("Setting read", new { Key = key });
                 return await Json.ToObjectAsync<T>((string)obj);
             }
         }
@@ -61,10 +72,12 @@ public class LocalSettingsService : ILocalSettingsService
 
             if (_settings != null && _settings.TryGetValue(key, out var obj))
             {
+                _log.Debug("Setting read", new { Key = key });
                 return await Json.ToObjectAsync<T>((string)obj);
             }
         }
 
+        _log.Debug("Setting not found", new { Key = key });
         return default;
     }
 
@@ -82,5 +95,7 @@ public class LocalSettingsService : ILocalSettingsService
 
             await Task.Run(() => _fileService.Save(_applicationDataFolder, _localsettingsFile, _settings));
         }
+
+        _log.Debug("Setting saved", new { Key = key });
     }
 }

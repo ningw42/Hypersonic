@@ -13,6 +13,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly IPlaybackService _playbackService;
+    private readonly ILogger _log;
     private List<SongInfo> _allSongs = [];
 
     [ObservableProperty]
@@ -44,10 +45,11 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
 
     public ObservableCollection<object> TrackListItems { get; } = [];
 
-    public PlaylistDetailViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService)
+    public PlaylistDetailViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService, ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
         _playbackService = playbackService;
+        _log = logService.GetLogger(nameof(PlaylistDetailViewModel));
     }
 
     public async void OnNavigatedTo(object parameter)
@@ -83,6 +85,8 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
                 return;
             }
 
+            _log.Info("Playlist fetched", new { PlaylistId = playlistId, playlist.Name, playlist.SongCount });
+
             PlaylistName = playlist.Name ?? string.Empty;
             Owner = playlist.Owner ?? string.Empty;
             Comment = playlist.Comment;
@@ -111,6 +115,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            _log.Error("Failed to load playlist", new { PlaylistId = playlistId }, ex);
         }
         finally
         {
@@ -126,6 +131,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
             return;
         }
 
+        _log.Info("Playing playlist", new { Playlist = PlaylistName, SongCount = _allSongs.Count });
         _playbackService.PlayQueue(BuildPlaybackTracks(), 0);
     }
 
@@ -139,6 +145,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
 
         var tracks = BuildPlaybackTracks();
         var index = _allSongs.IndexOf(song);
+        _log.Info("Playing playlist from track", new { Playlist = PlaylistName, TrackId = song.Id, song.Title, Index = index });
         _playbackService.PlayQueue(tracks, index >= 0 ? index : 0);
     }
 
@@ -170,9 +177,10 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
                 await client.StarAsync(id: song.Id);
             }
         }
-        catch
+        catch (Exception ex)
         {
             song.IsStarred = wasStarred;
+            _log.Warning("Failed to toggle star", new { SongId = song.Id, wasStarred }, ex);
         }
     }
 

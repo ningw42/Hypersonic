@@ -17,6 +17,7 @@ public sealed class TaskbarService : ITaskbarService
 
     private readonly IPlaybackService _playbackService;
     private readonly DispatcherQueue _dispatcherQueue;
+    private readonly ILogger _log;
 
     private IntPtr _hwnd;
     private ITaskbarList3? _taskbarList;
@@ -33,10 +34,11 @@ public sealed class TaskbarService : ITaskbarService
     private bool _buttonsAdded;
     private bool _disposed;
 
-    public TaskbarService(IPlaybackService playbackService)
+    public TaskbarService(IPlaybackService playbackService, ILoggingService logService)
     {
         _playbackService = playbackService;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _log = logService.GetLogger(nameof(TaskbarService));
     }
 
     public void Initialize(IntPtr hwnd)
@@ -47,14 +49,16 @@ public sealed class TaskbarService : ITaskbarService
         {
             _taskbarList = TaskbarNativeMethods.CreateTaskbarList();
         }
-        catch
+        catch (Exception ex)
         {
+            _log.Error("Failed to create taskbar COM object", exception: ex);
             return;
         }
 
         _taskbarButtonCreatedMessage = TaskbarNativeMethods.RegisterWindowMessageW("TaskbarButtonCreated");
 
         _isDarkTaskbar = DetectDarkTaskbar();
+        _log.Info("Taskbar initialized", new { IsDark = _isDarkTaskbar });
         CreateAllIcons();
 
         // Set up the window subclass BEFORE adding buttons.

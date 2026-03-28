@@ -12,6 +12,7 @@ namespace Hypersonic.ViewModels;
 public partial class PlaylistsViewModel : ObservableRecipient, INavigationAware
 {
     private readonly ISubsonicClientService _subsonicClientService;
+    private readonly ILogger _log;
     private List<PlaylistInfo> _allPlaylists = [];
 
     [ObservableProperty]
@@ -44,9 +45,10 @@ public partial class PlaylistsViewModel : ObservableRecipient, INavigationAware
         "Duration",
     ];
 
-    public PlaylistsViewModel(ISubsonicClientService subsonicClientService)
+    public PlaylistsViewModel(ISubsonicClientService subsonicClientService, ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
+        _log = logService.GetLogger(nameof(PlaylistsViewModel));
     }
 
     public async void OnNavigatedTo(object parameter)
@@ -114,11 +116,14 @@ public partial class PlaylistsViewModel : ObservableRecipient, INavigationAware
                 });
             }
 
+            _log.Info("Playlists fetched", new { Count = _allPlaylists.Count });
+
             ApplySorting();
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            _log.Error("Failed to load playlists", exception: ex);
         }
         finally
         {

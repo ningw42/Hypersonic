@@ -12,15 +12,18 @@ public class ThemeSelectorService : IThemeSelectorService
     public ElementTheme Theme { get; set; } = ElementTheme.Default;
 
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly ILogger _log;
 
-    public ThemeSelectorService(ILocalSettingsService localSettingsService)
+    public ThemeSelectorService(ILocalSettingsService localSettingsService, ILoggingService logService)
     {
         _localSettingsService = localSettingsService;
+        _log = logService.GetLogger(nameof(ThemeSelectorService));
     }
 
     public async Task InitializeAsync()
     {
         Theme = await LoadThemeFromSettingsAsync();
+        _log.Info("Theme loaded", new { Theme });
         await Task.CompletedTask;
     }
 

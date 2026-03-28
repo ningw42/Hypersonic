@@ -12,6 +12,7 @@ namespace Hypersonic.ViewModels;
 public partial class ArtistsViewModel : ObservableRecipient, INavigationAware
 {
     private readonly ISubsonicClientService _subsonicClientService;
+    private readonly ILogger _log;
     private List<ArtistInfo> _allArtists = [];
 
     [ObservableProperty]
@@ -44,9 +45,10 @@ public partial class ArtistsViewModel : ObservableRecipient, INavigationAware
         "Rating",
     ];
 
-    public ArtistsViewModel(ISubsonicClientService subsonicClientService)
+    public ArtistsViewModel(ISubsonicClientService subsonicClientService, ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
+        _log = logService.GetLogger(nameof(ArtistsViewModel));
     }
 
     public async void OnNavigatedTo(object parameter)
@@ -123,11 +125,14 @@ public partial class ArtistsViewModel : ObservableRecipient, INavigationAware
                 }
             }
 
+            _log.Info("Artists fetched", new { Count = _allArtists.Count });
+
             ApplySorting();
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            _log.Error("Failed to load artists", exception: ex);
         }
         finally
         {

@@ -14,6 +14,7 @@ public partial class ShellViewModel : ObservableRecipient
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly IPlaybackService _playbackService;
+    private readonly ILogger _log;
     private CancellationTokenSource? _searchCts;
 
     [ObservableProperty]
@@ -52,13 +53,15 @@ public partial class ShellViewModel : ObservableRecipient
         INavigationService navigationService,
         INavigationViewService navigationViewService,
         ISubsonicClientService subsonicClientService,
-        IPlaybackService playbackService)
+        IPlaybackService playbackService,
+        ILoggingService logService)
     {
         NavigationService = navigationService;
         NavigationService.Navigated += OnNavigated;
         NavigationViewService = navigationViewService;
         _subsonicClientService = subsonicClientService;
         _playbackService = playbackService;
+        _log = logService.GetLogger(nameof(ShellViewModel));
     }
 
     public async Task PerformSearchAsync(string query)
@@ -175,13 +178,15 @@ public partial class ShellViewModel : ObservableRecipient
             HasAlbumResults = albums.Count > 0;
             HasSongResults = songs.Count > 0;
             IsSearchResultsVisible = HasArtistResults || HasAlbumResults || HasSongResults;
+
+            _log.Debug("Search completed", new { Query = query, Artists = artists.Count, Albums = albums.Count, Songs = songs.Count });
         }
         catch (TaskCanceledException)
         {
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Silently fail for search suggestions
+            _log.Warning("Search failed", new { Query = query }, ex);
         }
     }
 

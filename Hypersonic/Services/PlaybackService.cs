@@ -103,6 +103,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null)
     {
+        _log.Info("Queue started", new { TrackCount = tracks.Count, StartIndex = startIndex });
         _source = source;
         _playbackQueue.SetQueue(tracks, startIndex);
 
@@ -193,6 +194,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void AddNext(IList<PlaybackTrack> tracks)
     {
+        _log.Debug("Adding tracks after current", new { Count = tracks.Count });
         var prevHasNext = HasNext;
         var prevHasPrevious = HasPrevious;
         _playbackQueue.AddNext(tracks);
@@ -202,6 +204,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void AddToEnd(IList<PlaybackTrack> tracks)
     {
+        _log.Debug("Adding tracks to end", new { Count = tracks.Count });
         var prevHasNext = HasNext;
         var prevHasPrevious = HasPrevious;
         _playbackQueue.AddToEnd(tracks);
@@ -211,6 +214,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void RemoveAt(int index)
     {
+        _log.Debug("Removing track from queue", new { Index = index });
         var prevHasNext = HasNext;
         var prevHasPrevious = HasPrevious;
         var newCurrent = _playbackQueue.RemoveAt(index);
@@ -272,6 +276,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void ClearAll()
     {
+        _log.Info("Queue cleared");
         _mediaPlayer.Pause();
         _mediaPlayer.Source = null;
         _source = null;
@@ -296,8 +301,11 @@ public class PlaybackService : IPlaybackService, IDisposable
         var result = _playbackQueue.JumpToTrack(trackId);
         if (result == null)
         {
+            _log.Debug("JumpToTrack ignored, track not in queue", new { TrackId = trackId });
             return;
         }
+
+        _log.Info("Jumped to track", new { TrackId = trackId });
 
         PlayCurrent();
         FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
@@ -310,6 +318,8 @@ public class PlaybackService : IPlaybackService, IDisposable
         {
             return;
         }
+
+        _log.Info("Playing track", new { TrackId = track.Id, track.Title });
 
         Duration = track.Duration;
         Position = 0;
@@ -420,6 +430,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
             if (next != null)
             {
+                _log.Debug("Auto-advancing to next track");
                 PlayCurrent();
                 FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
             }
@@ -427,6 +438,7 @@ public class PlaybackService : IPlaybackService, IDisposable
             {
                 // End of queue — stop playback, reset position and duration.
                 // NowPlaying remains set so the UI shows what was last playing.
+                _log.Info("Queue ended");
                 IsPlaying = false;
                 Position = 0;
                 Duration = 0;
