@@ -19,6 +19,7 @@ dotnet build Hypersonic.Client/Hypersonic.Client.csproj
 # Run tests
 dotnet test Hypersonic.Tests.MSTest/Hypersonic.Tests.MSTest.csproj
 dotnet test Hypersonic.Client.UnitTest/Hypersonic.Client.UnitTest.csproj
+dotnet test Hypersonic.UnitTest/Hypersonic.UnitTest.csproj
 
 # Run a single test
 dotnet test --filter "FullyQualifiedName~TestMethodName"
@@ -35,8 +36,9 @@ Note: The main WinUI app (`Hypersonic.csproj`) targets `net10.0-windows10.0.1904
 |---|---|
 | **Hypersonic** | WinUI 3 desktop app (Views, ViewModels, Services, Controls) |
 | **Hypersonic.Client** | Subsonic/OpenSubsonic API client library |
-| **Hypersonic.Tests.MSTest** | App unit tests (MSTest) |
+| **Hypersonic.Tests.MSTest** | App unit tests (MSTest, WinUI `[UITestMethod]`) |
 | **Hypersonic.Client.UnitTest** | Client library tests |
+| **Hypersonic.UnitTest** | Pure logic unit tests (PlaybackQueue, LoggingService) |
 
 ## App Folder Structure
 
@@ -50,13 +52,14 @@ Hypersonic/
 │   └── ViewModels/   # ViewModel interfaces (INavigationAware)
 ├── Controls/         # Custom controls (MarqueeTextBlock, SquarePanel)
 ├── Converters/       # XAML value converters
-├── Helpers/          # Utilities (TitleBarHelper, TrackListTemplateSelector)
+├── Helpers/          # Utilities (TitleBarHelper, RuntimeHelper, TrackListTemplateSelector)
 ├── Interop/          # COM interop (ITaskbarList3 for taskbar thumbnail buttons)
-├── Models/           # View-layer models (PlaybackTrack, SongInfo, SearchSuggestionItem)
-├── Services/         # Service implementations
+├── Models/           # View-layer models and enums (PlaybackTrack, SongInfo, BackdropType, RepeatMode)
+├── Services/
+│   └── Logging/      # Log sinks (FileSink, DebugSink)
 ├── Strings/en-us/    # Localization resources (Resources.resw)
 ├── Styles/           # Resource dictionaries (FontSizes, TextBlock, Thickness)
-├── Themes/           # Generic.xaml (custom control templates, FavoriteToggleButtonStyle)
+├── Themes/           # Generic.xaml (custom control templates, converters, FavoriteToggleButtonStyle)
 ├── ViewModels/       # MVVM ViewModels
 └── Views/            # XAML Pages
 ```
@@ -87,15 +90,17 @@ Hypersonic/
 | **IThemeSelectorService** | Persists theme preference (Light/Dark/Default) and updates title bar dynamically. |
 | **ILocalSettingsService** | Key-value persistence using `ApplicationData` (MSIX) or file-based JSON (unpackaged). |
 | **ITaskbarService** | Taskbar thumbnail buttons (Prev/Play-Pause/Next) via `ITaskbarList3` COM interop. Theme-aware icon rendering with GDI+. |
-| **IActivationService** | Startup orchestration: credential check → `ConnectPage` or `ShellPage`, theme + taskbar init. |
+| **ILoggingService** | Custom sink-based logging. Category-scoped loggers via `GetLogger(name)`. Sinks: `DebugSink` (debug output), `FileSink` (per-launch log files). |
+| **IBackdropSelectorService** | Persists and applies window backdrop: `None`, `Mica`, `MicaAlt`, `Acrylic`. Coordinates with theme service. |
+| **IActivationService** | Startup orchestration: credential check → `ConnectPage` or `ShellPage`, theme + taskbar + backdrop init. |
 
 ### Playback architecture
 
 - **Engine**: `Windows.Media.Playback.MediaPlayer` (native Windows media engine).
-- **SMTC**: System Media Transport Controls integration for lock screen / media key support. CommandManager is disabled; SMTC managed manually.
-- **Queue**: Linear playlist in `PlaybackService` with auto-advance on track end.
+- **SMTC**: System Media Transport Controls for lock screen / media key support. `CommandManager.IsEnabled = true` for automatic integration.
+- **Queue logic**: `PlaybackQueue` — pure logic class (no WinUI dependencies, fully unit-testable). Manages shuffle (Fisher-Yates), repeat (`Off`/`One`/`All`), navigation history (ID-based stack), play history (ring buffer, max 100), and queue mutations (`AddNext`, `AddToEnd`, `RemoveAt`, `MoveTrack`, `ClearUpcoming`).
 - **Position tracking**: `DispatcherQueueTimer` fires every 500ms to update the `Position` property.
-- **Event-driven**: PlaybackService raises events; `PlayerViewModel` and `TaskbarService` subscribe to update UI and taskbar state.
+- **Event-driven**: PlaybackService raises events (`PlaybackStateChanged`, `TrackChanged`, `PositionChanged`); `PlayerViewModel` and `TaskbarService` subscribe.
 
 ### Shell layout
 
@@ -116,9 +121,36 @@ Hypersonic/
 - **Incremental loading**: `IncrementalAlbumCollection` implements `ISupportIncrementalLoading` for lazy-loaded album grids (50 items per batch).
 - **Search debounce**: 300ms delay via `Task.Delay` + `CancellationTokenSource` to prevent stale API calls.
 - **Disc-based grouping**: `AlbumDetailViewModel` groups songs by disc number using a mixed-type collection (`DiscHeaderItem` + `SongInfo`) rendered by `TrackListTemplateSelector`.
-- **Taskbar buttons**: `ITaskbarList3` COM interop renders Segoe MDL2 Assets glyphs to bitmaps via GDI+, theme-aware (light/dark).
+- **Taskbar buttons**: `ITaskbarList3` COM interop renders Segoe MDL2 Assets glyphs to bitmaps via GDI+, theme-aware (light/dark). Responds to `WM_COMMAND` (0x0111) for button clicks.
 - **Custom controls**: `MarqueeTextBlock` (Composition API horizontal scroll animation), `SquarePanel` (1:1 aspect ratio layout).
 - **Cover art**: Loaded via `SubsonicClient.GetCoverArtUri()`, displayed as `BitmapImage` in XAML and `RandomAccessStreamReference` for SMTC.
+- **DPI**: `app.manifest` sets `PerMonitorV2` DPI awareness.
+- **MSIX detection**: `RuntimeHelper.IsMSIX` (P/Invoke to `kernel32.dll`) determines packaged vs unpackaged mode, affecting settings storage and log file paths.
+
+## Logging
+
+Custom sink-based system (not `Microsoft.Extensions.Logging`). Obtain a category-scoped `ILogger` via `ILoggingService.GetLogger(nameof(Class))`. Methods: `Debug()`, `Info()`, `Warning()`, `Error()` — each accepts `message`, optional `context` object (serialized as JSON), and optional `Exception`.
+
+- **Sinks**: `DebugSink` (Debug output, all levels), `FileSink` (per-launch file in `Logs/` directory, Info+).
+- **Log files**: MSIX → `ApplicationData.Current.LocalFolder\Logs\`; unpackaged → `%LOCALAPPDATA%\Hypersonic\Logs\`. Named `hypersonic-{yyyyMMdd-HHmmss}.log`.
+- **Release mode**: `MinimumLevel` set to `Info` (debug messages suppressed).
+- **Thread-safe**: `Lock`-based synchronization. Sink failures are isolated (logged to Debug, don't propagate).
+
+## Persisted settings keys
+
+Stored via `ILocalSettingsService` (MSIX → `ApplicationData`; unpackaged → `%LOCALAPPDATA%\Hypersonic\ApplicationData\LocalSettings.json`):
+
+| Key | Type | Purpose |
+|---|---|---|
+| `"ServerCredential"` | `ServerCredential` | Server URL, username, password |
+| `"AppBackgroundRequestedTheme"` | `string` (enum) | Theme: Light/Dark/Default |
+| `"AppRequestedBackdrop"` | `string` (enum) | Backdrop: None/Mica/MicaAlt/Acrylic |
+
+## Design documentation
+
+Feature specs and implementation guides live in `docs/`:
+- `docs/design/` — Design rationale and API contracts
+- `docs/implementation/` — Step-by-step implementation plans
 
 ## Key dependencies
 
@@ -135,9 +167,16 @@ Hypersonic/
 ## Testing
 
 - **Framework**: MSTest with `coverlet.collector` for coverage.
-- **Client tests**: Deserialization tests for XML/JSON API responses, client constructor validation.
-- **App tests**: Server URL resolution logic.
+- **Client tests** (`Hypersonic.Client.UnitTest`): Deserialization tests for XML/JSON API responses, client constructor validation.
+- **App tests** (`Hypersonic.Tests.MSTest`): Server URL resolution logic. Uses `[UITestMethod]` for WinUI-dependent tests.
+- **Unit tests** (`Hypersonic.UnitTest`): Pure logic tests (PlaybackQueue, LoggingService) — no WinUI dependencies.
 - **No mocking library** — tests are integration-oriented against real serialized data.
+
+## Error handling
+
+- **Unhandled exceptions**: `App_UnhandledException` handler logs to `ILoggingService` before crash.
+- **API client**: Catches `JsonException`/`XmlException` during deserialization, wraps as `InvalidOperationException`. `HttpRequestException` for network failures.
+- **URL resolution**: Swallows `HttpRequestException` for intermediate URL candidates, propagates only on final failure.
 
 ## Code Style
 
@@ -146,3 +185,13 @@ Enforced via `.editorconfig`:
 - **Naming**: PascalCase for types/members, interfaces prefixed with `I`
 - **Preferences**: `var` everywhere, file-scoped namespaces, prefer braces, pattern matching over `as`+null check
 - **Line endings**: CRLF
+
+## XAML converters
+
+Registered globally in `Themes/Generic.xaml`. Key converters: `BoolToVisibilityConverter`, `InverseBoolToVisibilityConverter`, `PlayPauseGlyphConverter`, `SecondsToTimeConverter`, `VolumeToPercentageConverter`, `EnumToBooleanConverter` (in Helpers).
+
+## What's not in the repo
+
+- No CI/CD pipeline (GitHub Actions, Azure Pipelines, etc.)
+- No central package management (`Directory.Build.props`, `global.json`)
+- No mocking library
