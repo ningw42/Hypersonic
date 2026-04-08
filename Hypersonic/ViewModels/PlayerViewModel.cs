@@ -77,6 +77,12 @@ public partial class PlayerViewModel : ObservableRecipient
     [ObservableProperty]
     private string queueCountText = string.Empty;
 
+    [ObservableProperty]
+    private bool shuffleEnabled;
+
+    [ObservableProperty]
+    private RepeatMode repeatMode;
+
     private bool _isExternalUpdate;
     private double _volumeBeforeMute = 100;
 
@@ -88,6 +94,10 @@ public partial class PlayerViewModel : ObservableRecipient
         _playbackService.TrackChanged += OnTrackChanged;
         _playbackService.PositionChanged += OnPositionChanged;
         _playbackService.QueueChanged += OnQueueChanged;
+
+        // Hydrate from current service state
+        ShuffleEnabled = _playbackService.ShuffleEnabled;
+        RepeatMode = _playbackService.RepeatMode;
     }
 
     [RelayCommand]
@@ -119,6 +129,24 @@ public partial class PlayerViewModel : ObservableRecipient
     private void Previous()
     {
         _playbackService.PreviousTrack();
+    }
+
+    [RelayCommand]
+    private void ToggleShuffle()
+    {
+        _playbackService.ShuffleEnabled = !_playbackService.ShuffleEnabled;
+    }
+
+    [RelayCommand]
+    private void CycleRepeatMode()
+    {
+        _playbackService.RepeatMode = _playbackService.RepeatMode switch
+        {
+            RepeatMode.Off => RepeatMode.All,
+            RepeatMode.All => RepeatMode.One,
+            RepeatMode.One => RepeatMode.Off,
+            _ => RepeatMode.Off,
+        };
     }
 
     [RelayCommand]
@@ -251,6 +279,8 @@ public partial class PlayerViewModel : ObservableRecipient
         VolumePercent = Math.Round(_playbackService.Volume * 100);
         Duration = _playbackService.Duration;
         DurationText = FormatTime(_playbackService.Duration);
+        ShuffleEnabled = _playbackService.ShuffleEnabled;
+        RepeatMode = _playbackService.RepeatMode;
     }
 
     private void OnTrackChanged(object? sender, EventArgs e)

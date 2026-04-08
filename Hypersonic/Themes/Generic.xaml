@@ -13,6 +13,9 @@
     <converters:PlayPauseGlyphConverter x:Key="PlayPauseGlyphConverter"/>
     <converters:SecondsToTimeConverter x:Key="SecondsToTimeConverter"/>
     <converters:BoolToGlyphConverter x:Key="BoolToGlyphConverter"/>
+    <converters:RepeatModeGlyphConverter x:Key="RepeatModeGlyphConverter"/>
+    <converters:RepeatModeToOpacityConverter x:Key="RepeatModeToOpacityConverter"/>
+    <converters:RepeatModeToAccentBrushConverter x:Key="RepeatModeToAccentBrushConverter"/>
 
     <!-- Favorite heart toggle button: nothing when unchecked, hollow heart on hover, red filled heart when checked -->
     <Style x:Key="FavoriteToggleButtonStyle" TargetType="ToggleButton">

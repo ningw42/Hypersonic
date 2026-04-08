@@ -293,11 +293,42 @@
 
                         <!-- Header -->
                         <Grid Padding="16,12,16,8">
-                            <TextBlock Text="Queue" FontWeight="SemiBold" FontSize="14"/>
-                            <TextBlock Text="{x:Bind Player.QueueCountText, Mode=OneWay}"
-                                       HorizontalAlignment="Right"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       FontSize="12" VerticalAlignment="Center"/>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Title + count -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="Queue" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="{x:Bind Player.QueueCountText, Mode=OneWay}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Shuffle + Repeat -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="0">
+                                <ToggleButton IsChecked="{x:Bind Player.ShuffleEnabled, Mode=OneWay}"
+                                              Command="{x:Bind Player.ToggleShuffleCommand}"
+                                              Width="28" Height="28" Padding="0"
+                                              Background="Transparent" BorderThickness="0"
+                                              VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8B1;" FontSize="12"/>
+                                </ToggleButton>
+                                <Button Command="{x:Bind Player.CycleRepeatModeCommand}"
+                                        Width="28" Height="28" Padding="0"
+                                        Background="Transparent" BorderThickness="0"
+                                        VerticalAlignment="Center">
+                                    <FontIcon Glyph="{x:Bind Player.RepeatMode, Mode=OneWay,
+                                                      Converter={StaticResource RepeatModeGlyphConverter}}"
+                                              FontSize="12"
+                                              Opacity="{x:Bind Player.RepeatMode, Mode=OneWay,
+                                                        Converter={StaticResource RepeatModeToOpacityConverter}}"
+                                              Foreground="{x:Bind Player.RepeatMode, Mode=OneWay,
+                                                           Converter={StaticResource RepeatModeToAccentBrushConverter}}"/>
+                                </Button>
+                            </StackPanel>
                         </Grid>
 
                         <!-- Track list -->
@@ -417,6 +448,8 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
@@ -426,33 +459,56 @@
                                FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                VerticalAlignment="Center" Width="36" TextAlignment="Right" Margin="0,0,8,0"/>
 
-                    <Button Grid.Column="1" Command="{x:Bind Player.PreviousCommand}"
+                    <ToggleButton Grid.Column="1"
+                                  IsChecked="{x:Bind Player.ShuffleEnabled, Mode=OneWay}"
+                                  Command="{x:Bind Player.ToggleShuffleCommand}"
+                                  Width="32" Height="32" Padding="0"
+                                  Background="Transparent" BorderThickness="0"
+                                  VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE8B1;" FontSize="14"/>
+                    </ToggleButton>
+
+                    <Button Grid.Column="2" Command="{x:Bind Player.PreviousCommand}"
                             Width="32" Height="32" Padding="0"
                             Background="Transparent" BorderThickness="0" VerticalAlignment="Center">
                         <FontIcon Glyph="&#xE892;" FontSize="14"/>
                     </Button>
-                    <Button Grid.Column="2" x:Name="PlayPauseButton" Command="{x:Bind Player.PlayPauseCommand}"
+                    <Button Grid.Column="3" x:Name="PlayPauseButton" Command="{x:Bind Player.PlayPauseCommand}"
                             Width="36" Height="36" Padding="0" CornerRadius="18" VerticalAlignment="Center">
                         <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="16"/>
                     </Button>
-                    <Button Grid.Column="3" Command="{x:Bind Player.NextCommand}"
+                    <Button Grid.Column="4" Command="{x:Bind Player.NextCommand}"
                             Width="32" Height="32" Padding="0"
                             Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
-                            Margin="0,0,8,0">
+                            Margin="0,0,0,0">
                         <FontIcon Glyph="&#xE893;" FontSize="14"/>
                     </Button>
 
-                    <Slider Grid.Column="4" Minimum="0"
+                    <Button Grid.Column="5"
+                            Command="{x:Bind Player.CycleRepeatModeCommand}"
+                            Width="32" Height="32" Padding="0"
+                            Background="Transparent" BorderThickness="0"
+                            VerticalAlignment="Center" Margin="0,0,8,0">
+                        <FontIcon Glyph="{x:Bind Player.RepeatMode, Mode=OneWay,
+                                          Converter={StaticResource RepeatModeGlyphConverter}}"
+                                  FontSize="14"
+                                  Opacity="{x:Bind Player.RepeatMode, Mode=OneWay,
+                                            Converter={StaticResource RepeatModeToOpacityConverter}}"
+                                  Foreground="{x:Bind Player.RepeatMode, Mode=OneWay,
+                                               Converter={StaticResource RepeatModeToAccentBrushConverter}}"/>
+                    </Button>
+
+                    <Slider Grid.Column="6" Minimum="0"
                             Maximum="{x:Bind Player.Duration, Mode=OneWay}"
                             Value="{x:Bind Player.Position, Mode=TwoWay}"
                             ThumbToolTipValueConverter="{StaticResource SecondsToTimeConverter}"
                             VerticalAlignment="Center"/>
 
-                    <TextBlock Grid.Column="5" Text="{x:Bind Player.DurationText, Mode=OneWay}"
+                    <TextBlock Grid.Column="7" Text="{x:Bind Player.DurationText, Mode=OneWay}"
                                FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                VerticalAlignment="Center" Width="36" Margin="8,0,0,0"/>
 
-                    <ToggleButton x:Name="QueueToggleButton" Grid.Column="6"
+                    <ToggleButton x:Name="QueueToggleButton" Grid.Column="8"
                             IsChecked="{x:Bind Player.IsQueueOpen, Mode=TwoWay}"
                             Width="32" Height="32" Padding="0" Margin="8,0,0,0"
                             BorderThickness="0" VerticalAlignment="Center">
