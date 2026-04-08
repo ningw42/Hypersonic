@@ -309,13 +309,14 @@
 
                             <!-- Shuffle + Repeat -->
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="0">
-                                <ToggleButton IsChecked="{x:Bind Player.ShuffleEnabled, Mode=OneWay}"
-                                              Command="{x:Bind Player.ToggleShuffleCommand}"
-                                              Width="28" Height="28" Padding="0"
-                                              Background="Transparent" BorderThickness="0"
-                                              VerticalAlignment="Center">
-                                    <FontIcon Glyph="&#xE8B1;" FontSize="12"/>
-                                </ToggleButton>
+                                <Button Command="{x:Bind Player.ToggleShuffleCommand}"
+                                        Width="28" Height="28" Padding="0"
+                                        Background="Transparent" BorderThickness="0"
+                                        VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8B1;" FontSize="12"
+                                              Foreground="{x:Bind Player.ShuffleEnabled, Mode=OneWay,
+                                                           Converter={StaticResource BoolToAccentBrushConverter}}"/>
+                                </Button>
                                 <Button Command="{x:Bind Player.CycleRepeatModeCommand}"
                                         Width="28" Height="28" Padding="0"
                                         Background="Transparent" BorderThickness="0"
@@ -323,8 +324,6 @@
                                     <FontIcon Glyph="{x:Bind Player.RepeatMode, Mode=OneWay,
                                                       Converter={StaticResource RepeatModeGlyphConverter}}"
                                               FontSize="12"
-                                              Opacity="{x:Bind Player.RepeatMode, Mode=OneWay,
-                                                        Converter={StaticResource RepeatModeToOpacityConverter}}"
                                               Foreground="{x:Bind Player.RepeatMode, Mode=OneWay,
                                                            Converter={StaticResource RepeatModeToAccentBrushConverter}}"/>
                                 </Button>
@@ -459,14 +458,15 @@
                                FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                VerticalAlignment="Center" Width="36" TextAlignment="Right" Margin="0,0,8,0"/>
 
-                    <ToggleButton Grid.Column="1"
-                                  IsChecked="{x:Bind Player.ShuffleEnabled, Mode=OneWay}"
-                                  Command="{x:Bind Player.ToggleShuffleCommand}"
-                                  Width="32" Height="32" Padding="0"
-                                  Background="Transparent" BorderThickness="0"
-                                  VerticalAlignment="Center">
-                        <FontIcon Glyph="&#xE8B1;" FontSize="14"/>
-                    </ToggleButton>
+                    <Button Grid.Column="1"
+                            Command="{x:Bind Player.ToggleShuffleCommand}"
+                            Width="32" Height="32" Padding="0"
+                            Background="Transparent" BorderThickness="0"
+                            VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE8B1;" FontSize="14"
+                                  Foreground="{x:Bind Player.ShuffleEnabled, Mode=OneWay,
+                                               Converter={StaticResource BoolToAccentBrushConverter}}"/>
+                    </Button>
 
                     <Button Grid.Column="2" Command="{x:Bind Player.PreviousCommand}"
                             Width="32" Height="32" Padding="0"
@@ -492,8 +492,6 @@
                         <FontIcon Glyph="{x:Bind Player.RepeatMode, Mode=OneWay,
                                           Converter={StaticResource RepeatModeGlyphConverter}}"
                                   FontSize="14"
-                                  Opacity="{x:Bind Player.RepeatMode, Mode=OneWay,
-                                            Converter={StaticResource RepeatModeToOpacityConverter}}"
                                   Foreground="{x:Bind Player.RepeatMode, Mode=OneWay,
                                                Converter={StaticResource RepeatModeToAccentBrushConverter}}"/>
                     </Button>
@@ -510,9 +508,12 @@
 
                     <ToggleButton x:Name="QueueToggleButton" Grid.Column="8"
                             IsChecked="{x:Bind Player.IsQueueOpen, Mode=TwoWay}"
+                            Style="{StaticResource TransparentToggleButtonStyle}"
                             Width="32" Height="32" Padding="0" Margin="8,0,0,0"
-                            BorderThickness="0" VerticalAlignment="Center">
-                        <FontIcon Glyph="&#xEA37;" FontSize="14"/>
+                            VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xEA37;" FontSize="14"
+                                  Foreground="{x:Bind Player.IsQueueOpen, Mode=OneWay,
+                                               Converter={StaticResource BoolToAccentBrushConverter}}"/>
                     </ToggleButton>
                 </Grid>
 

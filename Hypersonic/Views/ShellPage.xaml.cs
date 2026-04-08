@@ -88,6 +88,8 @@ public sealed partial class ShellPage : Page
             args.Handled = true;
         };
         KeyboardAccelerators.Add(searchAccelerator);
+
+        ActualThemeChanged += (_, _) => Player.NotifyThemeChanged();
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)

@@ -1,6 +1,5 @@
 using Hypersonic.Models;
 
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Media;
 
@@ -10,11 +9,10 @@ public class RepeatModeToAccentBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
     {
-        var isActive = value is RepeatMode mode && mode != RepeatMode.Off;
-        var key = isActive
+        var key = value is RepeatMode mode && mode != RepeatMode.Off
             ? "AccentTextFillColorPrimaryBrush"
-            : "TextFillColorTertiaryBrush";
-        return (Brush)Application.Current.Resources[key];
+            : "TextFillColorPrimaryBrush";
+        return BoolToAccentBrushConverter.GetThemedBrush(key);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)

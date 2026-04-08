@@ -100,6 +100,17 @@ public partial class PlayerViewModel : ObservableRecipient
         RepeatMode = _playbackService.RepeatMode;
     }
 
+    /// <summary>
+    /// Re-evaluates converter bindings that depend on the current theme.
+    /// Called from ShellPage when ActualThemeChanged fires.
+    /// </summary>
+    internal void NotifyThemeChanged()
+    {
+        OnPropertyChanged(nameof(ShuffleEnabled));
+        OnPropertyChanged(nameof(RepeatMode));
+        OnPropertyChanged(nameof(IsQueueOpen));
+    }
+
     [RelayCommand]
     private void PlayPause()
     {
