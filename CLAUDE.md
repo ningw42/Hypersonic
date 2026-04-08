@@ -10,10 +10,10 @@ Hypersonic is a WinUI 3 desktop music streaming client for Subsonic/OpenSubsonic
 
 ```bash
 # Build the full solution
-dotnet build Hypersonic.sln
+dotnet build Hypersonic.sln -p:Platform=x64
 
 # Build a specific project
-dotnet build Hypersonic/Hypersonic.csproj
+dotnet build Hypersonic/Hypersonic.csproj -p:Platform=x64
 dotnet build Hypersonic.Client/Hypersonic.Client.csproj
 
 # Run tests
@@ -70,12 +70,12 @@ Hypersonic/
 
 ### Key patterns
 
-- **DI registration**: All services, ViewModels, and Views are registered in `App.xaml.cs`. Services are singleton; Views/ViewModels are transient.
+- **DI registration**: All services, ViewModels, and Views are registered in `App.xaml.cs`. Services are singleton; Views/ViewModels are transient. Exceptions: `PlayerViewModel` is **singleton** (persists across navigation); `INavigationViewService` is **transient**.
 - **Service resolution**: `App.GetService<T>()` is the static accessor for resolving services anywhere.
 - **Navigation**: Frame-based. `PageService` maps ViewModel types to Page types by full name. When adding a new page, you must: (1) create the View and ViewModel, (2) register both in `App.xaml.cs`, (3) add the mapping in `PageService.Configure()`.
 - **ViewModel base**: ViewModels extend `ObservableRecipient` (from CommunityToolkit.Mvvm). Use `[ObservableProperty]` and `[RelayCommand]` source generator attributes.
 - **INavigationAware**: ViewModels implement this contract to receive `OnNavigatedTo`/`OnNavigatedFrom` lifecycle callbacks.
-- **Server connection**: `ISubsonicClientService` (singleton) manages the `SubsonicClient` lifecycle. Credentials are persisted via `ILocalSettingsService` under key `"ServerCredential"`. On startup, `DefaultActivationHandler` checks for saved credentials and navigates to `ConnectPage` or `MainPage` accordingly. URL resolution is intelligent: tries `https://<host>/rest` first, then bare host.
+- **Server connection**: `ISubsonicClientService` (singleton) manages the `SubsonicClient` lifecycle. Credentials are persisted via `ILocalSettingsService` under key `"ServerCredential"`. On startup, `ActivationService` checks for saved credentials and navigates to `ConnectPage` or `ShellPage` accordingly (`DefaultActivationHandler` only handles fallback navigation to `MainViewModel` once the shell exists). URL resolution is intelligent: tries `https://<host>/rest` first, then bare host.
 - **Localization**: String resources are in `Strings/en-us/Resources.resw`.
 
 ### Services
@@ -107,11 +107,11 @@ Hypersonic/
 1. **Top bar** — App icon + title (left), search box with `Ctrl+K` hotkey (center), popup with 3-column results (Artists | Albums | Songs).
 2. **Sidebar** — `NavigationView` with: Home, Albums, Artists, Playlists, Settings.
 3. **Content area** — `Frame` for page content.
-4. **Bottom bar** — `PlayerControl` (now playing info, playback buttons, seek bar, volume).
+4. **Bottom bar** — Player bar defined inline in `ShellPage.xaml` (now playing info, playback buttons, seek bar, volume, queue popup).
 
 ### Subsonic API Client (`Hypersonic.Client`)
 
-- `ISubsonicClient` / `SubsonicClient` — comprehensive wrapper covering System, Browsing, Album/Song Lists, Searching, Playlists, Media Retrieval, Media Annotation, Sharing, Podcasts, User Management, Bookmarks, and Library Scanning APIs.
+- `ISubsonicClient` / `SubsonicClient` — wrapper covering System, Browsing, Album/Song Lists, Searching, Playlists, Media Retrieval, Media Annotation, User Management, and Library Scanning APIs. Sharing, Podcast, Bookmark, Jukebox, and Chat regions are **stub placeholders** (empty `#region` blocks with no methods).
 - API endpoints are defined as constants in `Constants.Action`.
 - Request/Response pattern with strongly-typed DTOs in `Models/Entities/`, `Models/Requests/`, `Models/Responses/`.
 - Supports both XML and JSON response formats.
@@ -145,6 +145,10 @@ Stored via `ILocalSettingsService` (MSIX → `ApplicationData`; unpackaged → `
 | `"ServerCredential"` | `ServerCredential` | Server URL, username, password |
 | `"AppBackgroundRequestedTheme"` | `string` (enum) | Theme: Light/Dark/Default |
 | `"AppRequestedBackdrop"` | `string` (enum) | Backdrop: None/Mica/MicaAlt/Acrylic |
+
+## MVP Roadmap
+
+See [`ROADMAP.md`](ROADMAP.md) for the phased MVP plan — covers playback polish, persistence, full-window player with lyrics, scrobbling, playlist management, keyboard shortcuts, and stretch-goal offline caching.
 
 ## Design documentation
 
@@ -188,7 +192,7 @@ Enforced via `.editorconfig`:
 
 ## XAML converters
 
-Registered globally in `Themes/Generic.xaml`. Key converters: `BoolToVisibilityConverter`, `InverseBoolToVisibilityConverter`, `PlayPauseGlyphConverter`, `SecondsToTimeConverter`, `VolumeToPercentageConverter`, `EnumToBooleanConverter` (in Helpers).
+Registered globally in `Themes/Generic.xaml`. Key converters: `BoolToVisibilityConverter`, `InverseBoolToVisibilityConverter`, `StringToBoolConverter`, `PlayPauseGlyphConverter`, `SecondsToTimeConverter`, `VolumeToPercentageConverter`, `BoolToGlyphConverter`. Note: `EnumToBooleanConverter` (in Helpers) is registered locally in `SettingsPage.xaml`, not in Generic.xaml.
 
 ## What's not in the repo
 
