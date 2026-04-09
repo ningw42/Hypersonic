@@ -5,7 +5,7 @@
 | Item | Size | Status |
 |------|------|--------|
 | **Phase 1 — Core Playback Polish** | | |
-| 1.1 Shuffle & Repeat UI | S | 🔲 Not started |
+| 1.1 Shuffle & Repeat UI | S | ✅ Complete |
 | 1.2 Persistence (Settings & State) | M | 🔲 Not started |
 | **Phase 2 — Experience Essentials** | | |
 | 2.1 Home Page | M | 🔲 Not started |
