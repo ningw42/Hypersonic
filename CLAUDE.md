@@ -75,7 +75,7 @@ Hypersonic/
 - **Navigation**: Frame-based. `PageService` maps ViewModel types to Page types by full name. When adding a new page, you must: (1) create the View and ViewModel, (2) register both in `App.xaml.cs`, (3) add the mapping in `PageService.Configure()`.
 - **ViewModel base**: ViewModels extend `ObservableRecipient` (from CommunityToolkit.Mvvm). Use `[ObservableProperty]` and `[RelayCommand]` source generator attributes.
 - **INavigationAware**: ViewModels implement this contract to receive `OnNavigatedTo`/`OnNavigatedFrom` lifecycle callbacks.
-- **Server connection**: `ISubsonicClientService` (singleton) manages the `SubsonicClient` lifecycle. Credentials are persisted via `ILocalSettingsService` under key `"ServerCredential"`. On startup, `ActivationService` checks for saved credentials and navigates to `ConnectPage` or `ShellPage` accordingly (`DefaultActivationHandler` only handles fallback navigation to `MainViewModel` once the shell exists). URL resolution is intelligent: tries `https://<host>/rest` first, then bare host.
+- **Server connection**: `ISubsonicClientService` (singleton) manages the `SubsonicClient` lifecycle. Credentials are managed by `ICredentialService`: non-secret metadata (URL, username) stored via `ILocalSettingsService` under keys `"ServerAccounts"` and `"ActiveAccount"`, passwords stored in Windows Credential Manager (`PasswordVault`). On startup, `ActivationService` runs legacy migration, loads the active credential, tests the connection, and navigates to `ConnectPage` or `ShellPage`. URL resolution is intelligent: tries `https://<host>/rest` first, then bare host.
 - **Localization**: String resources are in `Strings/en-us/Resources.resw`.
 
 ### Services
@@ -88,11 +88,13 @@ Hypersonic/
 | **IPageService** | Maps ViewModel type names to Page types via dictionary lookup. |
 | **INavigationViewService** | Manages NavigationView menu item selection and header updates. |
 | **IThemeSelectorService** | Persists theme preference (Light/Dark/Default) and updates title bar dynamically. |
-| **ILocalSettingsService** | Key-value persistence using `ApplicationData` (MSIX) or file-based JSON (unpackaged). |
+| **ILocalSettingsService** | Key-value persistence using `ApplicationData` (MSIX) or file-based JSON (unpackaged). Supports `ReadSettingAsync`, `SaveSettingAsync`, `RemoveSettingAsync`. |
 | **ITaskbarService** | Taskbar thumbnail buttons (Prev/Play-Pause/Next) via `ITaskbarList3` COM interop. Theme-aware icon rendering with GDI+. |
 | **ILoggingService** | Custom sink-based logging. Category-scoped loggers via `GetLogger(name)`. Sinks: `DebugSink` (debug output), `FileSink` (per-launch log files). |
 | **IBackdropSelectorService** | Persists and applies window backdrop: `None`, `Mica`, `MicaAlt`, `Acrylic`. Coordinates with theme service. |
-| **IActivationService** | Startup orchestration: credential check → `ConnectPage` or `ShellPage`, theme + taskbar + backdrop init. |
+| **IActivationService** | Startup orchestration: app state init, credential migration, window restore, credential check → `ConnectPage` or `ShellPage`, theme + taskbar + backdrop init. |
+| **ICredentialService** | Manages server accounts list and passwords via `PasswordVault`. Handles legacy migration from plain-text `ServerCredential`. |
+| **IAppStateService** | Persists runtime state (playback prefs, window geometry, last page) to `AppState.json`. Read once at startup, written on change. |
 
 ### Playback architecture
 
@@ -142,9 +144,14 @@ Stored via `ILocalSettingsService` (MSIX → `ApplicationData`; unpackaged → `
 
 | Key | Type | Purpose |
 |---|---|---|
-| `"ServerCredential"` | `ServerCredential` | Server URL, username, password |
+| `"ServerAccounts"` | `ServerAccount[]` | List of known servers (URL + username) |
+| `"ActiveAccount"` | `ServerAccount` | Currently active server (URL + username) |
 | `"AppBackgroundRequestedTheme"` | `string` (enum) | Theme: Light/Dark/Default |
 | `"AppRequestedBackdrop"` | `string` (enum) | Backdrop: None/Mica/MicaAlt/Acrylic |
+
+Passwords are stored in Windows Credential Manager (`PasswordVault`) under resource key `Hypersonic:<serverUrl>`, not in settings.
+
+Runtime state (volume, mute, shuffle, repeat, window geometry, last page) is stored separately in `AppState.json` via `IAppStateService`.
 
 ## MVP Roadmap
 
@@ -164,9 +171,10 @@ Feature specs and implementation guides live in `docs/`:
 | Microsoft.Extensions.Hosting | 10.0.5 | Dependency injection container |
 | Microsoft.WindowsAppSDK | 1.8 | WinUI 3 framework |
 | Microsoft.Xaml.Behaviors.WinUI.Managed | 3.0.1 | XAML Behaviors |
-| Newtonsoft.Json | 13.0.4 | Settings JSON serialization |
 | System.Drawing.Common | 10.0.5 | GDI+ for taskbar icon rendering |
 | WinUIEx | 2.9.0 | Extended WinUI utilities (`WindowEx` base class) |
+
+JSON serialization uses `System.Text.Json` (built into .NET 10) via the `Helpers/Json.cs` wrapper. `JsonStringEnumConverter` is configured globally for human-readable enum serialization.
 
 ## Testing
 

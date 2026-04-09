@@ -14,8 +14,18 @@ public partial class ShellViewModel : ObservableRecipient
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly IPlaybackService _playbackService;
+    private readonly IAppStateService _appStateService;
     private readonly ILogger _log;
     private CancellationTokenSource? _searchCts;
+
+    private static readonly HashSet<string> TopLevelPages = new()
+    {
+        typeof(MainViewModel).FullName!,
+        typeof(AlbumsViewModel).FullName!,
+        typeof(ArtistsViewModel).FullName!,
+        typeof(PlaylistsViewModel).FullName!,
+        typeof(SettingsViewModel).FullName!,
+    };
 
     [ObservableProperty]
     private bool isBackEnabled;
@@ -54,6 +64,7 @@ public partial class ShellViewModel : ObservableRecipient
         INavigationViewService navigationViewService,
         ISubsonicClientService subsonicClientService,
         IPlaybackService playbackService,
+        IAppStateService appStateService,
         ILoggingService logService)
     {
         NavigationService = navigationService;
@@ -61,6 +72,7 @@ public partial class ShellViewModel : ObservableRecipient
         NavigationViewService = navigationViewService;
         _subsonicClientService = subsonicClientService;
         _playbackService = playbackService;
+        _appStateService = appStateService;
         _log = logService.GetLogger(nameof(ShellViewModel));
     }
 
@@ -238,6 +250,10 @@ public partial class ShellViewModel : ObservableRecipient
         if (e.SourcePageType == typeof(SettingsPage))
         {
             Selected = NavigationViewService.SettingsItem;
+
+            // Settings is a top-level page — persist it.
+            _appStateService.State.Navigation.LastPage = typeof(SettingsViewModel).FullName!;
+            _ = _appStateService.SaveNavigationAsync();
             return;
         }
 
@@ -245,6 +261,19 @@ public partial class ShellViewModel : ObservableRecipient
         if (selectedItem != null)
         {
             Selected = selectedItem;
+        }
+
+        // Persist navigation state for top-level parameterless pages only.
+        var pageKey = e.SourcePageType?.FullName;
+        if (pageKey != null)
+        {
+            // Map page type name to ViewModel type name by convention: replace "Page" suffix with "ViewModel".
+            var vmKey = pageKey.Replace("Views.", "ViewModels.").Replace("Page", "ViewModel");
+            if (TopLevelPages.Contains(vmKey))
+            {
+                _appStateService.State.Navigation.LastPage = vmKey;
+                _ = _appStateService.SaveNavigationAsync();
+            }
         }
     }
 }

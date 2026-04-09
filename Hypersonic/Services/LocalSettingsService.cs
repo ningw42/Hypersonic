@@ -63,7 +63,7 @@ public class LocalSettingsService : ILocalSettingsService
             if (ApplicationData.Current.LocalSettings.Values.TryGetValue(key, out var obj))
             {
                 _log.Debug("Setting read", new { Key = key });
-                return await Json.ToObjectAsync<T>((string)obj);
+                return await Json.ToObjectAsync<T>(obj.ToString()!);
             }
         }
         else
@@ -73,7 +73,7 @@ public class LocalSettingsService : ILocalSettingsService
             if (_settings != null && _settings.TryGetValue(key, out var obj))
             {
                 _log.Debug("Setting read", new { Key = key });
-                return await Json.ToObjectAsync<T>((string)obj);
+                return await Json.ToObjectAsync<T>(obj.ToString()!);
             }
         }
 
@@ -97,5 +97,23 @@ public class LocalSettingsService : ILocalSettingsService
         }
 
         _log.Debug("Setting saved", new { Key = key });
+    }
+
+    public async Task RemoveSettingAsync(string key)
+    {
+        if (RuntimeHelper.IsMSIX)
+        {
+            ApplicationData.Current.LocalSettings.Values.Remove(key);
+        }
+        else
+        {
+            await InitializeAsync();
+
+            _settings.Remove(key);
+
+            await Task.Run(() => _fileService.Save(_applicationDataFolder, _localsettingsFile, _settings));
+        }
+
+        _log.Debug("Setting removed", new { Key = key });
     }
 }

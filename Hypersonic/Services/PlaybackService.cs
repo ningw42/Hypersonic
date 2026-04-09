@@ -75,12 +75,27 @@ public class PlaybackService : IPlaybackService, IDisposable
         }
     }
 
+    public bool IsMuted
+    {
+        get => _mediaPlayer.IsMuted;
+        set
+        {
+            if (_mediaPlayer.IsMuted == value)
+            {
+                return;
+            }
+
+            _mediaPlayer.IsMuted = value;
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     public event EventHandler? PlaybackStateChanged;
     public event EventHandler? TrackChanged;
     public event EventHandler? PositionChanged;
     public event EventHandler? QueueChanged;
 
-    public PlaybackService(ILoggingService logService)
+    public PlaybackService(ILoggingService logService, IAppStateService appStateService)
     {
         _log = logService.GetLogger(nameof(PlaybackService));
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
@@ -99,6 +114,13 @@ public class PlaybackService : IPlaybackService, IDisposable
         var cmd = _mediaPlayer.CommandManager;
         cmd.NextReceived += OnCommandManagerNextReceived;
         cmd.PreviousReceived += OnCommandManagerPreviousReceived;
+
+        // Restore persisted playback preferences.
+        var playback = appStateService.State.Playback;
+        _mediaPlayer.Volume = Math.Clamp(playback.Volume / 100.0, 0, 1);
+        _mediaPlayer.IsMuted = playback.IsMuted;
+        _playbackQueue.SetShuffle(playback.ShuffleEnabled);
+        _playbackQueue.RepeatMode = playback.RepeatMode;
     }
 
     public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null)

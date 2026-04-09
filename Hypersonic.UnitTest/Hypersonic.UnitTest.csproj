@@ -17,11 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-  </ItemGroup>
-
-  <!-- Include source files directly since we can't reference the WinUI project -->
-  <ItemGroup>
     <Compile Include="..\Hypersonic\Models\PlaybackTrack.cs" Link="Models\PlaybackTrack.cs" />
     <Compile Include="..\Hypersonic\Models\QueueSource.cs" Link="Models\QueueSource.cs" />
     <Compile Include="..\Hypersonic\Models\RepeatMode.cs" Link="Models\RepeatMode.cs" />
@@ -33,6 +28,10 @@
     <Compile Include="..\Hypersonic\Services\LoggingService.cs" Link="Services\LoggingService.cs" />
     <Compile Include="..\Hypersonic\Services\Logging\DebugSink.cs" Link="Services\Logging\DebugSink.cs" />
     <Compile Include="..\Hypersonic\Services\Logging\FileSink.cs" Link="Services\Logging\FileSink.cs" />
+    <Compile Include="..\Hypersonic\Helpers\Json.cs" Link="Helpers\Json.cs" />
+    <Compile Include="..\Hypersonic\Helpers\VaultKeyHelper.cs" Link="Helpers\VaultKeyHelper.cs" />
+    <Compile Include="..\Hypersonic\Models\AppState.cs" Link="Models\AppState.cs" />
+    <Compile Include="..\Hypersonic\Models\ServerAccount.cs" Link="Models\ServerAccount.cs" />
     <Compile Include="..\Hypersonic\Services\PlaybackQueue.cs" Link="Services\PlaybackQueue.cs" />
   </ItemGroup>
 

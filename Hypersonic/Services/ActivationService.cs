@@ -5,6 +5,7 @@ using Hypersonic.Views;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Windowing;
 
 namespace Hypersonic.Services;
 
@@ -14,8 +15,9 @@ public class ActivationService : IActivationService
     private readonly IEnumerable<IActivationHandler> _activationHandlers;
     private readonly IThemeSelectorService _themeSelectorService;
     private readonly IBackdropSelectorService _backdropSelectorService;
-    private readonly ILocalSettingsService _localSettingsService;
+    private readonly ICredentialService _credentialService;
     private readonly ISubsonicClientService _subsonicClientService;
+    private readonly IAppStateService _appStateService;
     private readonly ILogger _log;
 
     public ActivationService(
@@ -23,16 +25,18 @@ public class ActivationService : IActivationService
         IEnumerable<IActivationHandler> activationHandlers,
         IThemeSelectorService themeSelectorService,
         IBackdropSelectorService backdropSelectorService,
-        ILocalSettingsService localSettingsService,
+        ICredentialService credentialService,
         ISubsonicClientService subsonicClientService,
+        IAppStateService appStateService,
         ILoggingService logService)
     {
         _defaultHandler = defaultHandler;
         _activationHandlers = activationHandlers;
         _themeSelectorService = themeSelectorService;
         _backdropSelectorService = backdropSelectorService;
-        _localSettingsService = localSettingsService;
+        _credentialService = credentialService;
         _subsonicClientService = subsonicClientService;
+        _appStateService = appStateService;
         _log = logService.GetLogger(nameof(ActivationService));
     }
 
@@ -43,10 +47,13 @@ public class ActivationService : IActivationService
         // Execute tasks before activation.
         await InitializeAsync();
 
+        // Restore window geometry from saved state.
+        RestoreWindowState();
+
         // Check credentials and set appropriate content.
         if (App.MainWindow.Content == null)
         {
-            var credential = await _localSettingsService.ReadSettingAsync<ServerCredential>("ServerCredential");
+            var credential = await _credentialService.GetActiveCredentialAsync();
 
             if (credential != null && !string.IsNullOrWhiteSpace(credential.ServerUrl))
             {
@@ -138,7 +145,12 @@ public class ActivationService : IActivationService
         _log.Debug("Initializing theme and backdrop");
         await _themeSelectorService.InitializeAsync().ConfigureAwait(false);
         await _backdropSelectorService.InitializeAsync().ConfigureAwait(false);
-        await Task.CompletedTask;
+
+        // Initialize app state (load AppState.json).
+        await _appStateService.InitializeAsync();
+
+        // Migrate legacy credentials if needed.
+        await _credentialService.MigrateFromLegacyAsync();
     }
 
     private async Task StartupAsync()
@@ -146,5 +158,65 @@ public class ActivationService : IActivationService
         await _themeSelectorService.SetRequestedThemeAsync();
         await _backdropSelectorService.SetRequestedBackdropAsync();
         await Task.CompletedTask;
+    }
+
+    private void RestoreWindowState()
+    {
+        var windowState = _appStateService.State.Window;
+        var window = App.MainWindow;
+
+        // Always apply saved normal bounds first, so the window's restore-size
+        // is correct regardless of whether we then maximize.
+        if (windowState.Width.HasValue && windowState.Height.HasValue)
+        {
+            window.Width = windowState.Width.Value;
+            window.Height = windowState.Height.Value;
+        }
+
+        if (windowState.X.HasValue && windowState.Y.HasValue)
+        {
+            if (IsPositionOnScreen(windowState.X.Value, windowState.Y.Value))
+            {
+                window.AppWindow.Move(new Windows.Graphics.PointInt32(windowState.X.Value, windowState.Y.Value));
+                _log.Debug("Window position restored", new { windowState.X, windowState.Y });
+            }
+            else
+            {
+                _log.Debug("Saved window position is off-screen, using OS default");
+            }
+        }
+
+        if (windowState.IsMaximized)
+        {
+            if (window.AppWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.Maximize();
+            }
+            _log.Debug("Window restored to maximized state");
+        }
+    }
+
+    private static bool IsPositionOnScreen(int x, int y)
+    {
+        try
+        {
+            var areas = DisplayArea.FindAll();
+            foreach (var area in areas)
+            {
+                var bounds = area.WorkArea;
+                if (x >= bounds.X && x < bounds.X + bounds.Width &&
+                    y >= bounds.Y && y < bounds.Y + bounds.Height)
+                {
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+            // If we can't enumerate displays, allow the position.
+            return true;
+        }
+
+        return false;
     }
 }

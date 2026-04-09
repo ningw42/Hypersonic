@@ -1,8 +1,8 @@
 using System.Text;
+using System.Text.Json;
 
 using Hypersonic.Contracts.Services;
-
-using Newtonsoft.Json;
+using Hypersonic.Helpers;
 
 namespace Hypersonic.Services;
 
@@ -14,7 +14,7 @@ public class FileService : IFileService
         if (File.Exists(path))
         {
             var json = File.ReadAllText(path);
-            return JsonConvert.DeserializeObject<T>(json);
+            return JsonSerializer.Deserialize<T>(json, Json.Options);
         }
 
         return default;
@@ -27,7 +27,7 @@ public class FileService : IFileService
             Directory.CreateDirectory(folderPath);
         }
 
-        var fileContent = JsonConvert.SerializeObject(content);
+        var fileContent = JsonSerializer.Serialize(content, Json.Options);
         File.WriteAllText(Path.Combine(folderPath, fileName), fileContent, Encoding.UTF8);
     }
 

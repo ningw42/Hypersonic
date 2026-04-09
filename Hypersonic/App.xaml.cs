@@ -97,6 +97,8 @@ public partial class App : Application
             services.AddSingleton<ISubsonicClientService, SubsonicClientService>();
             services.AddSingleton<IPlaybackService, PlaybackService>();
             services.AddSingleton<ITaskbarService, TaskbarService>();
+            services.AddSingleton<ICredentialService, CredentialService>();
+            services.AddSingleton<IAppStateService, AppStateService>();
 
             // Views and ViewModels
             services.AddSingleton<PlayerViewModel>();

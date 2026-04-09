@@ -12,6 +12,7 @@ public interface IPlaybackService
     double Position { get; }
     double Duration { get; }
     double Volume { get; set; }
+    bool IsMuted { get; set; }
     bool HasNext { get; }
     bool HasPrevious { get; }
     QueueSource? Source { get; }

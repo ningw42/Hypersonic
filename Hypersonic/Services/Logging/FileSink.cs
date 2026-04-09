@@ -1,6 +1,8 @@
+using System.Text.Json;
+
 using Hypersonic.Contracts.Services;
+using Hypersonic.Helpers;
 using Hypersonic.Models;
-using Newtonsoft.Json;
 
 namespace Hypersonic.Services.Logging;
 
@@ -32,7 +34,7 @@ public sealed class FileSink : ILogSink, IDisposable
             if (entry.Context is not null)
             {
                 _writer.Write(' ');
-                _writer.Write(JsonConvert.SerializeObject(entry.Context));
+                _writer.Write(JsonSerializer.Serialize(entry.Context, Json.CompactOptions));
             }
 
             if (entry.Exception is not null)

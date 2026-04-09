@@ -13,7 +13,8 @@ namespace Hypersonic.ViewModels;
 public partial class ConnectViewModel : ObservableRecipient
 {
     private readonly ISubsonicClientService _subsonicClientService;
-    private readonly ILocalSettingsService _localSettingsService;
+    private readonly ICredentialService _credentialService;
+    private readonly IAppStateService _appStateService;
     private readonly ILogger _log;
 
     [ObservableProperty]
@@ -46,23 +47,41 @@ public partial class ConnectViewModel : ObservableRecipient
     [ObservableProperty]
     private bool isConnecting;
 
+    private static readonly HashSet<string> TopLevelPages = new()
+    {
+        typeof(MainViewModel).FullName!,
+        typeof(AlbumsViewModel).FullName!,
+        typeof(ArtistsViewModel).FullName!,
+        typeof(PlaylistsViewModel).FullName!,
+        typeof(SettingsViewModel).FullName!,
+    };
+
     public ConnectViewModel(
         ISubsonicClientService subsonicClientService,
-        ILocalSettingsService localSettingsService,
+        ICredentialService credentialService,
+        IAppStateService appStateService,
         ILoggingService logService)
     {
         _subsonicClientService = subsonicClientService;
-        _localSettingsService = localSettingsService;
+        _credentialService = credentialService;
+        _appStateService = appStateService;
         _log = logService.GetLogger(nameof(ConnectViewModel));
     }
 
     public async Task LoadSavedCredentialsAsync()
     {
-        var credential = await _localSettingsService.ReadSettingAsync<ServerCredential>("ServerCredential");
+        // Always try to prefill URL + username from settings.
+        var account = await _credentialService.GetActiveServerAccountAsync();
+        if (account != null)
+        {
+            ServerUrl = account.ServerUrl;
+            Username = account.Username;
+        }
+
+        // Try to get password from vault; if unavailable, leave empty.
+        var credential = await _credentialService.GetActiveCredentialAsync();
         if (credential != null)
         {
-            ServerUrl = credential.ServerUrl;
-            Username = credential.Username;
             Password = credential.Password;
         }
     }
@@ -164,7 +183,8 @@ public partial class ConnectViewModel : ObservableRecipient
 
             // Save credentials with the resolved URL and create the active client
             credential.ServerUrl = result.ResolvedUrl;
-            await _localSettingsService.SaveSettingAsync("ServerCredential", credential);
+            await _credentialService.SaveCredentialAsync(credential);
+            await _credentialService.SetActiveServerAsync(result.ResolvedUrl, credential.Username);
             _subsonicClientService.CreateClient(credential);
             _log.Info("Connected and credentials saved", new { ResolvedUrl = result.ResolvedUrl, credential.Username });
 
@@ -172,7 +192,13 @@ public partial class ConnectViewModel : ObservableRecipient
             var shell = App.GetService<ShellPage>();
             App.MainWindow.Content = shell;
             var navigationService = App.GetService<INavigationService>();
-            navigationService.NavigateTo(typeof(MainViewModel).FullName!);
+
+            // Navigate to last page if it was a top-level page, otherwise default to MainViewModel.
+            var lastPage = _appStateService.State.Navigation.LastPage;
+            var pageKey = lastPage != null && TopLevelPages.Contains(lastPage)
+                ? lastPage
+                : typeof(MainViewModel).FullName!;
+            navigationService.NavigateTo(pageKey);
         }
         catch (HttpRequestException ex)
         {

@@ -6,7 +6,7 @@
 |------|------|--------|
 | **Phase 1 — Core Playback Polish** | | |
 | 1.1 Shuffle & Repeat UI | S | ✅ Complete |
-| 1.2 Persistence (Settings & State) | M | 🔲 Not started |
+| 1.2 Persistence (Credentials, Settings & State) | M | ✅ Complete |
 | **Phase 2 — Experience Essentials** | | |
 | 2.1 Home Page | M | 🔲 Not started |
 | 2.2 Now Playing / Full-Window Player | L | 🔲 Not started |
@@ -28,13 +28,17 @@
 
 The shuffle and repeat logic is fully implemented in the service layer (`PlaybackQueue`, `PlaybackService`). The gap is purely UI — add shuffle and repeat toggle buttons to the player bar, backed by ViewModel properties and commands.
 
-### 1.2 Persistence — Settings & Player State `[M]`
+### 1.2 Persistence — Credentials, Settings & Player State `[M]`
 
-Two distinct persistence categories:
+Three distinct persistence categories:
 
-**Settings** — Extend the existing `ILocalSettingsService` with additional user preference keys (audio quality, scrobble toggle, etc.).
+**Credentials** — Passwords stored in Windows Credential Manager via `PasswordVault`, encrypted by the OS. Non-secret connection metadata (server URL, username) stored in settings. Multi-server data model (one active server at a time, quick-switch UI deferred).
 
-**State** — New service that persists the player session (queue contents, current track, position, volume, shuffle/repeat mode, queue origin) so the app can restore playback state on relaunch. Persist stable track IDs and display metadata — not authenticated server URIs, which expire across sessions.
+**Settings** — Extended `ILocalSettingsService` with `RemoveSettingAsync`. Theme, backdrop, server accounts, and active account stored as key-value pairs.
+
+**State** — `AppStateService` persists the player session (volume, mute, shuffle, repeat, window geometry, last-viewed page) to `AppState.json`. Server-tied state (queue, current track, position) is deferred to a future design.
+
+Serialization migrated from Newtonsoft.Json to System.Text.Json.
 
 **Depends on**: 1.1
 

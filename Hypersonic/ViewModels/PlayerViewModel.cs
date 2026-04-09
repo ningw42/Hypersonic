@@ -4,12 +4,19 @@ using CommunityToolkit.Mvvm.Input;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Models;
 
+using Microsoft.UI.Dispatching;
+
 namespace Hypersonic.ViewModels;
 
 public partial class PlayerViewModel : ObservableRecipient
 {
     private readonly IPlaybackService _playbackService;
     private readonly INavigationService _navigationService;
+    private readonly IAppStateService _appStateService;
+
+    private bool _isExternalUpdate;
+    private bool _isSavingFromExternal;
+    private readonly DispatcherQueueTimer _volumeSaveTimer;
 
     [ObservableProperty]
     private string trackTitle = string.Empty;
@@ -83,21 +90,35 @@ public partial class PlayerViewModel : ObservableRecipient
     [ObservableProperty]
     private RepeatMode repeatMode;
 
-    private bool _isExternalUpdate;
-    private double _volumeBeforeMute = 100;
-
-    public PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService)
+    public PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService, IAppStateService appStateService)
     {
         _playbackService = playbackService;
         _navigationService = navigationService;
+        _appStateService = appStateService;
         _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
         _playbackService.TrackChanged += OnTrackChanged;
         _playbackService.PositionChanged += OnPositionChanged;
         _playbackService.QueueChanged += OnQueueChanged;
 
-        // Hydrate from current service state
+        // Setup debounce timer for volume save (1 second).
+        _volumeSaveTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+        _volumeSaveTimer.Interval = TimeSpan.FromSeconds(1);
+        _volumeSaveTimer.IsRepeating = false;
+        _volumeSaveTimer.Tick += (_, _) =>
+        {
+            _appStateService.State.Playback.Volume = VolumePercent;
+            _ = _appStateService.SavePlaybackAsync();
+        };
+
+        // Hydrate from current service state (already restored from AppState in PlaybackService).
+        VolumePercent = Math.Round(_playbackService.Volume * 100);
+        IsMuted = _playbackService.IsMuted;
         ShuffleEnabled = _playbackService.ShuffleEnabled;
         RepeatMode = _playbackService.RepeatMode;
+        UpdateVolumeGlyph();
+
+        // Prevent the initial hydration from triggering saves.
+        _isSavingFromExternal = false;
     }
 
     /// <summary>
@@ -163,17 +184,7 @@ public partial class PlayerViewModel : ObservableRecipient
     [RelayCommand]
     private void ToggleMute()
     {
-        if (IsMuted)
-        {
-            VolumePercent = _volumeBeforeMute;
-            IsMuted = false;
-        }
-        else
-        {
-            _volumeBeforeMute = VolumePercent;
-            VolumePercent = 0;
-            IsMuted = true;
-        }
+        _playbackService.IsMuted = !_playbackService.IsMuted;
     }
 
     [RelayCommand]
@@ -253,6 +264,19 @@ public partial class PlayerViewModel : ObservableRecipient
         _playbackService.JumpToTrack(item.Track.Id);
     }
 
+    /// <summary>
+    /// Flushes any pending debounced volume save. Call on window close.
+    /// </summary>
+    internal void FlushPendingSaves()
+    {
+        if (_volumeSaveTimer.IsRunning)
+        {
+            _volumeSaveTimer.Stop();
+            _appStateService.State.Playback.Volume = VolumePercent;
+            _appStateService.SaveSync();
+        }
+    }
+
     partial void OnPositionChanged(double value)
     {
         if (!_isExternalUpdate)
@@ -265,15 +289,47 @@ public partial class PlayerViewModel : ObservableRecipient
     {
         _playbackService.Volume = value / 100.0;
         UpdateVolumeGlyph();
-        if (value > 0 && IsMuted)
+
+        if (!_isSavingFromExternal)
         {
-            IsMuted = false;
+            // Debounce volume save — slider fires continuously during drag.
+            _volumeSaveTimer.Stop();
+            _volumeSaveTimer.Start();
+        }
+    }
+
+    partial void OnIsMutedChanged(bool value)
+    {
+        UpdateVolumeGlyph();
+
+        if (!_isSavingFromExternal)
+        {
+            _appStateService.State.Playback.IsMuted = value;
+            _ = _appStateService.SavePlaybackAsync();
+        }
+    }
+
+    partial void OnShuffleEnabledChanged(bool value)
+    {
+        if (!_isSavingFromExternal)
+        {
+            _appStateService.State.Playback.ShuffleEnabled = value;
+            _ = _appStateService.SavePlaybackAsync();
+        }
+    }
+
+    partial void OnRepeatModeChanged(RepeatMode value)
+    {
+        if (!_isSavingFromExternal)
+        {
+            _appStateService.State.Playback.RepeatMode = value;
+            _ = _appStateService.SavePlaybackAsync();
         }
     }
 
     private void UpdateVolumeGlyph()
     {
-        VolumeGlyph = VolumePercent switch
+        VolumeGlyph = IsMuted ? "\uE74F" : VolumePercent switch
         {
             0 => "\uE74F",    // Mute
             < 34 => "\uE993",  // Volume0
@@ -284,14 +340,17 @@ public partial class PlayerViewModel : ObservableRecipient
 
     private void OnPlaybackStateChanged(object? sender, EventArgs e)
     {
+        _isSavingFromExternal = true;
         IsPlaying = _playbackService.IsPlaying;
         HasNext = _playbackService.HasNext;
         HasPrevious = _playbackService.HasPrevious;
         VolumePercent = Math.Round(_playbackService.Volume * 100);
+        IsMuted = _playbackService.IsMuted;
         Duration = _playbackService.Duration;
         DurationText = FormatTime(_playbackService.Duration);
         ShuffleEnabled = _playbackService.ShuffleEnabled;
         RepeatMode = _playbackService.RepeatMode;
+        _isSavingFromExternal = false;
     }
 
     private void OnTrackChanged(object? sender, EventArgs e)

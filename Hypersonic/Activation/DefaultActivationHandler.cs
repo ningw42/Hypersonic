@@ -8,10 +8,21 @@ namespace Hypersonic.Activation;
 public class DefaultActivationHandler : ActivationHandler<LaunchActivatedEventArgs>
 {
     private readonly INavigationService _navigationService;
+    private readonly IAppStateService _appStateService;
 
-    public DefaultActivationHandler(INavigationService navigationService)
+    private static readonly HashSet<string> TopLevelPages = new()
+    {
+        typeof(MainViewModel).FullName!,
+        typeof(AlbumsViewModel).FullName!,
+        typeof(ArtistsViewModel).FullName!,
+        typeof(PlaylistsViewModel).FullName!,
+        typeof(SettingsViewModel).FullName!,
+    };
+
+    public DefaultActivationHandler(INavigationService navigationService, IAppStateService appStateService)
     {
         _navigationService = navigationService;
+        _appStateService = appStateService;
     }
 
     protected override bool CanHandleInternal(LaunchActivatedEventArgs args)
@@ -22,7 +33,12 @@ public class DefaultActivationHandler : ActivationHandler<LaunchActivatedEventAr
 
     protected async override Task HandleInternalAsync(LaunchActivatedEventArgs args)
     {
-        _navigationService.NavigateTo(typeof(MainViewModel).FullName!, args.Arguments);
+        var lastPage = _appStateService.State.Navigation.LastPage;
+        var pageKey = lastPage != null && TopLevelPages.Contains(lastPage)
+            ? lastPage
+            : typeof(MainViewModel).FullName!;
+
+        _navigationService.NavigateTo(pageKey, args.Arguments);
 
         await Task.CompletedTask;
     }
