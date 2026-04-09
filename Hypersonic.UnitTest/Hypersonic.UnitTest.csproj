@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.5" />
     <PackageReference Include="MSTest" Version="4.1.0" />
   </ItemGroup>
 
@@ -33,6 +34,12 @@
     <Compile Include="..\Hypersonic\Models\AppState.cs" Link="Models\AppState.cs" />
     <Compile Include="..\Hypersonic\Models\ServerAccount.cs" Link="Models\ServerAccount.cs" />
     <Compile Include="..\Hypersonic\Services\PlaybackQueue.cs" Link="Services\PlaybackQueue.cs" />
+    <Compile Include="..\Hypersonic\Services\FileService.cs" Link="Services\FileService.cs" />
+    <Compile Include="..\Hypersonic\Contracts\Services\IFileService.cs" Link="Contracts\Services\IFileService.cs" />
+    <Compile Include="..\Hypersonic\Contracts\Services\ILocalSettingsService.cs" Link="Contracts\Services\ILocalSettingsService.cs" />
+    <Compile Include="..\Hypersonic\Services\LocalSettingsService.cs" Link="Services\LocalSettingsService.cs" />
+    <Compile Include="..\Hypersonic\Models\LocalSettingsOptions.cs" Link="Models\LocalSettingsOptions.cs" />
+    <Compile Include="..\Hypersonic\Helpers\RuntimeHelper.cs" Link="Helpers\RuntimeHelper.cs" />
   </ItemGroup>
 
 </Project>
