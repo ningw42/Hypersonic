@@ -1,6 +1,7 @@
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Services;
 using Hypersonic.Helpers;
-using Hypersonic.Services;
 using Hypersonic.ViewModels;
 
 using Microsoft.UI.Dispatching;

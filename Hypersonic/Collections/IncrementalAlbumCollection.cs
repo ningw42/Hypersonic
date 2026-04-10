@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices.WindowsRuntime;
 
-using Hypersonic.Models;
+using Hypersonic.Core.Models;
 
 using Microsoft.UI.Xaml.Data;
 

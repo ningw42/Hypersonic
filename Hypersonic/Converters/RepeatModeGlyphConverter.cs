@@ -1,4 +1,4 @@
-using Hypersonic.Models;
+using Hypersonic.Core.Models;
 
 using Microsoft.UI.Xaml.Data;
 

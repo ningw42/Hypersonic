@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Hypersonic.Tests.MSTest" />
+    <InternalsVisibleTo Include="Hypersonic.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,6 +35,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Hypersonic.Core\Hypersonic.Core.csproj" />
     <ProjectReference Include="..\Hypersonic.Client\Hypersonic.Client.csproj" />
   </ItemGroup>
   <ItemGroup>

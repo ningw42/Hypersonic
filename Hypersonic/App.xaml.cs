@@ -1,9 +1,11 @@
 ﻿using Hypersonic.Activation;
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Models;
+using Hypersonic.Core.Services;
+using Hypersonic.Core.Services.Logging;
 using Hypersonic.Helpers;
-using Hypersonic.Models;
 using Hypersonic.Services;
-using Hypersonic.Services.Logging;
 using Hypersonic.ViewModels;
 using Hypersonic.Views;
 

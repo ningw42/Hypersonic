@@ -1,7 +1,8 @@
 using Hypersonic.Client;
 using Hypersonic.Client.Models.Responses;
 using Hypersonic.Contracts.Services;
-using Hypersonic.Models;
+using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Models;
 
 namespace Hypersonic.Services;
 

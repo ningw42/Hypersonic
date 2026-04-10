@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Helpers;
 

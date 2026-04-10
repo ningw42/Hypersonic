@@ -4,7 +4,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Contracts.ViewModels;
+using Hypersonic.Core.Models;
 using Hypersonic.Models;
 
 namespace Hypersonic.ViewModels;

@@ -8,6 +8,7 @@
     xmlns:behaviors="using:Hypersonic.Behaviors"
     xmlns:converters="using:Hypersonic.Converters"
     xmlns:models="using:Hypersonic.Models"
+    xmlns:coremodels="using:Hypersonic.Core.Models"
     xmlns:controls="using:Hypersonic.Controls"
     xmlns:i="using:Microsoft.Xaml.Interactivity"
     Loaded="OnLoaded">
@@ -91,7 +92,7 @@
                                               SelectionMode="None"
                                               MaxHeight="300">
                                         <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="models:SearchSuggestionItem">
+                                            <DataTemplate x:DataType="coremodels:SearchSuggestionItem">
                                                 <Grid Padding="2,4" ColumnSpacing="8">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
@@ -135,7 +136,7 @@
                                               SelectionMode="None"
                                               MaxHeight="300">
                                         <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="models:SearchSuggestionItem">
+                                            <DataTemplate x:DataType="coremodels:SearchSuggestionItem">
                                                 <Grid Padding="2,4" ColumnSpacing="8">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
@@ -179,7 +180,7 @@
                                               SelectionMode="None"
                                               MaxHeight="300">
                                         <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="models:SearchSuggestionItem">
+                                            <DataTemplate x:DataType="coremodels:SearchSuggestionItem">
                                                 <Grid Padding="2,4" ColumnSpacing="8">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>

@@ -1,5 +1,5 @@
 using Hypersonic.Contracts.Services;
-using Hypersonic.Models;
+using Hypersonic.Core.Models;
 using Hypersonic.ViewModels;
 
 using Microsoft.UI.Xaml;

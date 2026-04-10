@@ -1,6 +1,6 @@
 using Hypersonic.Client;
 using Hypersonic.Client.Models.Responses;
-using Hypersonic.Models;
+using Hypersonic.Core.Models;
 
 namespace Hypersonic.Contracts.Services;
 

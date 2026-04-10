@@ -5,8 +5,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Helpers;
-using Hypersonic.Models;
+using Hypersonic.Core.Models;
 
 using Microsoft.UI.Xaml;
 

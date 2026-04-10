@@ -4,6 +4,7 @@ using System.Drawing.Text;
 using System.Runtime.InteropServices;
 
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Interop;
 
 using Microsoft.UI.Dispatching;

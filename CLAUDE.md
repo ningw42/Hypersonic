@@ -17,9 +17,9 @@ dotnet build Hypersonic/Hypersonic.csproj -p:Platform=x64
 dotnet build Hypersonic.Client/Hypersonic.Client.csproj
 
 # Run tests
-dotnet test Hypersonic.Tests.MSTest/Hypersonic.Tests.MSTest.csproj
+dotnet test Hypersonic.Core.Tests/Hypersonic.Core.Tests.csproj
+dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64
 dotnet test Hypersonic.Client.UnitTest/Hypersonic.Client.UnitTest.csproj
-dotnet test Hypersonic.UnitTest/Hypersonic.UnitTest.csproj
 
 # Run a single test
 dotnet test --filter "FullyQualifiedName~TestMethodName"
@@ -34,29 +34,37 @@ Note: The main WinUI app (`Hypersonic.csproj`) targets `net10.0-windows10.0.1904
 
 | Project | Purpose |
 |---|---|
-| **Hypersonic** | WinUI 3 desktop app (Views, ViewModels, Services, Controls) |
+| **Hypersonic** | WinUI 3 desktop app (Views, ViewModels, platform Services, Controls). References Hypersonic.Core |
+| **Hypersonic.Core** | Platform-independent models, contracts, services, helpers (`net10.0`) |
 | **Hypersonic.Client** | Subsonic/OpenSubsonic API client library |
-| **Hypersonic.Tests.MSTest** | App unit tests (MSTest, WinUI `[UITestMethod]`) |
+| **Hypersonic.Core.Tests** | Core library tests (PlaybackQueue, LoggingService, persistence) |
+| **Hypersonic.Tests** | WinUI app tests (MSTest, `[UITestMethod]`, `dotnet test` with testhost fix) |
 | **Hypersonic.Client.UnitTest** | Client library tests |
-| **Hypersonic.UnitTest** | Pure logic unit tests (PlaybackQueue, LoggingService) |
 
 ## App Folder Structure
 
 ```
-Hypersonic/
+Hypersonic.Core/              # net10.0 class library — platform-independent code
+├── Models/           # Data models and enums (AppState, PlaybackTrack, RepeatMode, etc.)
+├── Contracts/
+│   └── Services/     # Service interfaces (IPlaybackService, ILoggingService, etc.)
+├── Helpers/          # Utilities (Json, VaultKeyHelper)
+└── Services/
+    └── Logging/      # Log sinks (FileSink, DebugSink)
+
+Hypersonic/                   # WinUI 3 app — references Hypersonic.Core
 ├── Activation/       # Startup handlers (DefaultActivationHandler)
 ├── Behaviors/        # XAML Behaviors (NavigationViewHeaderBehavior)
 ├── Collections/      # Custom collections (IncrementalAlbumCollection)
 ├── Contracts/
-│   ├── Services/     # Service interfaces
+│   ├── Services/     # WinUI service interfaces (INavigationService, ITaskbarService, etc.)
 │   └── ViewModels/   # ViewModel interfaces (INavigationAware)
 ├── Controls/         # Custom controls (MarqueeTextBlock, SquarePanel)
 ├── Converters/       # XAML value converters
-├── Helpers/          # Utilities (TitleBarHelper, RuntimeHelper, TrackListTemplateSelector)
+├── Helpers/          # WinUI utilities (TitleBarHelper, RuntimeHelper, TrackListTemplateSelector)
 ├── Interop/          # COM interop (ITaskbarList3 for taskbar thumbnail buttons)
-├── Models/           # View-layer models and enums (PlaybackTrack, SongInfo, BackdropType, RepeatMode)
-├── Services/
-│   └── Logging/      # Log sinks (FileSink, DebugSink)
+├── Models/           # Presentation models (SongInfo, QueueItem, DiscHeaderItem — use ObservableObject)
+├── Services/         # WinUI services (PlaybackService, LocalSettingsService, etc.)
 ├── Strings/en-us/    # Localization resources (Resources.resw)
 ├── Styles/           # Resource dictionaries (FontSizes, TextBlock, Thickness)
 ├── Themes/           # Generic.xaml (custom control templates, converters, FavoriteToggleButtonStyle)
@@ -80,27 +88,37 @@ Hypersonic/
 
 ### Services
 
+Services are split between Hypersonic.Core (platform-independent) and Hypersonic (WinUI-dependent).
+
+**Core services** (`Hypersonic.Core.Contracts.Services` / `Hypersonic.Core.Services`):
+
 | Service | Responsibility |
 |---|---|
-| **IPlaybackService** | Audio playback via `MediaPlayer`. Manages queue, now-playing, position, volume, SMTC. Events: `PlaybackStateChanged`, `TrackChanged`, `PositionChanged`. |
+| **IPlaybackService** | Audio playback contract: queue, now-playing, position, volume, shuffle, repeat. |
+| **ILoggingService** | Custom sink-based logging. Category-scoped loggers via `GetLogger(name)`. |
+| **IAppStateService** | Persists runtime state (playback prefs, window geometry, last page) to `AppState.json`. |
+| **ICredentialService** | Manages server accounts list and passwords. |
+| **IFileService** | Generic file read/write/delete using JSON serialization. |
+| **ILocalSettingsService** | Key-value persistence contract. |
+
+**WinUI services** (`Hypersonic.Contracts.Services` / `Hypersonic.Services`):
+
+| Service | Responsibility |
+|---|---|
 | **ISubsonicClientService** | Wraps `SubsonicClient` lifecycle. Credential validation, multi-URL resolution, connection testing. |
 | **INavigationService** | Frame-based navigation with `INavigationAware` lifecycle support and back button. |
 | **IPageService** | Maps ViewModel type names to Page types via dictionary lookup. |
 | **INavigationViewService** | Manages NavigationView menu item selection and header updates. |
 | **IThemeSelectorService** | Persists theme preference (Light/Dark/Default) and updates title bar dynamically. |
-| **ILocalSettingsService** | Key-value persistence using `ApplicationData` (MSIX) or file-based JSON (unpackaged). Supports `ReadSettingAsync`, `SaveSettingAsync`, `RemoveSettingAsync`. |
-| **ITaskbarService** | Taskbar thumbnail buttons (Prev/Play-Pause/Next) via `ITaskbarList3` COM interop. Theme-aware icon rendering with GDI+. |
-| **ILoggingService** | Custom sink-based logging. Category-scoped loggers via `GetLogger(name)`. Sinks: `DebugSink` (debug output), `FileSink` (per-launch log files). |
-| **IBackdropSelectorService** | Persists and applies window backdrop: `None`, `Mica`, `MicaAlt`, `Acrylic`. Coordinates with theme service. |
-| **IActivationService** | Startup orchestration: app state init, credential migration, window restore, credential check → `ConnectPage` or `ShellPage`, theme + taskbar + backdrop init. |
-| **ICredentialService** | Manages server accounts list and passwords via `PasswordVault`. Handles legacy migration from plain-text `ServerCredential`. |
-| **IAppStateService** | Persists runtime state (playback prefs, window geometry, last page) to `AppState.json`. Read once at startup, written on change. |
+| **ITaskbarService** | Taskbar thumbnail buttons (Prev/Play-Pause/Next) via `ITaskbarList3` COM interop. |
+| **IBackdropSelectorService** | Persists and applies window backdrop: `None`, `Mica`, `MicaAlt`, `Acrylic`. |
+| **IActivationService** | Startup orchestration: app state init, credential migration, window restore, theme + taskbar + backdrop init. |
 
 ### Playback architecture
 
 - **Engine**: `Windows.Media.Playback.MediaPlayer` (native Windows media engine).
 - **SMTC**: System Media Transport Controls for lock screen / media key support. `CommandManager.IsEnabled = true` for automatic integration.
-- **Queue logic**: `PlaybackQueue` — pure logic class (no WinUI dependencies, fully unit-testable). Manages shuffle (Fisher-Yates), repeat (`Off`/`One`/`All`), navigation history (ID-based stack), play history (ring buffer, max 100), and queue mutations (`AddNext`, `AddToEnd`, `RemoveAt`, `MoveTrack`, `ClearUpcoming`).
+- **Queue logic**: `PlaybackQueue` (in `Hypersonic.Core.Services`) — pure logic class (no WinUI dependencies, fully unit-testable). Manages shuffle (Fisher-Yates), repeat (`Off`/`One`/`All`), navigation history (ID-based stack), play history (ring buffer, max 100), and queue mutations (`AddNext`, `AddToEnd`, `RemoveAt`, `MoveTrack`, `ClearUpcoming`).
 - **Position tracking**: `DispatcherQueueTimer` fires every 500ms to update the `Position` property.
 - **Event-driven**: PlaybackService raises events (`PlaybackStateChanged`, `TrackChanged`, `PositionChanged`); `PlayerViewModel` and `TaskbarService` subscribe.
 
@@ -195,14 +213,14 @@ Feature specs and implementation guides live in `docs/`:
 | System.Drawing.Common | 10.0.5 | GDI+ for taskbar icon rendering |
 | WinUIEx | 2.9.0 | Extended WinUI utilities (`WindowEx` base class) |
 
-JSON serialization uses `System.Text.Json` (built into .NET 10) via the `Helpers/Json.cs` wrapper. `JsonStringEnumConverter` is configured globally for human-readable enum serialization.
+JSON serialization uses `System.Text.Json` (built into .NET 10) via the `Hypersonic.Core.Helpers.Json` wrapper. `JsonStringEnumConverter` is configured globally for human-readable enum serialization.
 
 ## Testing
 
 - **Framework**: MSTest with `coverlet.collector` for coverage.
+- **Core tests** (`Hypersonic.Core.Tests`): Pure logic tests — PlaybackQueue, LoggingService, FileSink, DebugSink, persistence helpers (Json, VaultKeyHelper, AppState). No WinUI dependencies, runs with plain `dotnet test`.
+- **App tests** (`Hypersonic.Tests`): WinUI-dependent tests — server URL resolution, LocalSettingsService, PlayerViewModel toggle commands. Uses `[UITestMethod]` for WinUI tests. Requires `-p:Platform=x64`. Includes testhost fix (`OutputType=Exe` + `GenerateProgramFile=true`) for dotnet/sdk#53412.
 - **Client tests** (`Hypersonic.Client.UnitTest`): Deserialization tests for XML/JSON API responses, client constructor validation.
-- **App tests** (`Hypersonic.Tests.MSTest`): Server URL resolution logic. Uses `[UITestMethod]` for WinUI-dependent tests.
-- **Unit tests** (`Hypersonic.UnitTest`): Pure logic tests (PlaybackQueue, LoggingService) — no WinUI dependencies.
 - **No mocking library** — tests are integration-oriented against real serialized data.
 
 ## Error handling

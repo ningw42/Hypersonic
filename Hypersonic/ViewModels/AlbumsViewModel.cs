@@ -3,8 +3,9 @@ using CommunityToolkit.Mvvm.Input;
 
 using Hypersonic.Collections;
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Contracts.ViewModels;
-using Hypersonic.Models;
+using Hypersonic.Core.Models;
 
 namespace Hypersonic.ViewModels;
 

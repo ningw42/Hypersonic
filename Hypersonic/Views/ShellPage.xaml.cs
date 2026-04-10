@@ -1,4 +1,5 @@
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Models;
 using Hypersonic.Helpers;
 using Hypersonic.Models;
 using Hypersonic.ViewModels;

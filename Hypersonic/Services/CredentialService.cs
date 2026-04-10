@@ -1,6 +1,7 @@
 using Hypersonic.Contracts.Services;
-using Hypersonic.Helpers;
-using Hypersonic.Models;
+using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Helpers;
+using Hypersonic.Core.Models;
 
 using Windows.Security.Credentials;
 

@@ -1,4 +1,4 @@
-using Hypersonic.Models;
+using Hypersonic.Core.Models;
 
 namespace Hypersonic.Contracts.Services;
 

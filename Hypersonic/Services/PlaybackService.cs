@@ -1,5 +1,7 @@
 using Hypersonic.Contracts.Services;
-using Hypersonic.Models;
+using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Models;
+using Hypersonic.Core.Services;
 
 using Windows.Media;
 using Windows.Media.Core;

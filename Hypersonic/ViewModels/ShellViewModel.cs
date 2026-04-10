@@ -3,7 +3,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using Hypersonic.Contracts.Services;
-using Hypersonic.Models;
+using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Models;
 using Hypersonic.Views;
 
 using Microsoft.UI.Xaml.Navigation;
