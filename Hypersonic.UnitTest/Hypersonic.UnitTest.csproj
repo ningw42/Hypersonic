@@ -40,7 +40,6 @@
     <Compile Include="..\Hypersonic\Services\LocalSettingsService.cs" Link="Services\LocalSettingsService.cs" />
     <Compile Include="..\Hypersonic\Models\LocalSettingsOptions.cs" Link="Models\LocalSettingsOptions.cs" />
     <Compile Include="..\Hypersonic\Helpers\RuntimeHelper.cs" Link="Helpers\RuntimeHelper.cs" />
-    <Compile Include="..\Hypersonic\Contracts\Services\IAppStateService.cs" Link="Contracts\Services\IAppStateService.cs" />
   </ItemGroup>
 
 </Project>

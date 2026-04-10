@@ -16,7 +16,7 @@ public partial class PlayerViewModel : ObservableRecipient
 
     private bool _isExternalUpdate;
     private bool _isSavingFromExternal;
-    private readonly DispatcherQueueTimer _volumeSaveTimer;
+    private readonly DispatcherQueueTimer? _volumeSaveTimer;
 
     [ObservableProperty]
     private string trackTitle = string.Empty;
@@ -91,6 +91,15 @@ public partial class PlayerViewModel : ObservableRecipient
     private RepeatMode repeatMode;
 
     public PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService, IAppStateService appStateService)
+        : this(playbackService, navigationService, appStateService, createTimer: true)
+    {
+    }
+
+    /// <summary>
+    /// Internal constructor for unit testing. Skips DispatcherQueue timer creation
+    /// when <paramref name="createTimer"/> is false, allowing instantiation without a UI thread.
+    /// </summary>
+    internal PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService, IAppStateService appStateService, bool createTimer)
     {
         _playbackService = playbackService;
         _navigationService = navigationService;
@@ -100,15 +109,18 @@ public partial class PlayerViewModel : ObservableRecipient
         _playbackService.PositionChanged += OnPositionChanged;
         _playbackService.QueueChanged += OnQueueChanged;
 
-        // Setup debounce timer for volume save (1 second).
-        _volumeSaveTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
-        _volumeSaveTimer.Interval = TimeSpan.FromSeconds(1);
-        _volumeSaveTimer.IsRepeating = false;
-        _volumeSaveTimer.Tick += (_, _) =>
+        if (createTimer)
         {
-            _appStateService.State.Playback.Volume = VolumePercent;
-            _ = _appStateService.SavePlaybackAsync();
-        };
+            // Setup debounce timer for volume save (1 second).
+            _volumeSaveTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+            _volumeSaveTimer.Interval = TimeSpan.FromSeconds(1);
+            _volumeSaveTimer.IsRepeating = false;
+            _volumeSaveTimer.Tick += (_, _) =>
+            {
+                _appStateService.State.Playback.Volume = VolumePercent;
+                _ = _appStateService.SavePlaybackAsync();
+            };
+        }
 
         // Hydrate from current service state (already restored from AppState in PlaybackService).
         // Guard prevents redundant saves during hydration (values already match AppState).
@@ -275,7 +287,7 @@ public partial class PlayerViewModel : ObservableRecipient
     /// </summary>
     internal void FlushPendingSaves()
     {
-        if (_volumeSaveTimer.IsRunning)
+        if (_volumeSaveTimer is { IsRunning: true })
         {
             _volumeSaveTimer.Stop();
             _appStateService.State.Playback.Volume = VolumePercent;
@@ -296,7 +308,7 @@ public partial class PlayerViewModel : ObservableRecipient
         _playbackService.Volume = value / 100.0;
         UpdateVolumeGlyph();
 
-        if (!_isSavingFromExternal)
+        if (!_isSavingFromExternal && _volumeSaveTimer is not null)
         {
             // Debounce volume save — slider fires continuously during drag.
             _volumeSaveTimer.Stop();
@@ -307,30 +319,6 @@ public partial class PlayerViewModel : ObservableRecipient
     partial void OnIsMutedChanged(bool value)
     {
         UpdateVolumeGlyph();
-
-        if (!_isSavingFromExternal)
-        {
-            _appStateService.State.Playback.IsMuted = value;
-            _ = _appStateService.SavePlaybackAsync();
-        }
-    }
-
-    partial void OnShuffleEnabledChanged(bool value)
-    {
-        if (!_isSavingFromExternal)
-        {
-            _appStateService.State.Playback.ShuffleEnabled = value;
-            _ = _appStateService.SavePlaybackAsync();
-        }
-    }
-
-    partial void OnRepeatModeChanged(RepeatMode value)
-    {
-        if (!_isSavingFromExternal)
-        {
-            _appStateService.State.Playback.RepeatMode = value;
-            _ = _appStateService.SavePlaybackAsync();
-        }
     }
 
     private void UpdateVolumeGlyph()
