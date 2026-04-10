@@ -111,13 +111,13 @@ public partial class PlayerViewModel : ObservableRecipient
         };
 
         // Hydrate from current service state (already restored from AppState in PlaybackService).
+        // Guard prevents redundant saves during hydration (values already match AppState).
+        _isSavingFromExternal = true;
         VolumePercent = Math.Round(_playbackService.Volume * 100);
         IsMuted = _playbackService.IsMuted;
         ShuffleEnabled = _playbackService.ShuffleEnabled;
         RepeatMode = _playbackService.RepeatMode;
         UpdateVolumeGlyph();
-
-        // Prevent the initial hydration from triggering saves.
         _isSavingFromExternal = false;
     }
 
@@ -167,6 +167,8 @@ public partial class PlayerViewModel : ObservableRecipient
     private void ToggleShuffle()
     {
         _playbackService.ShuffleEnabled = !_playbackService.ShuffleEnabled;
+        _appStateService.State.Playback.ShuffleEnabled = _playbackService.ShuffleEnabled;
+        _ = _appStateService.SavePlaybackAsync();
     }
 
     [RelayCommand]
@@ -179,12 +181,16 @@ public partial class PlayerViewModel : ObservableRecipient
             RepeatMode.One => RepeatMode.Off,
             _ => RepeatMode.Off,
         };
+        _appStateService.State.Playback.RepeatMode = _playbackService.RepeatMode;
+        _ = _appStateService.SavePlaybackAsync();
     }
 
     [RelayCommand]
     private void ToggleMute()
     {
         _playbackService.IsMuted = !_playbackService.IsMuted;
+        _appStateService.State.Playback.IsMuted = _playbackService.IsMuted;
+        _ = _appStateService.SavePlaybackAsync();
     }
 
     [RelayCommand]
