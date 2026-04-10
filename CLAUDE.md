@@ -72,7 +72,7 @@ Hypersonic/
 
 - **DI registration**: All services, ViewModels, and Views are registered in `App.xaml.cs`. Services are singleton; Views/ViewModels are transient. Exceptions: `PlayerViewModel` is **singleton** (persists across navigation); `INavigationViewService` is **transient**.
 - **Service resolution**: `App.GetService<T>()` is the static accessor for resolving services anywhere.
-- **Navigation**: Frame-based. `PageService` maps ViewModel types to Page types by full name. When adding a new page, you must: (1) create the View and ViewModel, (2) register both in `App.xaml.cs`, (3) add the mapping in `PageService.Configure()`.
+- **Navigation**: Frame-based. `PageService` maps ViewModel types to Page types by full name. When adding a new page, you must: (1) create the View and ViewModel, (2) register both in `App.xaml.cs`, (3) add the mapping in `PageService.Configure()`, (4) if top-level, add to `TopLevelPages` HashSet in `DefaultActivationHandler`, `ShellViewModel`, and `ConnectViewModel`.
 - **ViewModel base**: ViewModels extend `ObservableRecipient` (from CommunityToolkit.Mvvm). Use `[ObservableProperty]` and `[RelayCommand]` source generator attributes.
 - **INavigationAware**: ViewModels implement this contract to receive `OnNavigatedTo`/`OnNavigatedFrom` lifecycle callbacks.
 - **Server connection**: `ISubsonicClientService` (singleton) manages the `SubsonicClient` lifecycle. Credentials are managed by `ICredentialService`: non-secret metadata (URL, username) stored via `ILocalSettingsService` under keys `"ServerAccounts"` and `"ActiveAccount"`, passwords stored in Windows Credential Manager (`PasswordVault`). On startup, `ActivationService` runs legacy migration, loads the active credential, tests the connection, and navigates to `ConnectPage` or `ShellPage`. URL resolution is intelligent: tries `https://<host>/rest` first, then bare host.
@@ -103,6 +103,21 @@ Hypersonic/
 - **Queue logic**: `PlaybackQueue` — pure logic class (no WinUI dependencies, fully unit-testable). Manages shuffle (Fisher-Yates), repeat (`Off`/`One`/`All`), navigation history (ID-based stack), play history (ring buffer, max 100), and queue mutations (`AddNext`, `AddToEnd`, `RemoveAt`, `MoveTrack`, `ClearUpcoming`).
 - **Position tracking**: `DispatcherQueueTimer` fires every 500ms to update the `Position` property.
 - **Event-driven**: PlaybackService raises events (`PlaybackStateChanged`, `TrackChanged`, `PositionChanged`); `PlayerViewModel` and `TaskbarService` subscribe.
+
+### Pages
+
+| Page | ViewModel | Purpose |
+|---|---|---|
+| **ShellPage** | ShellViewModel + PlayerViewModel | App shell: nav sidebar, player bar, content frame |
+| **ConnectPage** | ConnectViewModel | Server login (URL + username + password) |
+| **MainPage** | MainViewModel | Home page (currently stub) |
+| **AlbumsPage** | AlbumsViewModel | Album grid with incremental loading |
+| **AlbumDetailPage** | AlbumDetailViewModel | Album tracks with disc-based grouping |
+| **ArtistsPage** | ArtistsViewModel | Artist list |
+| **ArtistDetailPage** | ArtistDetailViewModel | Artist albums + top tracks |
+| **PlaylistsPage** | PlaylistsViewModel | User playlists |
+| **PlaylistDetailPage** | PlaylistDetailViewModel | Playlist tracks |
+| **SettingsPage** | SettingsViewModel | Theme & backdrop selectors |
 
 ### Shell layout
 
@@ -151,7 +166,13 @@ Stored via `ILocalSettingsService` (MSIX → `ApplicationData`; unpackaged → `
 
 Passwords are stored in Windows Credential Manager (`PasswordVault`) under resource key `Hypersonic:<serverUrl>`, not in settings.
 
-Runtime state (volume, mute, shuffle, repeat, window geometry, last page) is stored separately in `AppState.json` via `IAppStateService`.
+Runtime state (volume, mute, shuffle, repeat, window geometry, last page) is stored separately in `AppState.json` via `IAppStateService`. The state model has three nested sections: `PlaybackState` (volume, mute, shuffle, repeat), `WindowState` (size, position, maximized), `NavigationState` (last page).
+
+### Persistence patterns
+
+- **External update guard**: `PlayerViewModel._isSavingFromExternal` flag prevents redundant saves when hydrating ViewModel properties from service state (e.g., on startup or playback state change events).
+- **Debounced saves**: 1-second non-repeating `DispatcherQueueTimer` in `PlayerViewModel` (volume changes) and `MainWindow` (window geometry). Batches rapid changes to avoid excessive disk writes.
+- **Synchronous close flush**: `MainWindow_Closed` sets `_isClosing = true`, stops timers, calls `SaveWindowState(sync: true)` and `PlayerViewModel.FlushPendingSaves()`, then `AppStateService.SaveSync()` — all synchronous to avoid races with process exit.
 
 ## MVP Roadmap
 
