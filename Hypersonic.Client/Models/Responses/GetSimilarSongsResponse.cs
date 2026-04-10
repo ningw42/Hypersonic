@@ -9,5 +9,5 @@ public class GetSimilarSongsResponse : SubsonicResponse
 {
     [JsonPropertyName("similarSongs")]
     [XmlElement("similarSongs")]
-    public SimilarSongs SimilarSongs { get; set; }
+    public SimilarSongs SimilarSongs { get; set; } = null!;
 }

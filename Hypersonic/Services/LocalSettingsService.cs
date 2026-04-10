@@ -28,7 +28,7 @@ public class LocalSettingsService : ILocalSettingsService
     private readonly string _applicationDataFolder;
     private readonly string _localsettingsFile;
 
-    private IDictionary<string, object> _settings;
+    private IDictionary<string, object?> _settings;
 
     private bool _isInitialized;
 
@@ -41,7 +41,7 @@ public class LocalSettingsService : ILocalSettingsService
         _applicationDataFolder = Path.Combine(_localApplicationData, _options.ApplicationDataFolder ?? _defaultApplicationDataFolder);
         _localsettingsFile = _options.LocalSettingsFile ?? _defaultLocalSettingsFile;
 
-        _settings = new Dictionary<string, object>();
+        _settings = new Dictionary<string, object?>();
 
         _log.Info("Settings initialized", new
         {
@@ -55,7 +55,7 @@ public class LocalSettingsService : ILocalSettingsService
     {
         if (!_isInitialized)
         {
-            _settings = await Task.Run(() => _fileService.Read<IDictionary<string, object>>(_applicationDataFolder, _localsettingsFile)) ?? new Dictionary<string, object>();
+            _settings = await Task.Run(() => _fileService.Read<IDictionary<string, object?>>(_applicationDataFolder, _localsettingsFile)) ?? new Dictionary<string, object?>();
 
             if (MigrateDoubleSerializedValues())
             {

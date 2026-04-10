@@ -37,7 +37,7 @@ public partial class SongInfo : ObservableObject
 
     // Observable for UI toggle
     [ObservableProperty]
-    private bool isStarred;
+    public partial bool IsStarred { get; set; }
 
     // Display helpers for zero-suppression
     public string BitRateDisplay => BitRate > 0 ? $"{BitRate}" : "";

@@ -183,7 +183,7 @@ public class SubsonicClient : ISubsonicClient
 
     public ResponseFormat ResponseFormat { get; private set; }
 
-    private SubsonicRequest baseRequest = null;
+    private SubsonicRequest? baseRequest;
 
     private SubsonicRequest BaseRequest
     {
@@ -599,18 +599,18 @@ public class SubsonicClient : ISubsonicClient
         XmlSerializer serializer = new XmlSerializer(typeof(T));
         using (XmlReader reader = new XmlTextReader(stream) { Namespaces = false })
         {
-            return (T)serializer.Deserialize(reader);
+            return (T)serializer.Deserialize(reader)!;
         }
     }
 
     public static T DeserializeJsonResponse<T>(Stream stream)
     {
-        JsonResponseWrapper<T> wrapper = JsonSerializer.Deserialize<JsonResponseWrapper<T>>(stream);
+        JsonResponseWrapper<T> wrapper = JsonSerializer.Deserialize<JsonResponseWrapper<T>>(stream)!;
         return wrapper.SubsonicResponse;
     }
 
     public static T DeserializeJson<T>(Stream stream)
     {
-        return JsonSerializer.Deserialize<T>(stream);
+        return JsonSerializer.Deserialize<T>(stream)!;
     }
 }

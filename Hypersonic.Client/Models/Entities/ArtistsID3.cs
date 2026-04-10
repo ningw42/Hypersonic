@@ -7,9 +7,9 @@ public class ArtistsID3
 {
     [JsonPropertyName("ignoredArticles")]
     [XmlAttribute("ignoredArticles")]
-    public string IgnoredArticles { get; set; }
+    public string? IgnoredArticles { get; set; }
 
     [JsonPropertyName("index")]
     [XmlElement("index")]
-    public IndexID3[] Index { get; set; }
+    public IndexID3[]? Index { get; set; }
 }

@@ -7,6 +7,6 @@ public class Genres
 {
     [JsonPropertyName("genres")]
     [XmlElement("genres")]
-    public Genre[] Genre { get; set; }
+    public Genre[]? Genre { get; set; }
 }
 

@@ -19,47 +19,47 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
     private List<AlbumInfo> _allAlbums = [];
 
     [ObservableProperty]
-    private string artistName = string.Empty;
+    public partial string ArtistName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string? artistImageUrl;
+    public partial string? ArtistImageUrl { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AlbumCountText))]
-    private int albumCount;
+    public partial int AlbumCount { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TotalSongCountText))]
-    private int totalSongCount;
+    public partial int TotalSongCount { get; set; }
 
     [ObservableProperty]
-    private string? biography;
+    public partial string? Biography { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BiographyMaxLines))]
     [NotifyPropertyChangedFor(nameof(BiographyToggleText))]
-    private bool isBiographyExpanded;
+    public partial bool IsBiographyExpanded { get; set; }
 
     [ObservableProperty]
-    private bool hasBiography;
+    public partial bool HasBiography { get; set; }
 
     [ObservableProperty]
-    private bool hasSimilarArtists;
+    public partial bool HasSimilarArtists { get; set; }
 
     [ObservableProperty]
-    private bool isLoading;
+    public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
-    private string? errorMessage;
+    public partial string? ErrorMessage { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
-    private int selectedSortIndex;
+    public partial int SelectedSortIndex { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SortOrderGlyph))]
     [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
-    private bool isSortDescending = true;
+    public partial bool IsSortDescending { get; set; } = true;
 
     public string SortOrderGlyph => IsSortDescending ? "\uE74B" : "\uE74A";
 
@@ -239,7 +239,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // GetArtistInfo2 may not be supported; page still works without it
                 _log.Debug("GetArtistInfo2 unavailable");

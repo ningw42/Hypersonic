@@ -7,11 +7,11 @@ public class Child
 {
     [JsonPropertyName("id")]
     [XmlAttribute("id")]
-    public string Id { get; set; }
+    public string Id { get; set; } = null!;
 
     [JsonPropertyName("parent")]
     [XmlAttribute("parent")]
-    public string Parent { get; set; }
+    public string? Parent { get; set; }
 
     [JsonPropertyName("isDir")]
     [XmlAttribute("isDir")]
@@ -19,15 +19,15 @@ public class Child
 
     [JsonPropertyName("title")]
     [XmlAttribute("title")]
-    public string Title { get; set; }
+    public string Title { get; set; } = null!;
 
     [JsonPropertyName("album")]
     [XmlAttribute("album")]
-    public string Album { get; set; }
+    public string? Album { get; set; }
 
     [JsonPropertyName("artist")]
     [XmlAttribute("artist")]
-    public string Artist { get; set; }
+    public string? Artist { get; set; }
 
     [JsonPropertyName("track")]
     [XmlAttribute("track")]
@@ -39,11 +39,11 @@ public class Child
 
     [JsonPropertyName("genre")]
     [XmlAttribute("genre")]
-    public string Genre { get; set; }
+    public string? Genre { get; set; }
 
     [JsonPropertyName("coverArt")]
     [XmlAttribute("coverArt")]
-    public string CoverArt { get; set; }
+    public string? CoverArt { get; set; }
 
     [JsonPropertyName("size")]
     [XmlAttribute("size")]
@@ -51,19 +51,19 @@ public class Child
 
     [JsonPropertyName("contentType")]
     [XmlAttribute("contentType")]
-    public string ContentType { get; set; }
+    public string? ContentType { get; set; }
 
     [JsonPropertyName("suffix")]
     [XmlAttribute("suffix")]
-    public string Suffix { get; set; }
-    
+    public string? Suffix { get; set; }
+
     [JsonPropertyName("transcodedContentType")]
     [XmlAttribute("transcodedContentType")]
-    public string TranscodedContentType { get; set; }
+    public string? TranscodedContentType { get; set; }
 
     [JsonPropertyName("transcodedSuffix")]
     [XmlAttribute("transcodedSuffix")]
-    public string transcodedSuffix { get; set; }
+    public string? transcodedSuffix { get; set; }
 
     [JsonPropertyName("duration")]
     [XmlAttribute("duration")]
@@ -87,7 +87,7 @@ public class Child
 
     [JsonPropertyName("path")]
     [XmlAttribute("path")]
-    public string Path { get; set; }
+    public string? Path { get; set; }
 
     [JsonPropertyName("isVideo")]
     [XmlAttribute("isVideo")]
@@ -111,27 +111,27 @@ public class Child
 
     [JsonPropertyName("created")]
     [XmlAttribute("created")]
-    public string Created { get; set; }
+    public string? Created { get; set; }
 
     [JsonPropertyName("starred")]
     [XmlAttribute("starred")]
-    public string Starred { get; set; }
+    public string? Starred { get; set; }
 
     [JsonPropertyName("albumId")]
     [XmlAttribute("albumId")]
-    public string AlbumId { get; set; }
+    public string? AlbumId { get; set; }
 
     [JsonPropertyName("artistId")]
     [XmlAttribute("artistId")]
-    public string ArtistId { get; set; }
+    public string? ArtistId { get; set; }
 
     [JsonPropertyName("type")]
     [XmlAttribute("type")]
-    public string Type { get; set; }
+    public string? Type { get; set; }
 
     [JsonPropertyName("mediaType")]
     [XmlAttribute("mediaType")]
-    public string MediaType { get; set; }
+    public string? MediaType { get; set; }
 
     [JsonPropertyName("bookmarkPosition")]
     [XmlAttribute("bookmarkPosition")]
@@ -147,7 +147,7 @@ public class Child
 
     [JsonPropertyName("played")]
     [XmlAttribute("played")]
-    public string Played { get; set; }
+    public string? Played { get; set; }
 
     [JsonPropertyName("bpm")]
     [XmlAttribute("bpm")]
@@ -155,49 +155,49 @@ public class Child
 
     [JsonPropertyName("comment")]
     [XmlAttribute("comment")]
-    public string Comment { get; set; }
+    public string? Comment { get; set; }
 
     [JsonPropertyName("sortName")]
     [XmlAttribute("sortName")]
-    public string SortName { get; set; }
+    public string? SortName { get; set; }
 
     [JsonPropertyName("musicBrainzId")]
     [XmlAttribute("musicBrainzId")]
-    public string MusicBrainzId { get; set; }
+    public string? MusicBrainzId { get; set; }
 
     [JsonPropertyName("genres")]
     [XmlElement("genres")]
-    public ItemGenre[] Genres { get; set; }
+    public ItemGenre[]? Genres { get; set; }
 
     [JsonPropertyName("artists")]
     [XmlElement("artists")]
-    public ArtistID3[] Artists { get; set; }
+    public ArtistID3[]? Artists { get; set; }
 
     [JsonPropertyName("displayArtist")]
     [XmlAttribute("displayArtist")]
-    public string DisplayArtist { get; set; }
+    public string? DisplayArtist { get; set; }
 
     [JsonPropertyName("albumArtists")]
     [XmlElement("albumArtists")]
-    public ArtistID3[] AlbumArtists { get; set; }
+    public ArtistID3[]? AlbumArtists { get; set; }
 
     [JsonPropertyName("displayAlbumArtist")]
     [XmlAttribute("displayAlbumArtist")]
-    public string DisplayAlbumArtist { get; set; }
+    public string? DisplayAlbumArtist { get; set; }
 
     [JsonPropertyName("contributors")]
     [XmlElement("contributors")]
-    public Contributor[] Contributors { get; set; }
+    public Contributor[]? Contributors { get; set; }
 
     [JsonPropertyName("displayComposer")]
     [XmlAttribute("displayComposer")]
-    public string DisplayComposer { get; set; }
+    public string? DisplayComposer { get; set; }
 
     [JsonPropertyName("moods")]
     [XmlElement("moods")]
-    public string[] Moods { get; set; }
+    public string[]? Moods { get; set; }
 
     [JsonPropertyName("replayGain")]
     [XmlElement("replayGain")]
-    public ReplayGain ReplayGain { get; set; }
+    public ReplayGain? ReplayGain { get; set; }
 }

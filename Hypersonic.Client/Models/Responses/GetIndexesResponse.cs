@@ -9,5 +9,5 @@ public class GetIndexesResponse : SubsonicResponse
 {
     [JsonPropertyName("indexes")]
     [XmlElement("indexes")]
-    public Indexes Indexes { get; set; }
+    public Indexes Indexes { get; set; } = null!;
 }

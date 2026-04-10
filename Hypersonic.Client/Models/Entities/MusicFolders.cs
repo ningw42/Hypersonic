@@ -7,6 +7,6 @@ public class MusicFolders
 {
     [JsonPropertyName("musicFolder")]
     [XmlElement("musicFolder")]
-    public MusicFolder[] MusicFolder { get; set; }
+    public MusicFolder[]? MusicFolder { get; set; }
 }
 

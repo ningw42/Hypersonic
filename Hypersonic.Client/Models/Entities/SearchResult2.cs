@@ -7,13 +7,13 @@ public class SearchResult2
 {
     [JsonPropertyName("artist")]
     [XmlElement("artist")]
-    public Artist[] Artists { get; set; }
+    public Artist[]? Artists { get; set; }
 
     [JsonPropertyName("album")]
     [XmlElement("album")]
-    public Child[] Album { get; set; }
+    public Child[]? Album { get; set; }
 
     [JsonPropertyName("song")]
     [XmlElement("song")]
-    public Child[] Song { get; set; }
+    public Child[]? Song { get; set; }
 }

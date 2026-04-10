@@ -11,5 +11,5 @@ public class DiscTitle
 
     [JsonPropertyName("title")]
     [XmlAttribute("title")]
-    public string Title { get; set; }
+    public string? Title { get; set; }
 }

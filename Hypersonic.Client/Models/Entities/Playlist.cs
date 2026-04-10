@@ -7,19 +7,19 @@ public class Playlist
 {
     [JsonPropertyName("id")]
     [XmlAttribute("id")]
-    public string Id { get; set; }
+    public string Id { get; set; } = null!;
 
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [JsonPropertyName("comment")]
     [XmlAttribute("comment")]
-    public string Comment { get; set; }
+    public string? Comment { get; set; }
 
     [JsonPropertyName("owner")]
     [XmlAttribute("owner")]
-    public string Owner { get; set; }
+    public string? Owner { get; set; }
 
     [JsonPropertyName("public")]
     [XmlAttribute("public")]
@@ -43,9 +43,9 @@ public class Playlist
 
     [JsonPropertyName("coverArt")]
     [XmlAttribute("coverArt")]
-    public string CoverArt { get; set; }
+    public string? CoverArt { get; set; }
 
     [JsonPropertyName("allowedUser")]
     [XmlElement("allowedUser")]
-    public string[] AllowedUser { get; set; }
+    public string[]? AllowedUser { get; set; }
 }

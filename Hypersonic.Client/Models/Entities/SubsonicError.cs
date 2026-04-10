@@ -12,9 +12,9 @@ public class SubsonicError
 
     [JsonPropertyName("message")]
     [XmlAttribute("message")]
-    public string Message { get; set; }
+    public string Message { get; set; } = null!;
 
     [JsonPropertyName("helpUrl")]
     [XmlAttribute("helpUrl")]
-    public string HelpUrl { get; set; }
+    public string? HelpUrl { get; set; }
 }

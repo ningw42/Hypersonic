@@ -8,29 +8,29 @@ public class ArtistInfo
 {
     [JsonPropertyName("biography")]
     [XmlAttribute("biography")]
-    public string Biography { get; set; }
+    public string? Biography { get; set; }
 
     [JsonPropertyName("musicBrainzId")]
     [XmlAttribute("musicBrainzId")]
-    public string MusicBrainzId { get; set; }
+    public string? MusicBrainzId { get; set; }
 
     [JsonPropertyName("lastFmUrl")]
     [XmlAttribute("lastFmUrl")]
-    public string LastFmUrl { get; set; }
+    public string? LastFmUrl { get; set; }
 
     [JsonPropertyName("smallImageUrl")]
     [XmlAttribute("smallImageUrl")]
-    public string SmallImageUrl { get; set; }
+    public string? SmallImageUrl { get; set; }
 
     [JsonPropertyName("mediumImageUrl")]
     [XmlAttribute("mediumImageUrl")]
-    public string MediumImageUrl { get; set; }
+    public string? MediumImageUrl { get; set; }
 
     [JsonPropertyName("largeImageUrl")]
     [XmlAttribute("largeImageUrl")]
-    public string LargeImageUrl { get; set; }
+    public string? LargeImageUrl { get; set; }
 
     [JsonPropertyName("similarArtist")]
     [XmlElement("similarArtist")]
-    public Artist[] SimilarArtist { get; set; }
+    public Artist[]? SimilarArtist { get; set; }
 }

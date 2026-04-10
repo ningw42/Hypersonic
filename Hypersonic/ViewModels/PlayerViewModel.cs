@@ -21,76 +21,76 @@ public partial class PlayerViewModel : ObservableRecipient
     private readonly DispatcherQueueTimer? _volumeSaveTimer;
 
     [ObservableProperty]
-    private string trackTitle = string.Empty;
+    public partial string TrackTitle { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string artistName = string.Empty;
+    public partial string ArtistName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string albumName = string.Empty;
+    public partial string AlbumName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string? artistId;
+    public partial string? ArtistId { get; set; }
 
     [ObservableProperty]
-    private string? albumId;
+    public partial string? AlbumId { get; set; }
 
     [ObservableProperty]
-    private string? coverArtUrl;
+    public partial string? CoverArtUrl { get; set; }
 
     [ObservableProperty]
-    private bool isPlaying;
+    public partial bool IsPlaying { get; set; }
 
     [ObservableProperty]
-    private double position;
+    public partial double Position { get; set; }
 
     [ObservableProperty]
-    private double duration;
+    public partial double Duration { get; set; }
 
     [ObservableProperty]
-    private double volumePercent = 100;
+    public partial double VolumePercent { get; set; } = 100;
 
     [ObservableProperty]
-    private bool hasNext;
+    public partial bool HasNext { get; set; }
 
     [ObservableProperty]
-    private bool hasPrevious;
+    public partial bool HasPrevious { get; set; }
 
     [ObservableProperty]
-    private bool hasTrack;
+    public partial bool HasTrack { get; set; }
 
     [ObservableProperty]
-    private string positionText = "0:00";
+    public partial string PositionText { get; set; } = "0:00";
 
     [ObservableProperty]
-    private string durationText = "0:00";
+    public partial string DurationText { get; set; } = "0:00";
 
     [ObservableProperty]
-    private bool isMuted;
+    public partial bool IsMuted { get; set; }
 
     [ObservableProperty]
-    private string volumeGlyph = "\uE767";
+    public partial string VolumeGlyph { get; set; } = "\uE767";
 
     [ObservableProperty]
-    private IReadOnlyList<QueueItem> queueItems = Array.Empty<QueueItem>();
+    public partial IReadOnlyList<QueueItem> QueueItems { get; set; } = Array.Empty<QueueItem>();
 
     [ObservableProperty]
-    private int effectiveQueueIndex = -1;
+    public partial int EffectiveQueueIndex { get; set; } = -1;
 
     [ObservableProperty]
-    private bool isQueueOpen;
+    public partial bool IsQueueOpen { get; set; }
 
     [ObservableProperty]
-    private bool isQueueEmpty = true;
+    public partial bool IsQueueEmpty { get; set; } = true;
 
     [ObservableProperty]
-    private string queueCountText = string.Empty;
+    public partial string QueueCountText { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private bool shuffleEnabled;
+    public partial bool ShuffleEnabled { get; set; }
 
     [ObservableProperty]
-    private RepeatMode repeatMode;
+    public partial RepeatMode RepeatMode { get; set; }
 
     public PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService, IAppStateService appStateService)
         : this(playbackService, navigationService, appStateService, createTimer: true)

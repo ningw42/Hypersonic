@@ -8,5 +8,5 @@ public class LyricsList
 {
     [JsonPropertyName("structuredLyrics")]
     [XmlElement("structuredLyrics")]
-    public StructuredLyrics[] StructuredLyrics { get; set; }
+    public StructuredLyrics[]? StructuredLyrics { get; set; }
 }

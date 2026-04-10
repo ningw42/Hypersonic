@@ -7,5 +7,5 @@ public class AlbumList2
 {
     [JsonPropertyName("album")]
     [XmlElement("album")]
-    public AlbumID3[] Album { get; set; }
+    public AlbumID3[]? Album { get; set; }
 }

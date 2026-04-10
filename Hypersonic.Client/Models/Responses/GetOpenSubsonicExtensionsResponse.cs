@@ -9,5 +9,5 @@ public class GetOpenSubsonicExtensionsResponse : SubsonicResponse
 {
     [JsonPropertyName("openSubsonicExtensions")]
     [XmlElement("openSubsonicExtensions")]
-    public OpenSubsonicExtension[] OpenSubsonicExtensions { get; set; }
+    public OpenSubsonicExtension[] OpenSubsonicExtensions { get; set; } = null!;
 }

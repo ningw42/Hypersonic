@@ -19,31 +19,31 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
     private List<SongInfo> _allSongs = [];
 
     [ObservableProperty]
-    private string playlistName = string.Empty;
+    public partial string PlaylistName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string? coverArtUrl;
+    public partial string? CoverArtUrl { get; set; }
 
     [ObservableProperty]
-    private string owner = string.Empty;
+    public partial string Owner { get; set; } = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCommentVisible))]
-    private string? comment;
+    public partial string? Comment { get; set; }
 
     public bool IsCommentVisible => !string.IsNullOrEmpty(Comment);
 
     [ObservableProperty]
-    private int songCount;
+    public partial int SongCount { get; set; }
 
     [ObservableProperty]
-    private string totalDuration = string.Empty;
+    public partial string TotalDuration { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private bool isLoading;
+    public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
-    private string? errorMessage;
+    public partial string? ErrorMessage { get; set; }
 
     public ObservableCollection<object> TrackListItems { get; } = [];
 

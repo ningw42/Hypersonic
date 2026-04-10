@@ -9,7 +9,7 @@ public class GetTopSongsResponse : SubsonicResponse
 {
     [JsonPropertyName("topSongs")]
     [XmlElement("topSongs")]
-    public TopSongs TopSongs { get; set; }
+    public TopSongs TopSongs { get; set; } = null!;
 }
 
 

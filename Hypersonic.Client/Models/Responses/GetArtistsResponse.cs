@@ -9,5 +9,5 @@ public class GetArtistsResponse : SubsonicResponse
 {
     [JsonPropertyName("artists")]
     [XmlElement("artists")]
-    public ArtistsID3 Artists { get; set; }
+    public ArtistsID3 Artists { get; set; } = null!;
 }

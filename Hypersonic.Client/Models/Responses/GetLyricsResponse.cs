@@ -9,5 +9,5 @@ public class GetLyricsResponse : SubsonicResponse
 {
     [JsonPropertyName("lyrics")]
     [XmlElement("lyrics")]
-    public Lyrics Lyrics { get; set; }
+    public Lyrics Lyrics { get; set; } = null!;
 }

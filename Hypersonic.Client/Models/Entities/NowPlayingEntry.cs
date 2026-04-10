@@ -7,11 +7,11 @@ public class NowPlayingEntry : Child
 {
     [JsonPropertyName("username")]
     [XmlAttribute("username")]
-    public string UserName { get; set; }
+    public string? UserName { get; set; }
 
     [JsonPropertyName("minutesAgo")]
     [XmlAttribute("minutesAgo")]
-    public string MinutesAgo { get; set; }
+    public string? MinutesAgo { get; set; }
 
     [JsonPropertyName("playerId")]
     [XmlAttribute("playerId")]
@@ -19,5 +19,5 @@ public class NowPlayingEntry : Child
 
     [JsonPropertyName("playerName")]
     [XmlAttribute("playerName")]
-    public string PlayerName { get; set; }
+    public string? PlayerName { get; set; }
 }

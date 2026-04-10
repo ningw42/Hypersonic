@@ -7,9 +7,9 @@ public class IndexID3
 {
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [JsonPropertyName("artist")]
     [XmlElement("artist")]
-    public Artist[] Artist { get; set; }
+    public Artist[]? Artist { get; set; }
 }

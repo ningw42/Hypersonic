@@ -9,5 +9,5 @@ public class GetStarred2Response : SubsonicResponse
 {
     [JsonPropertyName("starred2")]
     [XmlElement("starred2")]
-    public Starred2 Starred2 { get; set; }
+    public Starred2 Starred2 { get; set; } = null!;
 }

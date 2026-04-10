@@ -7,23 +7,23 @@ public class AlbumID3
 {
     [JsonPropertyName("id")]
     [XmlAttribute("id")]
-    public string Id { get; set; }
+    public string Id { get; set; } = null!;
 
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [JsonPropertyName("artist")]
     [XmlAttribute("artist")]
-    public string Artist { get; set; }
+    public string Artist { get; set; } = null!;
 
     [JsonPropertyName("artistId")]
     [XmlAttribute("artistId")]
-    public string ArtistId { get; set; }
+    public string ArtistId { get; set; } = null!;
 
     [JsonPropertyName("coverArt")]
     [XmlAttribute("coverArt")]
-    public string CoverArt { get; set; }
+    public string? CoverArt { get; set; }
 
     [JsonPropertyName("songCount")]
     [XmlAttribute("songCount")]
@@ -39,11 +39,11 @@ public class AlbumID3
 
     [JsonPropertyName("created")]
     [XmlAttribute("created")]
-    public string Created { get; set; }
+    public string? Created { get; set; }
 
     [JsonPropertyName("starred")]
     [XmlAttribute("starred")]
-    public string Starred { get; set; }
+    public string? Starred { get; set; }
 
     [JsonPropertyName("year")]
     [XmlAttribute("year")]
@@ -51,11 +51,11 @@ public class AlbumID3
 
     [JsonPropertyName("genre")]
     [XmlAttribute("genre")]
-    public string Genre { get; set; }
+    public string? Genre { get; set; }
 
     [JsonPropertyName("played")]
     [XmlAttribute("played")]
-    public string Played { get; set; }
+    public string? Played { get; set; }
 
     [JsonPropertyName("userRating")]
     [XmlAttribute("userRating")]
@@ -63,47 +63,47 @@ public class AlbumID3
 
     [JsonPropertyName("recordLabels")]
     [XmlElement("recordLabels")]
-    public RecordLabel[] RecordLabels { get; set; }
+    public RecordLabel[]? RecordLabels { get; set; }
 
     [JsonPropertyName("musicBrainzId")]
     [XmlAttribute("musicBrainzId")]
-    public string MusicBrainzId { get; set; }
+    public string? MusicBrainzId { get; set; }
 
     [JsonPropertyName("genres")]
     [XmlElement("genres")]
-    public ItemGenre[] Genres { get; set; }
+    public ItemGenre[]? Genres { get; set; }
 
     [JsonPropertyName("artists")]
     [XmlElement("artists")]
-    public ArtistID3[] Artists { get; set; }
+    public ArtistID3[]? Artists { get; set; }
 
     [JsonPropertyName("displayArtist")]
     [XmlAttribute("displayArtist")]
-    public string DisplayArtist { get; set; }
+    public string? DisplayArtist { get; set; }
 
     [JsonPropertyName("releaseTypes")]
     [XmlElement("releaseTypes")]
-    public string[] ReleaseTypes { get; set; }
+    public string[]? ReleaseTypes { get; set; }
 
     [JsonPropertyName("moods")]
     [XmlElement("moods")]
-    public string[] Moods { get; set; }
+    public string[]? Moods { get; set; }
 
     [JsonPropertyName("sortName")]
     [XmlAttribute("sortName")]
-    public string SortName { get; set; }
+    public string? SortName { get; set; }
 
     [JsonPropertyName("originalReleaseDate")]
     [XmlElement("originalReleaseDate")]
-    public ItemDate OriginalReleaseDate { get; set; }
+    public ItemDate? OriginalReleaseDate { get; set; }
 
     [JsonPropertyName("releaseDate")]
     [XmlElement("releaseDate")]
-    public ItemDate ReleaseDate { get; set; }
+    public ItemDate? ReleaseDate { get; set; }
 
     public bool IsCompilation { get; set; }
 
     [JsonPropertyName("discTitles")]
     [XmlElement("discTitles")]
-    public DiscTitle[] DiscTitles { get; set; }
+    public DiscTitle[]? DiscTitles { get; set; }
 }

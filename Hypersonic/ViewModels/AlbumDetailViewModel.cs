@@ -20,33 +20,33 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
     private List<SongInfo> _allSongs = [];
 
     [ObservableProperty]
-    private string albumName = string.Empty;
+    public partial string AlbumName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string albumArtist = string.Empty;
+    public partial string AlbumArtist { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string? albumArtistId;
+    public partial string? AlbumArtistId { get; set; }
 
     [ObservableProperty]
-    private string? albumArtistImageUrl;
+    public partial string? AlbumArtistImageUrl { get; set; }
 
     [ObservableProperty]
-    private string? coverArtUrl;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ReleaseDateGenre))]
-    private string releaseDate = string.Empty;
-
-    [ObservableProperty]
-    private int songCount;
-
-    [ObservableProperty]
-    private string totalDuration = string.Empty;
+    public partial string? CoverArtUrl { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ReleaseDateGenre))]
-    private string? genre;
+    public partial string ReleaseDate { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial int SongCount { get; set; }
+
+    [ObservableProperty]
+    public partial string TotalDuration { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ReleaseDateGenre))]
+    public partial string? Genre { get; set; }
 
     public string ReleaseDateGenre
     {
@@ -61,13 +61,13 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
     }
 
     [ObservableProperty]
-    private bool isMultiDisc;
+    public partial bool IsMultiDisc { get; set; }
 
     [ObservableProperty]
-    private bool isLoading;
+    public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
-    private string? errorMessage;
+    public partial string? ErrorMessage { get; set; }
 
     public ObservableCollection<object> TrackListItems { get; } = [];
 
@@ -295,7 +295,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                         : null;
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _log.Debug("Failed to load artist image", new { ArtistId = artistId });
             // Best-effort; artist image is non-critical

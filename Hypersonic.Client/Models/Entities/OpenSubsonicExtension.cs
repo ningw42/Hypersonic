@@ -7,9 +7,9 @@ public class OpenSubsonicExtension
 {
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [JsonPropertyName("versions")]
     [XmlElement("versions")]
-    public int[] Versions { get; set; }
+    public int[] Versions { get; set; } = null!;
 }

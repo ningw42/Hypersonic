@@ -17,19 +17,19 @@ public partial class PlaylistsViewModel : ObservableRecipient, INavigationAware
     private List<PlaylistInfo> _allPlaylists = [];
 
     [ObservableProperty]
-    private bool isLoading;
+    public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
-    private string? errorMessage;
+    public partial string? ErrorMessage { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
-    private int selectedSortIndex;
+    public partial int SelectedSortIndex { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SortOrderGlyph))]
     [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
-    private bool isSortDescending;
+    public partial bool IsSortDescending { get; set; }
 
     public string SortOrderGlyph => IsSortDescending ? "\uE74B" : "\uE74A";
 

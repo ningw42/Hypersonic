@@ -7,7 +7,7 @@ public class Genre
 {
     [JsonPropertyName("value")]
     [XmlAttribute("value")]
-    public string Value { get; set; }
+    public string Value { get; set; } = null!;
 
     [JsonPropertyName("songCount")]
     [XmlAttribute("songCount")]

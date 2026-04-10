@@ -9,5 +9,5 @@ public class GetGenresResponse : SubsonicResponse
 {
     [JsonPropertyName("genres")]
     [XmlElement("genres")]
-    public Genres Genres { get; set; }
+    public Genres Genres { get; set; } = null!;
 }

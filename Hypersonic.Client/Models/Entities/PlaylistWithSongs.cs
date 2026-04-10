@@ -7,5 +7,5 @@ public class PlaylistWithSongs : Playlist
 {
     [JsonPropertyName("entry")]
     [XmlElement("entry")]
-    public Child[] Entry { get; set; }
+    public Child[]? Entry { get; set; }
 }

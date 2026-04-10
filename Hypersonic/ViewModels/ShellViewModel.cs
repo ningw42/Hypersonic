@@ -29,22 +29,22 @@ public partial class ShellViewModel : ObservableRecipient
     };
 
     [ObservableProperty]
-    private bool isBackEnabled;
+    public partial bool IsBackEnabled { get; set; }
 
     [ObservableProperty]
-    private object? selected;
+    public partial object? Selected { get; set; }
 
     [ObservableProperty]
-    private bool isSearchResultsVisible;
+    public partial bool IsSearchResultsVisible { get; set; }
 
     [ObservableProperty]
-    private bool hasArtistResults;
+    public partial bool HasArtistResults { get; set; }
 
     [ObservableProperty]
-    private bool hasAlbumResults;
+    public partial bool HasAlbumResults { get; set; }
 
     [ObservableProperty]
-    private bool hasSongResults;
+    public partial bool HasSongResults { get; set; }
 
     public ObservableCollection<SearchSuggestionItem> ArtistResults { get; } = [];
     public ObservableCollection<SearchSuggestionItem> AlbumResults { get; } = [];

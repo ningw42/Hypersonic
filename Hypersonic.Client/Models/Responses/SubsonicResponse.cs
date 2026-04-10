@@ -9,19 +9,19 @@ public class SubsonicResponse
 {
     [JsonPropertyName("status")]
     [XmlAttribute("status")]
-    public string Status { get; set; }
+    public string Status { get; set; } = null!;
 
     [JsonPropertyName("version")]
     [XmlAttribute("version")]
-    public string Version { get; set; }
+    public string Version { get; set; } = null!;
 
     [JsonPropertyName("type")]
     [XmlAttribute("type")]
-    public string Type { get; set; }
+    public string Type { get; set; } = null!;
 
     [JsonPropertyName("serverVersion")]
     [XmlAttribute("serverVersion")]
-    public string ServerVersion { get; set; }
+    public string ServerVersion { get; set; } = null!;
 
     [JsonPropertyName("openSubsonic")]
     [XmlAttribute("openSubsonic")]
@@ -29,5 +29,5 @@ public class SubsonicResponse
 
     [JsonPropertyName("error")]
     [XmlElement("error")]
-    public SubsonicError Error { get; set; }
+    public SubsonicError? Error { get; set; }
 }

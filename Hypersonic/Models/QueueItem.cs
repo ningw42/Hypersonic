@@ -9,5 +9,5 @@ public partial class QueueItem : ObservableObject
     public PlaybackTrack Track { get; init; } = null!;
 
     [ObservableProperty]
-    private bool isCurrent;
+    public partial bool IsCurrent { get; set; }
 }

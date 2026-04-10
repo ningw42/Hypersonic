@@ -7,13 +7,13 @@ public class Contributor
 {
     [JsonPropertyName("role")]
     [XmlAttribute("role")]
-    public string Role { get; set; }
+    public string Role { get; set; } = null!;
 
     [JsonPropertyName("subRole")]
     [XmlAttribute("subRole")]
-    public string SubRole { get; set; }
+    public string? SubRole { get; set; }
 
     [JsonPropertyName("artist")]
     [XmlElement("artist")]
-    public ArtistID3 Artist { get; set; }
+    public ArtistID3? Artist { get; set; }
 }

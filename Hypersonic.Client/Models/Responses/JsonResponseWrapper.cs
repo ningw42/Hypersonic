@@ -12,5 +12,5 @@ public class JsonResponseWrapper<T>
     public T SubsonicResponse
     {
         get; set;
-    }
+    } = default!;
 }

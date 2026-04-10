@@ -10,5 +10,5 @@ public class GetMusicDirectoryResponse : SubsonicResponse
 {
     [JsonPropertyName("directory")]
     [XmlElement("directory")]
-    public Directory Directory { get; set; }
+    public Directory Directory { get; set; } = null!;
 }

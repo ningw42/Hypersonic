@@ -18,21 +18,21 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
     private int _offset;
 
     [ObservableProperty]
-    private bool isLoading;
+    public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
-    private string? errorMessage;
+    public partial string? ErrorMessage { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSortOrderSupported))]
     [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
-    private int selectedSortIndex;
+    public partial int SelectedSortIndex { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SortOrderGlyph))]
     [NotifyPropertyChangedFor(nameof(IsSortOrderSupported))]
     [NotifyPropertyChangedFor(nameof(SortOrderTooltip))]
-    private bool isSortDescending = true;
+    public partial bool IsSortDescending { get; set; } = true;
 
     public string SortOrderGlyph => IsSortDescending ? "\uE74B" : "\uE74A";
 

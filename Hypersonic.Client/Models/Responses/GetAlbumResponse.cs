@@ -9,5 +9,5 @@ public class GetAlbumResponse : SubsonicResponse
 {
     [JsonPropertyName("album")]
     [XmlElement("album")]
-    public AlbumID3WithSongs Album { get; set; }
+    public AlbumID3WithSongs Album { get; set; } = null!;
 }

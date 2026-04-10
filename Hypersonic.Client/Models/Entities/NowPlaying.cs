@@ -7,5 +7,5 @@ public class NowPlaying
 {
     [JsonPropertyName("entry")]
     [XmlElement("entry")]
-    public NowPlayingEntry[] Entry { get; set; }
+    public NowPlayingEntry[]? Entry { get; set; }
 }

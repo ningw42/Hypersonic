@@ -28,5 +28,5 @@ public class StructuredLyrics
 
     [JsonPropertyName("line")]
     [XmlElement("line")]
-    public LyricLine[] Line { get; set; }
+    public LyricLine[]? Line { get; set; }
 }

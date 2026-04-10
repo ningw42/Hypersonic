@@ -9,5 +9,5 @@ public class GetNowPlayingResponse : SubsonicResponse
 {
     [JsonPropertyName("nowPlaying")]
     [XmlElement("nowPlaying")]
-    public NowPlaying NowPlaying { get; set; }
+    public NowPlaying NowPlaying { get; set; } = null!;
 }

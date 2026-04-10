@@ -13,9 +13,9 @@ public class MusicFolder
     [JsonPropertyName("id")]
     [XmlAttribute("id")]
     [JsonConverter(typeof(ForgivingStringConverter))]
-    public string Id { get; set; }
+    public string Id { get; set; } = null!;
 
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 }

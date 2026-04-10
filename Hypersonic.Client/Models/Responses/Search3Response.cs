@@ -9,5 +9,5 @@ public class Search3Response : SubsonicResponse
 {
     [JsonPropertyName("searchResult3")]
     [XmlElement("searchResult3")]
-    public SearchResult3 SearchResult3 { get; set; }
+    public SearchResult3 SearchResult3 { get; set; } = null!;
 }

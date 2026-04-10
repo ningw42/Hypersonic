@@ -24,7 +24,7 @@ public static class Json
         return await Task.Run(() => JsonSerializer.Deserialize<T>(value, _options));
     }
 
-    public static async Task<string> StringifyAsync(object value)
+    public static async Task<string> StringifyAsync(object? value)
     {
         return await Task.Run(() => JsonSerializer.Serialize(value, _options));
     }

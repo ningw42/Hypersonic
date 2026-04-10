@@ -21,13 +21,13 @@ public partial class SettingsViewModel : ObservableRecipient
     private readonly IBackdropSelectorService _backdropSelectorService;
 
     [ObservableProperty]
-    private ElementTheme _elementTheme;
+    public partial ElementTheme ElementTheme { get; set; }
 
     [ObservableProperty]
-    private BackdropType _backdropType;
+    public partial BackdropType BackdropType { get; set; }
 
     [ObservableProperty]
-    private string _versionDescription;
+    public partial string VersionDescription { get; set; }
 
     public ICommand SwitchThemeCommand
     {
@@ -43,9 +43,9 @@ public partial class SettingsViewModel : ObservableRecipient
     {
         _themeSelectorService = themeSelectorService;
         _backdropSelectorService = backdropSelectorService;
-        _elementTheme = _themeSelectorService.Theme;
-        _backdropType = _backdropSelectorService.Backdrop;
-        _versionDescription = GetVersionDescription();
+        ElementTheme = _themeSelectorService.Theme;
+        BackdropType = _backdropSelectorService.Backdrop;
+        VersionDescription = GetVersionDescription();
 
         SwitchThemeCommand = new RelayCommand<ElementTheme>(
             async (param) =>

@@ -9,5 +9,5 @@ public class GetMusicFoldersResponse : SubsonicResponse
 {
     [JsonPropertyName("musicFolders")]
     [XmlElement("musicFolders")]
-    public MusicFolders MusicFolders { get; set; }
+    public MusicFolders MusicFolders { get; set; } = null!;
 }

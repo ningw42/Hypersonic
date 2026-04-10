@@ -7,5 +7,5 @@ public class RecordLabel
 {
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 }

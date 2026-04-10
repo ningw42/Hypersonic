@@ -11,13 +11,13 @@ public class License
 
     [JsonPropertyName("email")]
     [XmlAttribute("email")]
-    public string Email { get; set; }
+    public string? Email { get; set; }
 
     [JsonPropertyName("licenseExpires")]
     [XmlAttribute("licenseExpires")]
-    public string LicenseExpires { get; set; }
+    public string? LicenseExpires { get; set; }
 
     [JsonPropertyName("trialExpires")]
     [XmlAttribute("trialExpires")]
-    public string TrialExpires { get; set; }
+    public string? TrialExpires { get; set; }
 }

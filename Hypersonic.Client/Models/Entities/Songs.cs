@@ -35,5 +35,5 @@ public class Songs
 {
     [JsonPropertyName("song")]
     [XmlElement("song")]
-    public Song[] Song { get; set; }
+    public Song[]? Song { get; set; }
 }

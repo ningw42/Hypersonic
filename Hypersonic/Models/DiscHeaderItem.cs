@@ -8,5 +8,5 @@ public partial class DiscHeaderItem : ObservableObject
     public int DiscNumber { get; set; }
 
     [ObservableProperty]
-    private bool isExpanded = true;
+    public partial bool IsExpanded { get; set; } = true;
 }

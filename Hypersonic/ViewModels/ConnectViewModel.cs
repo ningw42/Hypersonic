@@ -19,34 +19,34 @@ public partial class ConnectViewModel : ObservableRecipient
     private readonly ILogger _log;
 
     [ObservableProperty]
-    private string serverUrl = string.Empty;
+    public partial string ServerUrl { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string username = string.Empty;
+    public partial string Username { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string password = string.Empty;
+    public partial string Password { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private bool isTestingConnection;
+    public partial bool IsTestingConnection { get; set; }
 
     [ObservableProperty]
-    private bool isTestResultVisible;
+    public partial bool IsTestResultVisible { get; set; }
 
     [ObservableProperty]
-    private string testResultMessage = string.Empty;
+    public partial string TestResultMessage { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private InfoBarSeverity testResultSeverity = InfoBarSeverity.Informational;
+    public partial InfoBarSeverity TestResultSeverity { get; set; } = InfoBarSeverity.Informational;
 
     [ObservableProperty]
-    private bool isInvalidCredentialVisible;
+    public partial bool IsInvalidCredentialVisible { get; set; }
 
     [ObservableProperty]
-    private string invalidCredentialMessage = string.Empty;
+    public partial string InvalidCredentialMessage { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private bool isConnecting;
+    public partial bool IsConnecting { get; set; }
 
     private static readonly HashSet<string> TopLevelPages = new()
     {

@@ -9,5 +9,5 @@ public class GetSongsByGenreResponse : SubsonicResponse
 {
     [JsonPropertyName("songsByGenre")]
     [XmlElement("songsByGenre")]
-    public SongByGenre SongsByGenre { get; set; }
+    public SongByGenre SongsByGenre { get; set; } = null!;
 }

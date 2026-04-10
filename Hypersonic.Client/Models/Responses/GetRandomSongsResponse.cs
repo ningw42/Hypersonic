@@ -9,5 +9,5 @@ public class GetRandomSongsResponse : SubsonicResponse
 {
     [JsonPropertyName("randomSongs")]
     [XmlElement("randomSongs")]
-    public RandomSongs RandomSongs { get; set; }
+    public RandomSongs RandomSongs { get; set; } = null!;
 }

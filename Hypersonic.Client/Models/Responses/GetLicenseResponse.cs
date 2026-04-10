@@ -12,5 +12,5 @@ public class GetLicenseResponse : SubsonicResponse
     public License License
     {
         get; set;
-    }
+    } = null!;
 }

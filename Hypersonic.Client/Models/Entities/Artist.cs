@@ -17,19 +17,19 @@ public class Artist
 {
     [JsonPropertyName("id")]
     [XmlAttribute("id")]
-    public string Id { get; set; }
+    public string Id { get; set; } = null!;
 
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [JsonPropertyName("coverArt")]
     [XmlAttribute("coverArt")]
-    public string CoverArt { get; set; }
+    public string? CoverArt { get; set; }
 
     [JsonPropertyName("artistImageUrl")]
     [XmlAttribute("artistImageUrl")]
-    public string ArtistImageUrl { get; set; }
+    public string? ArtistImageUrl { get; set; }
 
     [JsonPropertyName("albumCount")]
     [XmlAttribute("albumCount")]
@@ -37,15 +37,15 @@ public class Artist
 
     [JsonPropertyName("starred")]
     [XmlAttribute("starred")]
-    public string Starred { get; set; }
+    public string? Starred { get; set; }
 
     [JsonPropertyName("musicBrainzId")]
     [XmlAttribute("musicBrainzId")]
-    public string MusicBrainzId { get; set; }
+    public string? MusicBrainzId { get; set; }
 
     [JsonPropertyName("sortName")]
     [XmlAttribute("sortName")]
-    public string SortName { get; set; }
+    public string? SortName { get; set; }
 
     [JsonPropertyName("userRating")]
     [XmlAttribute("userRating")]
@@ -57,9 +57,9 @@ public class Artist
 
     [JsonPropertyName("roles")]
     [XmlElement("roles")]
-    public string[] Roles { get; set; }
+    public string[]? Roles { get; set; }
 
     [JsonPropertyName("album")]
     [XmlElement("album")]
-    public AlbumID3[] Album { get; set; }
+    public AlbumID3[]? Album { get; set; }
 }

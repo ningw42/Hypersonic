@@ -7,19 +7,19 @@ public class Directory
 {
     [JsonPropertyName("id")]
     [XmlAttribute("id")]
-    public string Id { get; set; }
+    public string Id { get; set; } = null!;
 
     [JsonPropertyName("parent")]
     [XmlAttribute("parent")]
-    public string Parent { get; set; }
+    public string? Parent { get; set; }
 
     [JsonPropertyName("name")]
     [XmlAttribute("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 
     [JsonPropertyName("starred")]
     [XmlAttribute("starred")]
-    public string Starred { get; set; }
+    public string? Starred { get; set; }
 
     [JsonPropertyName("userRating")]
     [XmlAttribute("userRating")]
@@ -35,5 +35,5 @@ public class Directory
 
     [JsonPropertyName("child")]
     [XmlElement("child")]
-    public Child[] Child { get; set; }
+    public Child[]? Child { get; set; }
 }
