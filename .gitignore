@@ -8,3 +8,9 @@
 
 # Ignore TestResults
 TestResults/
+
+# MSIX signing certificates (private key material)
+*.pfx
+
+# MSIX output artifacts
+AppPackages/

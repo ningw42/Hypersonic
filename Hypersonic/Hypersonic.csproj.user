@@ -4,7 +4,12 @@
     <DebuggerFlavor>ProjectDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup>
-    <ActiveDebugProfile>Hypersonic (Unpackaged)</ActiveDebugProfile>
+    <ActiveDebugProfile>Hypersonic (Package)</ActiveDebugProfile>
+    <_LastSelectedProfileId>C:\Users\ningw\GitHub\Hypersonic\Hypersonic\Properties\PublishProfiles\win-x64.pubxml</_LastSelectedProfileId>
+    <UapAppxPackageBuildMode>SideloadOnly</UapAppxPackageBuildMode>
+    <AppxShowAllApps>False</AppxShowAllApps>
+    <AppxBuildConfigurationSelection>x64</AppxBuildConfigurationSelection>
+    <PackageOptionalProjectsInIdeBuilds>False</PackageOptionalProjectsInIdeBuilds>
   </PropertyGroup>
   <ItemGroup>
     <Page Update="Themes\Generic.xaml">
