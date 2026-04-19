@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Hypersonic.Collections;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
 
@@ -151,6 +152,11 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
         var result = new List<AlbumInfo>(albums.Length);
         foreach (var album in albums)
         {
+            var (artists, hasStructured) = SongArtistMapper.MapArtists(
+                album.Artists?.Select(a => (a.Name, (string?)a.Id)),
+                album.Artist,
+                album.ArtistId);
+
             result.Add(new AlbumInfo
             {
                 Id = album.Id,
@@ -164,6 +170,9 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
                     : null,
                 SongCount = album.SongCount,
                 Duration = TimeSpan.FromSeconds(album.Duration),
+                DisplayArtist = album.DisplayArtist,
+                Artists = artists,
+                HasStructuredArtists = hasStructured,
             });
         }
 

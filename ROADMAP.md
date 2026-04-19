@@ -143,6 +143,7 @@ Phase 1                Phase 2              Phase 3              Phase 4
 
 ## Out of Scope (Post-MVP)
 
+- Segmented clickable artist links in the queue flyout (behind a user setting for track list interactivity level — the compact 40px rows make per-artist click targets impractical by default)
 - User-configurable track list columns
 - Equalizer / audio effects
 - Multi-server support

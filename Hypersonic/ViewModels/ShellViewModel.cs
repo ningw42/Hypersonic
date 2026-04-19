@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Helpers;
 using Hypersonic.Core.Models;
 using Hypersonic.Views;
 
@@ -147,6 +148,11 @@ public partial class ShellViewModel : ObservableRecipient
             {
                 foreach (var song in result.Song)
                 {
+                    var (songArtists, songHasStructured) = SongArtistMapper.MapArtists(
+                        song.Artists?.Select(a => (a.Name, (string?)a.Id)),
+                        song.Artist,
+                        song.ArtistId);
+
                     songs.Add(new SearchSuggestionItem
                     {
                         Type = SearchResultType.Song,
@@ -158,6 +164,9 @@ public partial class ShellViewModel : ObservableRecipient
                             : null,
                         Artist = song.Artist,
                         ArtistId = song.ArtistId,
+                        DisplayArtist = song.DisplayArtist,
+                        Artists = songArtists,
+                        HasStructuredArtists = songHasStructured,
                         Album = song.Album,
                         AlbumId = song.AlbumId,
                         Duration = song.Duration,
@@ -231,6 +240,10 @@ public partial class ShellViewModel : ObservableRecipient
                     Title = item.PrimaryText,
                     Artist = item.Artist ?? string.Empty,
                     ArtistId = item.ArtistId,
+                    DisplayArtist = item.DisplayArtist,
+                    Artists = item.Artists,
+                    HasStructuredArtists = item.HasStructuredArtists,
+                    FlatArtistText = DisplayArtistRenderer.BuildFlatText(item.DisplayArtist, item.Artists, item.HasStructuredArtists),
                     Album = item.Album ?? string.Empty,
                     AlbumId = item.AlbumId,
                     Duration = item.Duration,

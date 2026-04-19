@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
 
@@ -72,6 +73,8 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
     public int BiographyMaxLines => IsBiographyExpanded ? 999 : 3;
 
     public string BiographyToggleText => IsBiographyExpanded ? "Show less" : "Show more";
+
+    public string? CurrentArtistId { get; private set; }
 
     public ObservableCollection<AlbumInfo> Albums { get; } = [];
 
@@ -146,7 +149,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
         _navigationService.NavigateTo(typeof(ArtistDetailViewModel).FullName!, artist.Id);
     }
 
-    private async Task LoadArtistAsync(string artistId)
+    internal async Task LoadArtistAsync(string artistId)
     {
         var client = _subsonicClientService.Client;
         if (client == null)
@@ -154,6 +157,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
             return;
         }
 
+        CurrentArtistId = artistId;
         IsLoading = true;
         ErrorMessage = null;
 
@@ -177,19 +181,29 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
             AlbumCount = artist.AlbumCount;
 
             var albums = artist.Album ?? [];
-            _allAlbums = albums.Select(a => new AlbumInfo
+            _allAlbums = albums.Select(a =>
             {
-                Id = a.Id,
-                Name = a.Name ?? string.Empty,
-                Artist = a.DisplayArtist ?? a.Artist ?? string.Empty,
-                ArtistId = a.ArtistId,
-                Year = a.Year,
-                CoverArt = a.CoverArt,
-                CoverArtUrl = !string.IsNullOrEmpty(a.CoverArt)
-                    ? client.GetCoverArtUri(a.CoverArt, "300").ToString()
-                    : null,
-                SongCount = a.SongCount,
-                Duration = TimeSpan.FromSeconds(a.Duration),
+                var (artists, hasStructured) = SongArtistMapper.MapArtists(
+                    a.Artists?.Select(x => (x.Name, (string?)x.Id)),
+                    a.Artist, a.ArtistId);
+
+                return new AlbumInfo
+                {
+                    Id = a.Id,
+                    Name = a.Name ?? string.Empty,
+                    Artist = a.DisplayArtist ?? a.Artist ?? string.Empty,
+                    ArtistId = a.ArtistId,
+                    DisplayArtist = a.DisplayArtist,
+                    Artists = artists,
+                    HasStructuredArtists = hasStructured,
+                    Year = a.Year,
+                    CoverArt = a.CoverArt,
+                    CoverArtUrl = !string.IsNullOrEmpty(a.CoverArt)
+                        ? client.GetCoverArtUri(a.CoverArt, "300").ToString()
+                        : null,
+                    SongCount = a.SongCount,
+                    Duration = TimeSpan.FromSeconds(a.Duration),
+                };
             }).ToList();
 
             TotalSongCount = _allAlbums.Sum(a => a.SongCount ?? 0);

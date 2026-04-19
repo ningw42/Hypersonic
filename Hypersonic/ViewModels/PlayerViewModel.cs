@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Models;
@@ -13,7 +12,6 @@ namespace Hypersonic.ViewModels;
 public partial class PlayerViewModel : ObservableRecipient
 {
     private readonly IPlaybackService _playbackService;
-    private readonly INavigationService _navigationService;
     private readonly IAppStateService _appStateService;
 
     private bool _isExternalUpdate;
@@ -24,13 +22,18 @@ public partial class PlayerViewModel : ObservableRecipient
     public partial string TrackTitle { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string ArtistName { get; set; } = string.Empty;
+    public partial string? DisplayArtist { get; set; }
+
+    [ObservableProperty]
+    public partial List<SongArtistInfo> Artists { get; set; } = [];
+
+    public bool HasStructuredArtists { get; private set; }
+
+    [ObservableProperty]
+    public partial string FlatArtistText { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string AlbumName { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string? ArtistId { get; set; }
 
     [ObservableProperty]
     public partial string? AlbumId { get; set; }
@@ -92,19 +95,14 @@ public partial class PlayerViewModel : ObservableRecipient
     [ObservableProperty]
     public partial RepeatMode RepeatMode { get; set; }
 
-    public PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService, IAppStateService appStateService)
-        : this(playbackService, navigationService, appStateService, createTimer: true)
+    public PlayerViewModel(IPlaybackService playbackService, IAppStateService appStateService)
+        : this(playbackService, appStateService, createTimer: true)
     {
     }
 
-    /// <summary>
-    /// Internal constructor for unit testing. Skips DispatcherQueue timer creation
-    /// when <paramref name="createTimer"/> is false, allowing instantiation without a UI thread.
-    /// </summary>
-    internal PlayerViewModel(IPlaybackService playbackService, INavigationService navigationService, IAppStateService appStateService, bool createTimer)
+    internal PlayerViewModel(IPlaybackService playbackService, IAppStateService appStateService, bool createTimer)
     {
         _playbackService = playbackService;
-        _navigationService = navigationService;
         _appStateService = appStateService;
         _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
         _playbackService.TrackChanged += OnTrackChanged;
@@ -133,6 +131,23 @@ public partial class PlayerViewModel : ObservableRecipient
         RepeatMode = _playbackService.RepeatMode;
         UpdateVolumeGlyph();
         _isSavingFromExternal = false;
+
+        var track = _playbackService.NowPlaying;
+        if (track != null)
+        {
+            HasTrack = true;
+            TrackTitle = track.Title;
+            AlbumName = track.Album;
+            AlbumId = track.AlbumId;
+            HasStructuredArtists = track.HasStructuredArtists;
+            DisplayArtist = track.DisplayArtist;
+            Artists = track.Artists;
+            FlatArtistText = track.FlatArtistText;
+            CoverArtUrl = track.CoverArtUri?.ToString();
+            Duration = track.Duration;
+            DurationText = FormatTime(track.Duration);
+            IsPlaying = _playbackService.IsPlaying;
+        }
     }
 
     /// <summary>
@@ -207,23 +222,7 @@ public partial class PlayerViewModel : ObservableRecipient
         _ = _appStateService.SavePlaybackAsync();
     }
 
-    [RelayCommand]
-    private void NavigateToArtist()
-    {
-        if (!string.IsNullOrEmpty(ArtistId))
-        {
-            _navigationService.NavigateTo(typeof(ArtistDetailViewModel).FullName!, ArtistId);
-        }
-    }
-
-    [RelayCommand]
-    private void NavigateToAlbum()
-    {
-        if (!string.IsNullOrEmpty(AlbumId))
-        {
-            _navigationService.NavigateTo(typeof(AlbumDetailViewModel).FullName!, AlbumId);
-        }
-    }
+    public event EventHandler? NowPlayingMetadataChanged;
 
     public void RefreshQueue()
     {
@@ -354,10 +353,12 @@ public partial class PlayerViewModel : ObservableRecipient
         var track = _playbackService.NowPlaying;
         HasTrack = track != null;
         TrackTitle = track?.Title ?? string.Empty;
-        ArtistName = track?.Artist ?? string.Empty;
         AlbumName = track?.Album ?? string.Empty;
-        ArtistId = track?.ArtistId;
         AlbumId = track?.AlbumId;
+        HasStructuredArtists = track?.HasStructuredArtists ?? false;
+        DisplayArtist = track?.DisplayArtist;
+        Artists = track?.Artists ?? [];
+        FlatArtistText = track?.FlatArtistText ?? string.Empty;
         CoverArtUrl = track?.CoverArtUri?.ToString();
         Duration = track?.Duration ?? 0;
         DurationText = FormatTime(track?.Duration ?? 0);
@@ -368,6 +369,7 @@ public partial class PlayerViewModel : ObservableRecipient
         HasNext = _playbackService.HasNext;
         HasPrevious = _playbackService.HasPrevious;
         RefreshQueue();
+        NowPlayingMetadataChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnQueueChanged(object? sender, EventArgs e)

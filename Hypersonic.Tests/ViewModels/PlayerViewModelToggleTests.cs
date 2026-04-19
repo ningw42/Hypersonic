@@ -1,11 +1,7 @@
-using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Models;
 using Hypersonic.ViewModels;
-
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Navigation;
 
 namespace Hypersonic.Tests.ViewModels;
 
@@ -62,15 +58,6 @@ public class PlayerViewModelToggleTests
         public void RaisePlaybackStateChanged() => PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private sealed class FakeNavigationService : INavigationService
-    {
-        public event NavigatedEventHandler? Navigated;
-        public bool CanGoBack => false;
-        public Frame? Frame { get; set; }
-        public bool NavigateTo(string pageKey, object? parameter = null, bool clearNavigation = false) => true;
-        public bool GoBack() => false;
-    }
-
     private sealed class FakeAppStateService : IAppStateService
     {
         public AppState State { get; } = new();
@@ -93,9 +80,8 @@ public class PlayerViewModelToggleTests
     private static (PlayerViewModel vm, FakePlaybackService playback, FakeAppStateService appState) CreateViewModel()
     {
         var playback = new FakePlaybackService();
-        var nav = new FakeNavigationService();
         var appState = new FakeAppStateService();
-        var vm = new PlayerViewModel(playback, nav, appState, createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, createTimer: false);
         return (vm, playback, appState);
     }
 
@@ -188,9 +174,8 @@ public class PlayerViewModelToggleTests
             Volume = 0.75,
         };
         var appState = new FakeAppStateService();
-        var nav = new FakeNavigationService();
 
-        _ = new PlayerViewModel(playback, nav, appState, createTimer: false);
+        _ = new PlayerViewModel(playback, appState, createTimer: false);
 
         Assert.AreEqual(0, appState.PlaybackSaveCount, "Hydration must not trigger saves");
     }

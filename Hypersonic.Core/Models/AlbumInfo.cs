@@ -11,4 +11,8 @@ public class AlbumInfo
     public string? CoverArtUrl { get; set; }
     public int? SongCount { get; set; }
     public TimeSpan? Duration { get; set; }
+
+    public string? DisplayArtist { get; set; }
+    public List<SongArtistInfo> Artists { get; set; } = [];
+    public bool HasStructuredArtists { get; set; }
 }

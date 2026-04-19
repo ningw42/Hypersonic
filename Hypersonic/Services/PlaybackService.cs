@@ -354,7 +354,7 @@ public class PlaybackService : IPlaybackService, IDisposable
         var displayProperties = playbackItem.GetDisplayProperties();
         displayProperties.Type = MediaPlaybackType.Music;
         displayProperties.MusicProperties.Title = track.Title ?? string.Empty;
-        displayProperties.MusicProperties.Artist = track.Artist ?? string.Empty;
+        displayProperties.MusicProperties.Artist = track.FlatArtistText;
         displayProperties.MusicProperties.AlbumTitle = track.Album ?? string.Empty;
         if (track.CoverArtUri != null)
         {

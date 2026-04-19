@@ -22,6 +22,12 @@ public record BuildSegmentsResult(
 
 public static class DisplayArtistRenderer
 {
+    public static string BuildFlatText(string? displayArtist, List<SongArtistInfo> artists, bool hasStructuredArtists)
+    {
+        var result = BuildSegments(displayArtist, artists, hasStructuredArtists);
+        return string.Concat(result.Segments.Select(s => s.Text));
+    }
+
     public static BuildSegmentsResult BuildSegments(
         string? displayArtist,
         List<SongArtistInfo> artists,

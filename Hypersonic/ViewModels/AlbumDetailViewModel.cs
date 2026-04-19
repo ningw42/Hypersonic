@@ -18,7 +18,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
     private readonly IPlaybackService _playbackService;
     private readonly INavigationService _navigationService;
     private readonly ILogger _log;
-    private List<SongInfo> _allSongs = [];
+    internal List<SongInfo> _allSongs = [];
 
     [ObservableProperty]
     public partial string AlbumName { get; set; } = string.Empty;
@@ -319,21 +319,33 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
         }
     }
 
-    private List<PlaybackTrack> BuildPlaybackTracks()
+    internal List<PlaybackTrack> BuildPlaybackTracks()
     {
-        return _allSongs.Select(s => new PlaybackTrack
+        return _allSongs.Select(s =>
         {
-            Id = s.Id,
-            Title = s.Title,
-            Artist = s.Artist,
-            ArtistId = s.ArtistId,
-            Album = AlbumName,
-            AlbumId = s.AlbumId,
-            Duration = s.Duration,
-            TrackNumber = s.TrackNumber,
-            DiscNumber = s.DiscNumber,
-            CoverArtUri = s.CoverArtUri ?? (CoverArtUrl != null ? new Uri(CoverArtUrl) : null),
-            StreamUri = s.StreamUri,
+            var (artists, hasStructured) = SongArtistMapper.MapArtists(
+                s.Artists.Select(a => (a.Name, (string?)a.Id)),
+                s.Artist,
+                s.ArtistId);
+
+            return new PlaybackTrack
+            {
+                Id = s.Id,
+                Title = s.Title,
+                Artist = s.Artist,
+                ArtistId = s.ArtistId,
+                DisplayArtist = s.DisplayArtist,
+                Artists = artists,
+                HasStructuredArtists = hasStructured,
+                FlatArtistText = DisplayArtistRenderer.BuildFlatText(s.DisplayArtist, artists, hasStructured),
+                Album = AlbumName,
+                AlbumId = s.AlbumId,
+                Duration = s.Duration,
+                TrackNumber = s.TrackNumber,
+                DiscNumber = s.DiscNumber,
+                CoverArtUri = s.CoverArtUri ?? (CoverArtUrl != null ? new Uri(CoverArtUrl) : null),
+                StreamUri = s.StreamUri,
+            };
         }).ToList();
     }
 

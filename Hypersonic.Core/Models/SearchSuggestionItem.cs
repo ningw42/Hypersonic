@@ -18,6 +18,9 @@ public class SearchSuggestionItem
     // Song-only fields for playback
     public string? Artist { get; set; }
     public string? ArtistId { get; set; }
+    public string? DisplayArtist { get; set; }
+    public List<SongArtistInfo> Artists { get; set; } = [];
+    public bool HasStructuredArtists { get; set; }
     public string? Album { get; set; }
     public string? AlbumId { get; set; }
     public int Duration { get; set; }

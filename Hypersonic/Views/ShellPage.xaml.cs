@@ -1,4 +1,5 @@
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Helpers;
 using Hypersonic.Core.Models;
 using Hypersonic.Helpers;
 using Hypersonic.Models;
@@ -7,6 +8,7 @@ using Hypersonic.ViewModels;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -69,10 +71,134 @@ public sealed partial class ShellPage : Page
             }
         };
 
+        Player.NowPlayingMetadataChanged += (_, _) => RenderNowPlaying();
+
         QueuePopup.Closed += (_, _) =>
         {
             Player.IsQueueOpen = false;
         };
+
+        RenderNowPlaying();
+        PlayPauseIcon.Glyph = Player.IsPlaying ? "\uE769" : "\uE768";
+        if (!string.IsNullOrEmpty(Player.CoverArtUrl))
+        {
+            PlayerCoverArt.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Player.CoverArtUrl));
+        }
+    }
+
+    private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
+    private Brush TertiaryBrush => TertiaryBrushProvider.Foreground;
+
+    private void RenderNowPlaying()
+    {
+        RenderNowPlayingArtist();
+        RenderNowPlayingAlbum();
+    }
+
+    private void RenderNowPlayingArtist()
+    {
+        NowPlayingArtistText.Blocks.Clear();
+
+        var result = DisplayArtistRenderer.BuildSegments(
+            Player.DisplayArtist, Player.Artists, Player.HasStructuredArtists);
+        ToolTipService.SetToolTip(NowPlayingArtistText,
+            BuildArtistTooltip(result, Player.DisplayArtist, Player.Artists));
+
+        var paragraph = new Paragraph();
+        var secondaryBrush = SecondaryBrush;
+        var tertiaryBrush = TertiaryBrush;
+
+        foreach (var segment in result.Segments)
+        {
+            if (segment.Kind == ArtistSegmentKind.Connector)
+            {
+                paragraph.Inlines.Add(new Run
+                {
+                    Text = segment.Text,
+                    Foreground = tertiaryBrush,
+                });
+            }
+            else
+            {
+                var artist = segment.Artist!;
+                if (!string.IsNullOrEmpty(artist.Id))
+                {
+                    var link = new Hyperlink
+                    {
+                        UnderlineStyle = UnderlineStyle.None,
+                        Foreground = secondaryBrush,
+                    };
+                    link.Inlines.Add(new Run { Text = segment.Text });
+                    var artistId = artist.Id;
+                    link.Click += (s, e) =>
+                    {
+                        App.GetService<INavigationService>()
+                            .NavigateTo(typeof(ArtistDetailViewModel).FullName!, artistId);
+                    };
+                    paragraph.Inlines.Add(link);
+                }
+                else
+                {
+                    paragraph.Inlines.Add(new Run
+                    {
+                        Text = segment.Text,
+                        Foreground = secondaryBrush,
+                    });
+                }
+            }
+        }
+
+        NowPlayingArtistText.Blocks.Add(paragraph);
+    }
+
+    private void RenderNowPlayingAlbum()
+    {
+        NowPlayingAlbumText.Blocks.Clear();
+        ToolTipService.SetToolTip(NowPlayingAlbumText, Player.AlbumName);
+
+        var paragraph = new Paragraph();
+        var tertiaryBrush = TertiaryBrush;
+
+        if (!string.IsNullOrEmpty(Player.AlbumId))
+        {
+            var link = new Hyperlink
+            {
+                UnderlineStyle = UnderlineStyle.None,
+                Foreground = tertiaryBrush,
+            };
+            link.Inlines.Add(new Run { Text = Player.AlbumName });
+            var albumId = Player.AlbumId;
+            link.Click += (s, e) =>
+            {
+                App.GetService<INavigationService>()
+                    .NavigateTo(typeof(AlbumDetailViewModel).FullName!, albumId);
+            };
+            paragraph.Inlines.Add(link);
+        }
+        else
+        {
+            paragraph.Inlines.Add(new Run
+            {
+                Text = Player.AlbumName,
+                Foreground = tertiaryBrush,
+            });
+        }
+
+        NowPlayingAlbumText.Blocks.Add(paragraph);
+    }
+
+    private static string BuildArtistTooltip(
+        BuildSegmentsResult result, string? displayArtist, List<SongArtistInfo> artists)
+    {
+        if (result.UsedStructuredFallback && !string.IsNullOrEmpty(displayArtist))
+        {
+            return displayArtist;
+        }
+        if (result.HasUnmatchedArtists)
+        {
+            return string.Join(", ", artists.Where(a => !string.IsNullOrEmpty(a.Name)).Select(a => a.Name));
+        }
+        return string.Concat(result.Segments.Select(s => s.Text));
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -90,7 +216,11 @@ public sealed partial class ShellPage : Page
         };
         KeyboardAccelerators.Add(searchAccelerator);
 
-        ActualThemeChanged += (_, _) => Player.NotifyThemeChanged();
+        ActualThemeChanged += (_, _) =>
+        {
+            Player.NotifyThemeChanged();
+            RenderNowPlaying();
+        };
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)

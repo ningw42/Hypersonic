@@ -215,4 +215,40 @@ public class DisplayArtistRendererTests
         Assert.AreEqual("Some Artist", result.Segments[0].Text);
         Assert.IsNull(result.Segments[0].Artist!.Id);
     }
+
+    [TestMethod]
+    public void BuildFlatText_NormalMatch_ReturnsOriginalDisplayArtist()
+    {
+        var artists = new List<SongArtistInfo>
+        {
+            new() { Name = "Dr. Dre", Id = "1" },
+            new() { Name = "Eminem", Id = "2" },
+        };
+
+        var flat = DisplayArtistRenderer.BuildFlatText("Dr. Dre feat. Eminem", artists, true);
+
+        Assert.AreEqual("Dr. Dre feat. Eminem", flat);
+    }
+
+    [TestMethod]
+    public void BuildFlatText_CommaFallback_ReturnsCommaSeparatedNames()
+    {
+        var artists = new List<SongArtistInfo>
+        {
+            new() { Name = "Artist A", Id = "1" },
+            new() { Name = "Artist B", Id = "2" },
+        };
+
+        var flat = DisplayArtistRenderer.BuildFlatText("Various Artists", artists, true);
+
+        Assert.AreEqual("Artist A, Artist B", flat);
+    }
+
+    [TestMethod]
+    public void BuildFlatText_EmptyArtists_ReturnsEmpty()
+    {
+        var flat = DisplayArtistRenderer.BuildFlatText(null, [], false);
+
+        Assert.AreEqual(string.Empty, flat);
+    }
 }
