@@ -429,11 +429,13 @@
                                FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
                     <RichTextBlock x:Name="NowPlayingArtistText"
                                    Margin="0,-2,0,-2"
+                                   HorizontalAlignment="Left"
                                    TextTrimming="CharacterEllipsis" MaxLines="1"
                                    IsTextSelectionEnabled="False"
                                    FontSize="12"/>
                     <RichTextBlock x:Name="NowPlayingAlbumText"
                                    Margin="0,-2,0,0"
+                                   HorizontalAlignment="Left"
                                    TextTrimming="CharacterEllipsis" MaxLines="1"
                                    IsTextSelectionEnabled="False"
                                    FontSize="11"/>

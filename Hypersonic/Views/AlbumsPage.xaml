@@ -134,6 +134,7 @@
                                     <!-- Artist name -->
                                     <RichTextBlock Grid.Row="2"
                                                    Margin="12,0,12,2"
+                                                   HorizontalAlignment="Left"
                                                    VerticalAlignment="Top"
                                                    TextTrimming="CharacterEllipsis"
                                                    MaxLines="1"

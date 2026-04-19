@@ -213,6 +213,7 @@
                                 <!-- Album -->
                                 <RichTextBlock Grid.Column="2"
                                                VerticalAlignment="Center"
+                                               HorizontalAlignment="Left"
                                                TextTrimming="CharacterEllipsis"
                                                MaxLines="1"
                                                IsTextSelectionEnabled="False"
@@ -221,6 +222,7 @@
                                 <!-- Artist -->
                                 <RichTextBlock Grid.Column="3"
                                                VerticalAlignment="Center"
+                                               HorizontalAlignment="Left"
                                                TextTrimming="CharacterEllipsis"
                                                MaxLines="1"
                                                IsTextSelectionEnabled="False"
