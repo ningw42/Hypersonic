@@ -161,24 +161,69 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <HyperlinkButton Grid.Column="0"
-                                             Command="{x:Bind ViewModel.NavigateToArtistCommand}"
-                                             Padding="0" Margin="0" MinHeight="0" MinWidth="0"
-                                             VerticalAlignment="Center">
-                                <Grid Width="28" Height="28" CornerRadius="14">
-                                    <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                               RadiusX="14" RadiusY="14"/>
-                                    <FontIcon Glyph="&#xE77B;"
-                                              FontSize="12"
-                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                                    <Image Source="{Binding ViewModel.AlbumArtistImageUrl, ElementName=PageRoot}"
-                                           Stretch="UniformToFill"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                                </Grid>
-                            </HyperlinkButton>
+                            <Button Grid.Column="0"
+                                    Command="{x:Bind ViewModel.NavigateToArtistCommand}"
+                                    Margin="0,-6" MinHeight="0" MinWidth="0"
+                                    VerticalAlignment="Center">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Grid Width="40" Height="40"
+                                                          Background="Transparent"
+                                                          CornerRadius="20">
+                                                        <VisualStateManager.VisualStateGroups>
+                                                            <VisualStateGroup x:Name="CommonStates">
+                                                                <VisualState x:Name="Normal"/>
+                                                                <VisualState x:Name="PointerOver">
+                                                                    <Storyboard>
+                                                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HoverCircle" Storyboard.TargetProperty="Opacity">
+                                                                            <DiscreteObjectKeyFrame KeyTime="0" Value="1"/>
+                                                                        </ObjectAnimationUsingKeyFrames>
+                                                                    </Storyboard>
+                                                                </VisualState>
+                                                                <VisualState x:Name="Pressed">
+                                                                    <Storyboard>
+                                                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HoverCircle" Storyboard.TargetProperty="Opacity">
+                                                                            <DiscreteObjectKeyFrame KeyTime="0" Value="1"/>
+                                                                        </ObjectAnimationUsingKeyFrames>
+                                                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="HoverCircle" Storyboard.TargetProperty="Fill">
+                                                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SubtleFillColorTertiaryBrush}"/>
+                                                                        </ObjectAnimationUsingKeyFrames>
+                                                                    </Storyboard>
+                                                                </VisualState>
+                                                            </VisualStateGroup>
+                                                        </VisualStateManager.VisualStateGroups>
+                                                        <Ellipse x:Name="HoverCircle"
+                                                                 Width="40" Height="40"
+                                                                 Fill="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                                 Opacity="0"/>
+                                                        <Grid Width="28" Height="28" CornerRadius="14"
+                                                              HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                                       RadiusX="14" RadiusY="14"/>
+                                                            <FontIcon Glyph="&#xE77B;"
+                                                                      FontSize="12"
+                                                                      Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"/>
+                                                            <Image Source="{Binding ViewModel.AlbumArtistImageUrl, ElementName=PageRoot}"
+                                                                   Stretch="UniformToFill"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                             <RichTextBlock Grid.Column="1"
                                            x:Name="AlbumArtistText" VerticalAlignment="Center"
                                            TextTrimming="CharacterEllipsis" MaxLines="1"
