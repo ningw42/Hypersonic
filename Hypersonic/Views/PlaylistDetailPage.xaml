@@ -11,6 +11,8 @@
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
     <Grid>
+        <TextBlock x:Name="SecondaryBrushProvider" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed"/>
+        <TextBlock x:Name="TertiaryBrushProvider" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="Collapsed"/>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Padding="0,0,0,24">
 
@@ -95,6 +97,8 @@
                       Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="60"/>
                         <ColumnDefinition Width="50"/>
@@ -116,31 +120,41 @@
                                FontSize="13"
                                FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="2"
-                               Text="Duration"
+                               Text="Album"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                FontSize="13"
                                FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="3"
-                               Text="Codec"
+                               Text="Artist"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                FontSize="13"
                                FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="4"
-                               Text="Bitrate"
+                               Text="Duration"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                FontSize="13"
                                FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="5"
-                               Text="Plays"
+                               Text="Codec"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                FontSize="13"
                                FontWeight="SemiBold"/>
                     <TextBlock Grid.Column="6"
+                               Text="Bitrate"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="7"
+                               Text="Plays"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               FontSize="13"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Grid.Column="8"
                                Text="BPM"
                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                FontSize="13"
                                FontWeight="SemiBold"/>
-                    <FontIcon Grid.Column="7"
+                    <FontIcon Grid.Column="9"
                               Glyph="&#xEB51;"
                               FontSize="12"
                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
@@ -148,7 +162,8 @@
                 </Grid>
 
                 <!-- Track list -->
-                <ListView ItemsSource="{x:Bind ViewModel.TrackListItems, Mode=OneWay}"
+                <ListView x:Name="TrackListView"
+                          ItemsSource="{x:Bind ViewModel.TrackListItems, Mode=OneWay}"
                           SelectionMode="None"
                           IsItemClickEnabled="True"
                           ItemClick="TrackList_ItemClick">
@@ -169,6 +184,8 @@
                             <Grid ColumnSpacing="12" Padding="0,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="60"/>
                                     <ColumnDefinition Width="50"/>
@@ -193,38 +210,54 @@
                                            VerticalAlignment="Center"
                                            ToolTipService.ToolTip="{x:Bind Title}"/>
 
+                                <!-- Album -->
+                                <RichTextBlock Grid.Column="2"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="1"
+                                               IsTextSelectionEnabled="False"
+                                               DataContextChanged="AlbumLink_DataContextChanged"/>
+
+                                <!-- Artist -->
+                                <RichTextBlock Grid.Column="3"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxLines="1"
+                                               IsTextSelectionEnabled="False"
+                                               DataContextChanged="ArtistLinks_DataContextChanged"/>
+
                                 <!-- Duration -->
-                                <TextBlock Grid.Column="2"
+                                <TextBlock Grid.Column="4"
                                            Text="{x:Bind Duration, Converter={StaticResource SecondsToTimeConverter}}"
                                            VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
                                 <!-- Codec -->
-                                <TextBlock Grid.Column="3"
+                                <TextBlock Grid.Column="5"
                                            Text="{x:Bind Suffix}"
                                            VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
                                 <!-- Bitrate -->
-                                <TextBlock Grid.Column="4"
+                                <TextBlock Grid.Column="6"
                                            Text="{x:Bind BitRateDisplay}"
                                            VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
                                 <!-- Play count -->
-                                <TextBlock Grid.Column="5"
+                                <TextBlock Grid.Column="7"
                                            Text="{x:Bind PlayCount}"
                                            VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
                                 <!-- BPM -->
-                                <TextBlock Grid.Column="6"
+                                <TextBlock Grid.Column="8"
                                            Text="{x:Bind BPMDisplay}"
                                            VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
                                 <!-- Favorite -->
-                                <ToggleButton Grid.Column="7"
+                                <ToggleButton Grid.Column="9"
                                               IsChecked="{x:Bind IsStarred, Mode=OneWay}"
                                               Padding="0"
                                               Width="32" Height="32"

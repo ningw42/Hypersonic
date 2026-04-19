@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using Hypersonic.Core.Models;
+
 namespace Hypersonic.Models;
 
 public partial class SongInfo : ObservableObject
@@ -12,8 +14,9 @@ public partial class SongInfo : ObservableObject
     public int Duration { get; set; }
     public int DiscNumber { get; set; }
 
-    // Carried for future use
     public string Artist { get; set; } = string.Empty;
+    public List<SongArtistInfo> Artists { get; set; } = [];
+    public bool HasStructuredArtists { get; set; }
     public string Album { get; set; } = string.Empty;
     public string? Genre { get; set; }
     public int Year { get; set; }

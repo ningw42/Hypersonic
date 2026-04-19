@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
 using Hypersonic.Models;
@@ -30,6 +31,14 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     [ObservableProperty]
     public partial string? AlbumArtistImageUrl { get; set; }
+
+    [ObservableProperty]
+    public partial List<SongArtistInfo> AlbumArtists { get; set; } = [];
+
+    [ObservableProperty]
+    public partial string? AlbumDisplayArtist { get; set; }
+
+    public bool AlbumHasStructuredArtists { get; private set; }
 
     [ObservableProperty]
     public partial string? CoverArtUrl { get; set; }
@@ -119,6 +128,14 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
             AlbumArtistId = album.ArtistId;
             Genre = album.Genre;
             SongCount = album.SongCount;
+
+            AlbumDisplayArtist = album.DisplayArtist;
+            var (albumArtists, albumHasStructured) = SongArtistMapper.MapArtists(
+                album.Artists?.Select(a => (a.Name, (string?)a.Id)),
+                album.Artist,
+                album.ArtistId);
+            AlbumHasStructuredArtists = albumHasStructured;
+            AlbumArtists = albumArtists;
             CoverArtUrl = !string.IsNullOrEmpty(album.CoverArt)
                 ? client.GetCoverArtUri(album.CoverArt, "600").ToString()
                 : null;
@@ -322,6 +339,11 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     private static SongInfo MapSongInfo(Client.Models.Entities.Child song, Client.ISubsonicClient client)
     {
+        var (artists, hasStructured) = SongArtistMapper.MapArtists(
+            song.Artists?.Select(a => (a.Name, (string?)a.Id)),
+            song.Artist,
+            song.ArtistId);
+
         return new SongInfo
         {
             Id = song.Id,
@@ -330,6 +352,8 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
             Duration = song.Duration,
             DiscNumber = song.DiscNumber,
             Artist = song.Artist ?? string.Empty,
+            Artists = artists,
+            HasStructuredArtists = hasStructured,
             Album = song.Album ?? string.Empty,
             Genre = song.Genre,
             Year = song.Year,
