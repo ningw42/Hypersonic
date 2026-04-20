@@ -7,6 +7,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:behaviors="using:Hypersonic.Behaviors"
     xmlns:controls="using:Hypersonic.Controls"
+    xmlns:models="using:Hypersonic.Models"
     mc:Ignorable="d"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
@@ -203,6 +204,176 @@
                         </DataTemplate>
                     </ItemsRepeater.ItemTemplate>
                 </ItemsRepeater>
+
+                <!-- Top Songs section -->
+                <StackPanel x:Name="TopSongsSection"
+                            Visibility="{x:Bind ViewModel.IsTopSongsSectionVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Margin="0,0,0,24">
+
+                    <!-- Top Songs header with SelectorBar -->
+                    <Grid Margin="0,16,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   x:Uid="ArtistDetail_TopSongs"
+                                   Style="{StaticResource SubtitleTextBlockStyle}"
+                                   VerticalAlignment="Center"/>
+
+                        <ProgressRing Grid.Column="1"
+                                      IsActive="{x:Bind ViewModel.IsTopSongsLoading, Mode=OneWay}"
+                                      Width="20" Height="20"
+                                      Margin="12,0,0,0"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Visibility="{x:Bind ViewModel.IsTopSongsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <SelectorBar x:Name="TopSongsModeSelector"
+                                     Grid.Column="2"
+                                     VerticalAlignment="Center"
+                                     Visibility="{x:Bind ViewModel.HasTopSongs, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                     SelectionChanged="TopSongsModeSelector_SelectionChanged">
+                            <SelectorBarItem x:Name="CommunityModeItem" Text="Community"
+                                             IsEnabled="{x:Bind ViewModel.IsCommunityAvailable, Mode=OneWay}"/>
+                            <SelectorBarItem x:Name="PersonalModeItem" Text="Personal"
+                                             IsEnabled="{x:Bind ViewModel.IsPersonalAvailable, Mode=OneWay}"/>
+                        </SelectorBar>
+                    </Grid>
+
+                    <!-- Top Songs column headers -->
+                    <Grid ColumnSpacing="12"
+                          Padding="12,8,12,4"
+                          BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                          BorderThickness="0,0,0,1"
+                          Visibility="{x:Bind ViewModel.HasTopSongs, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="36"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="#" HorizontalAlignment="Right"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1" Text="Title"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="2" Text="Album"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="3" Text="Artist"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="4" Text="Duration"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="5" Text="Codec"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="6" Text="Bitrate"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="7" Text="Plays"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="8" Text="BPM"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" FontWeight="SemiBold"/>
+                        <FontIcon Grid.Column="9" Glyph="&#xEB51;" FontSize="12"
+                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Top Songs track list -->
+                    <ListView x:Name="TopSongsListView"
+                              ItemsSource="{x:Bind ViewModel.TopSongs, Mode=OneWay}"
+                              SelectionMode="None"
+                              IsItemClickEnabled="True"
+                              ItemClick="TopSongsList_ItemClick"
+                              Visibility="{x:Bind ViewModel.HasTopSongs, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <ListView.ItemContainerTransitions>
+                            <TransitionCollection>
+                                <RepositionThemeTransition/>
+                            </TransitionCollection>
+                        </ListView.ItemContainerTransitions>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="12,2"/>
+                                <Setter Property="MinHeight" Value="36"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="models:SongInfo">
+                                <Grid ColumnSpacing="12" Padding="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="2*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="60"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="60"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="36"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0" Text="{x:Bind PositionNumber}"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Title}"
+                                               TextTrimming="CharacterEllipsis" MaxLines="1"
+                                               VerticalAlignment="Center"
+                                               ToolTipService.ToolTip="{x:Bind Title}"/>
+
+                                    <RichTextBlock Grid.Column="2"
+                                                   VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="1"
+                                                   IsTextSelectionEnabled="False"
+                                                   DataContextChanged="TopSongAlbumLink_DataContextChanged"/>
+
+                                    <RichTextBlock Grid.Column="3"
+                                                   VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="1"
+                                                   IsTextSelectionEnabled="False"
+                                                   DataContextChanged="TopSongArtistLinks_DataContextChanged"/>
+
+                                    <TextBlock Grid.Column="4"
+                                               Text="{x:Bind Duration, Converter={StaticResource SecondsToTimeConverter}}"
+                                               VerticalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                    <TextBlock Grid.Column="5" Text="{x:Bind Suffix}"
+                                               VerticalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                    <TextBlock Grid.Column="6" Text="{x:Bind BitRateDisplay}"
+                                               VerticalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                    <TextBlock Grid.Column="7" Text="{x:Bind PlayCount}"
+                                               VerticalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                    <TextBlock Grid.Column="8" Text="{x:Bind BPMDisplay}"
+                                               VerticalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                    <ToggleButton Grid.Column="9"
+                                                  IsChecked="{x:Bind IsStarred, Mode=OneWay}"
+                                                  Padding="0" Width="32" Height="32"
+                                                  VerticalAlignment="Center" BorderThickness="0"
+                                                  Background="Transparent"
+                                                  Style="{StaticResource FavoriteToggleButtonStyle}"
+                                                  Command="{Binding ViewModel.ToggleTopSongStarCommand, ElementName=PageRoot}"
+                                                  CommandParameter="{x:Bind}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
 
                 <!-- Similar Artists section header -->
                 <TextBlock x:Uid="ArtistDetail_SimilarArtists"

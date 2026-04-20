@@ -39,6 +39,10 @@ Add a "Top Songs" section to the Artist Detail page, showing the most popular tr
 
 ## UI Design
 
+### Section Placement
+
+The Top Songs section appears **after the Discography album grid** and **before the Similar Artists section**, keeping the primary content (albums) front and center while surfacing popularity data as a secondary section.
+
 ### Section Layout
 
 ```

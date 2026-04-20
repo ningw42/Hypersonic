@@ -1,6 +1,7 @@
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Helpers;
 using Hypersonic.Core.Models;
+using Hypersonic.Models;
 using Hypersonic.ViewModels;
 
 using Microsoft.UI.Xaml;
@@ -19,18 +20,44 @@ public sealed partial class ArtistDetailPage : Page
         ViewModel = App.GetService<ArtistDetailViewModel>();
         InitializeComponent();
         ActualThemeChanged += OnActualThemeChanged;
+        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         Unloaded += (s, e) =>
         {
             ActualThemeChanged -= OnActualThemeChanged;
+            ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
         };
     }
 
     private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
+
+    private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(ArtistDetailViewModel.SelectedTopSongsMode) or nameof(ArtistDetailViewModel.HasTopSongs))
+        {
+            SyncTopSongsModeSelector();
+        }
+    }
+
+    private void SyncTopSongsModeSelector()
+    {
+        if (!ViewModel.HasTopSongs)
+        {
+            return;
+        }
+
+        var target = ViewModel.SelectedTopSongsMode == 0 ? CommunityModeItem : PersonalModeItem;
+        if (TopSongsModeSelector.SelectedItem != target)
+        {
+            TopSongsModeSelector.SelectedItem = target;
+        }
+    }
+
     private Brush TertiaryBrush => TertiaryBrushProvider.Foreground;
 
     private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
         ReRenderAllAlbumCards();
+        ReRenderTopSongsRows();
     }
 
     private void ReRenderAllAlbumCards()
@@ -43,6 +70,19 @@ public sealed partial class ArtistDetailPage : Page
                 var dc = fe.DataContext;
                 fe.DataContext = null;
                 fe.DataContext = dc;
+            }
+        }
+    }
+
+    private void ReRenderTopSongsRows()
+    {
+        for (var i = 0; i < TopSongsListView.Items.Count; i++)
+        {
+            if (TopSongsListView.ContainerFromIndex(i) is ListViewItem container)
+            {
+                var dataContext = container.DataContext;
+                container.DataContext = null;
+                container.DataContext = dataContext;
             }
         }
     }
@@ -73,6 +113,80 @@ public sealed partial class ArtistDetailPage : Page
         var result = DisplayArtistRenderer.BuildSegments(
             album.DisplayArtist, album.Artists, album.HasStructuredArtists);
         ToolTipService.SetToolTip(rtb, BuildArtistTooltip(result, album.DisplayArtist, album.Artists));
+        RenderArtistSegments(rtb, result.Segments, ViewModel.CurrentArtistId);
+    }
+
+    private void TopSongsModeSelector_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    {
+        var selectedItem = sender.SelectedItem;
+        if (selectedItem == CommunityModeItem)
+        {
+            ViewModel.SelectedTopSongsMode = 0;
+        }
+        else if (selectedItem == PersonalModeItem)
+        {
+            ViewModel.SelectedTopSongsMode = 1;
+        }
+        ViewModel.ApplyTopSongsMode();
+    }
+
+    private void TopSongsList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is SongInfo song)
+        {
+            ViewModel.PlayFromTopSongCommand.Execute(song);
+        }
+    }
+
+    private void TopSongAlbumLink_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        if (sender is not RichTextBlock rtb || rtb.DataContext is not SongInfo song)
+        {
+            return;
+        }
+
+        rtb.Blocks.Clear();
+        ToolTipService.SetToolTip(rtb, song.Album);
+        var secondaryBrush = SecondaryBrush;
+
+        var paragraph = new Paragraph();
+        if (!string.IsNullOrEmpty(song.AlbumId))
+        {
+            var link = new Hyperlink
+            {
+                UnderlineStyle = UnderlineStyle.None,
+                Foreground = secondaryBrush,
+            };
+            link.Inlines.Add(new Run { Text = song.Album });
+            var albumId = song.AlbumId;
+            link.Click += (s, e) =>
+            {
+                App.GetService<INavigationService>()
+                    .NavigateTo(typeof(AlbumDetailViewModel).FullName!, albumId);
+            };
+            paragraph.Inlines.Add(link);
+        }
+        else
+        {
+            paragraph.Inlines.Add(new Run
+            {
+                Text = song.Album,
+                Foreground = secondaryBrush,
+            });
+        }
+        rtb.Blocks.Add(paragraph);
+    }
+
+    private void TopSongArtistLinks_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        if (sender is not RichTextBlock rtb || rtb.DataContext is not SongInfo song)
+        {
+            return;
+        }
+
+        var result = DisplayArtistRenderer.BuildSegments(
+            song.DisplayArtist, song.Artists, song.HasStructuredArtists);
+        ToolTipService.SetToolTip(rtb, BuildArtistTooltip(result, song.DisplayArtist, song.Artists));
         RenderArtistSegments(rtb, result.Segments, ViewModel.CurrentArtistId);
     }
 

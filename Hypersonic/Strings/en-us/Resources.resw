@@ -171,6 +171,9 @@
   <data name="ArtistDetail_SimilarArtists.Text" xml:space="preserve">
     <value>Similar Artists</value>
   </data>
+  <data name="ArtistDetail_TopSongs.Text" xml:space="preserve">
+    <value>Top Songs</value>
+  </data>
   <data name="Playlists_Title.Text" xml:space="preserve">
     <value>Playlists</value>
   </data>

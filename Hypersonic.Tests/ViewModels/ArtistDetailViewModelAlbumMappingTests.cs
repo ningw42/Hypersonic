@@ -105,6 +105,44 @@ public class ArtistDetailViewModelAlbumMappingTests
         public Uri GetAvatarUri(string username) => throw new NotImplementedException();
     }
 
+    private sealed class NullPlaybackService : IPlaybackService
+    {
+        public PlaybackTrack? NowPlaying => null;
+        public IReadOnlyList<PlaybackTrack> Queue => Array.Empty<PlaybackTrack>();
+        public int QueueIndex => -1;
+        public int EffectiveQueueIndex => -1;
+        public bool IsPlaying { get; set; }
+        public double Position { get; set; }
+        public double Duration { get; set; }
+        public double Volume { get; set; } = 1.0;
+        public bool IsMuted { get; set; }
+        public bool HasNext { get; set; }
+        public bool HasPrevious { get; set; }
+        public QueueSource? Source => null;
+        public bool ShuffleEnabled { get; set; }
+        public RepeatMode RepeatMode { get; set; }
+        public IReadOnlyList<PlaybackTrack> History => Array.Empty<PlaybackTrack>();
+        public event EventHandler? PlaybackStateChanged;
+        public event EventHandler? TrackChanged;
+        public event EventHandler? PositionChanged;
+        public event EventHandler? QueueChanged;
+        public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null) { }
+        public void Resume() { }
+        public void Pause() { }
+        public void Stop() { }
+        public void NextTrack() { }
+        public void PreviousTrack() { }
+        public void Seek(double positionSeconds) { }
+        public void AddNext(IList<PlaybackTrack> tracks) { }
+        public void AddToEnd(IList<PlaybackTrack> tracks) { }
+        public void RemoveAt(int index) { }
+        public void MoveTrack(int fromIndex, int toIndex) { }
+        public void ClearUpcoming() { }
+        public void ClearAll() { }
+        public void JumpToTrack(string trackId) { }
+        public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
+    }
+
     private sealed class FakeSubsonicClientService : ISubsonicClientService
     {
         public ISubsonicClient? Client { get; set; }
@@ -149,6 +187,7 @@ public class ArtistDetailViewModelAlbumMappingTests
         var vm = new ArtistDetailViewModel(
             clientService,
             new FakeNavigationService(),
+            new NullPlaybackService(),
             new NullLoggingService());
 
         await vm.LoadArtistAsync("ar1");
