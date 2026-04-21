@@ -4,9 +4,9 @@ using CommunityToolkit.Mvvm.Input;
 using Hypersonic.Collections;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
-using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
+using Hypersonic.Helpers;
 
 namespace Hypersonic.ViewModels;
 
@@ -149,34 +149,7 @@ public partial class AlbumsViewModel : ObservableRecipient, INavigationAware
 
         _log.Info("Albums fetched", new { Count = albums.Length, TotalOffset = _offset });
 
-        var result = new List<AlbumInfo>(albums.Length);
-        foreach (var album in albums)
-        {
-            var (artists, hasStructured) = SongArtistMapper.MapArtists(
-                album.Artists?.Select(a => (a.Name, (string?)a.Id)),
-                album.Artist,
-                album.ArtistId);
-
-            result.Add(new AlbumInfo
-            {
-                Id = album.Id,
-                Name = album.Name,
-                Artist = album.Artist,
-                ArtistId = album.ArtistId,
-                Year = album.Year,
-                CoverArt = album.CoverArt,
-                CoverArtUrl = !string.IsNullOrEmpty(album.CoverArt)
-                    ? client.GetCoverArtUri(album.CoverArt, "300").ToString()
-                    : null,
-                SongCount = album.SongCount,
-                Duration = TimeSpan.FromSeconds(album.Duration),
-                DisplayArtist = album.DisplayArtist,
-                Artists = artists,
-                HasStructuredArtists = hasStructured,
-            });
-        }
-
-        return result;
+        return AlbumMapper.MapAll(albums, client);
     }
 
     private (string type, int? fromYear, int? toYear) GetSortParameters()

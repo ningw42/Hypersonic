@@ -9,6 +9,7 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
+using Hypersonic.Helpers;
 using Hypersonic.Models;
 
 namespace Hypersonic.ViewModels;
@@ -288,30 +289,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
             AlbumCount = artist.AlbumCount;
 
             var albums = artist.Album ?? [];
-            _allAlbums = albums.Select(a =>
-            {
-                var (artists, hasStructured) = SongArtistMapper.MapArtists(
-                    a.Artists?.Select(x => (x.Name, (string?)x.Id)),
-                    a.Artist, a.ArtistId);
-
-                return new AlbumInfo
-                {
-                    Id = a.Id,
-                    Name = a.Name ?? string.Empty,
-                    Artist = a.DisplayArtist ?? a.Artist ?? string.Empty,
-                    ArtistId = a.ArtistId,
-                    DisplayArtist = a.DisplayArtist,
-                    Artists = artists,
-                    HasStructuredArtists = hasStructured,
-                    Year = a.Year,
-                    CoverArt = a.CoverArt,
-                    CoverArtUrl = !string.IsNullOrEmpty(a.CoverArt)
-                        ? client.GetCoverArtUri(a.CoverArt, "300").ToString()
-                        : null,
-                    SongCount = a.SongCount,
-                    Duration = TimeSpan.FromSeconds(a.Duration),
-                };
-            }).ToList();
+            _allAlbums = AlbumMapper.MapAll(albums, client);
 
             TotalSongCount = _allAlbums.Sum(a => a.SongCount ?? 0);
 
