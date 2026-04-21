@@ -14,6 +14,9 @@
 | 4.1 Scrobbling | S | 🔲 Not started |
 | 4.2 Playlist Management UI | M | 🔲 Not started |
 | 4.3 Keyboard Shortcuts | S | 🔲 Not started |
+| 4.4 CoverflowControl for Home Carousel | M | 🔲 Not started |
+| 4.5 Carousel Scrollbar Polish | S | 🔲 Not started |
+| 4.6 Now-Playing Track Highlight | S | 🔲 Not started |
 | **── MVP ship line ──** | | |
 | **Phase 3 — Data Layer (Stretch)** | | |
 | 3.1 SQLite Metadata Cache | XL | 🔲 Not started |
@@ -104,6 +107,26 @@ Global keyboard accelerators: Space (play/pause), Ctrl+arrows (next/prev/volume)
 
 **Depends on**: 1.1
 
+### 4.4 CoverflowControl for Home Page Carousel `[M]`
+
+The Home Page's top carousel (e.g., recently played, featured albums) should use a custom CoverflowControl — a 3D perspective carousel where the centered item is enlarged and flanked by tilted, receding neighbors. Built as a reusable WinUI control using Composition API transforms (rotation, translation, scale) driven by a `ScrollViewer` or pointer/touch input. The control should support item templates, keyboard/gamepad navigation, and smooth spring animations between positions. This replaces a flat horizontal list with a visually rich hero element that draws attention to the featured content.
+
+**Depends on**: 2.1
+
+### 4.5 Carousel Scrollbar Polish `[S]`
+
+Three usability issues with horizontal carousels across the app (Home Page, artist detail, etc.):
+
+1. **Auto-hide scrollbar** — The horizontal scrollbar should only appear on hover or during active scroll, then fade out after a short delay. Use `ScrollViewer` visual states or Composition API opacity animations to achieve this, keeping the layout clean when idle.
+2. **Mouse horizontal scroll vs. vertical scroll conflict** — When the mouse wheel is used over a carousel, the event should scroll the carousel horizontally rather than bubbling up to the page's vertical `ScrollViewer`. Handle `PointerWheelChanged` on the carousel's `ScrollViewer` to translate vertical wheel delta into horizontal offset and mark the event as handled.
+3. **Scrollbar proximity to content** — The scrollbar renders too close to the carousel items, making it visually cramped. Add a margin or padding between the last row of content and the scrollbar track so the two don't collide visually.
+
+**Depends on**: 2.1
+
+### 4.6 Now-Playing Track Highlight in Track Lists `[S]`
+
+Whenever the user is browsing a page that contains a track list (album detail, artist top songs, playlist detail, search results), the currently playing track should be visually distinguished. Compare each rendered track's ID against `PlayerViewModel.CurrentTrack.Id` — if they match, apply a highlight: a left accent bar, a subtle background tint, or a small "now playing" animated icon (e.g., equalizer bars). The highlight must update reactively: when the track changes or when the user navigates to a page whose list contains the playing track. Implement this as a shared behavior or converter so every track list picks it up without per-page duplication.
+
 ---
 
 ## Dependency Graph
@@ -116,9 +139,11 @@ Phase 1                Phase 2              Phase 3              Phase 4
                     │        │                          │
                     │        └──▶ 4.1 Scrobble          └──▶ 3.3 Audio Cache
                     │
-                    ├──▶ 2.2 Now Playing    2.1 Home ──────── (standalone)
-                    │
-                    └──▶ 4.3 Shortcuts      4.2 Playlists ─── (standalone)
+                    ├──▶ 2.2 Now Playing    2.1 Home ──┬──▶ 4.4 Coverflow
+                    │                                  │
+                    └──▶ 4.3 Shortcuts                 └──▶ 4.5 Scrollbar Polish
+                                            
+                    4.2 Playlists ─── (standalone)      4.6 Track Highlight ── (standalone)
 ```
 
 ## Recommended Implementation Order
@@ -129,13 +154,16 @@ Phase 1                Phase 2              Phase 3              Phase 4
 | 2 | 1.2 Persistence (Settings & State) | M | 1.1 |
 | 3 | 2.1 Home Page | M | — |
 | 4 | 2.2 Now Playing / Full-Window Player | L | 1.1 |
-| 5 | 4.1 Scrobbling | S | 1.2 |
-| 6 | 4.3 Keyboard Shortcuts | S | 1.1 |
-| 7 | 4.2 Playlist Management UI | M | — |
+| 5 | 4.4 CoverflowControl for Home Carousel | M | 2.1 |
+| 6 | 4.5 Carousel Scrollbar Polish | S | 2.1 |
+| 7 | 4.6 Now-Playing Track Highlight | S | — |
+| 8 | 4.1 Scrobbling | S | 1.2 |
+| 9 | 4.3 Keyboard Shortcuts | S | 1.1 |
+| 10 | 4.2 Playlist Management UI | M | — |
 | | **── MVP ship line ──** | | |
-| 8 | 3.1 SQLite Metadata Cache | XL | — |
-| 9 | 3.2 Image Cache | L | 3.1 |
-| 10 | 3.3 Audio Cache | XL | 3.1 |
+| 11 | 3.1 SQLite Metadata Cache | XL | — |
+| 12 | 3.2 Image Cache | L | 3.1 |
+| 13 | 3.3 Audio Cache | XL | 3.1 |
 
 **Size key**: S = a few hours · M = 1–2 days · L = 3–5 days · XL = 1+ weeks
 
