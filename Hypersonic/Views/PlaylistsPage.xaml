@@ -56,6 +56,7 @@
 
         <!-- Playlists list -->
         <ScrollViewer Grid.Row="2">
+            <Border Padding="0,0,16,0">
             <ItemsRepeater ItemsSource="{x:Bind ViewModel.Playlists, Mode=OneWay}">
                 <ItemsRepeater.Layout>
                     <StackLayout Spacing="0"/>
@@ -135,6 +136,7 @@
                     </DataTemplate>
                 </ItemsRepeater.ItemTemplate>
             </ItemsRepeater>
+            </Border>
         </ScrollViewer>
 
         <!-- Loading indicator overlay -->

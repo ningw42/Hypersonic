@@ -13,7 +13,7 @@
 
     <Grid>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Padding="0,0,0,24">
+            <StackPanel Padding="0,0,16,24">
 
                 <!-- Artist header -->
                 <Grid Margin="0,0,0,24" ColumnSpacing="24">
@@ -382,8 +382,7 @@
                            Visibility="{x:Bind ViewModel.HasSimilarArtists, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                 <!-- Similar Artists horizontal list -->
-                <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled"
+                <controls:CarouselPanel
                               Visibility="{x:Bind ViewModel.HasSimilarArtists, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                     <ItemsRepeater ItemsSource="{x:Bind ViewModel.SimilarArtists, Mode=OneWay}">
                         <ItemsRepeater.Layout>
@@ -461,7 +460,7 @@
                             </DataTemplate>
                         </ItemsRepeater.ItemTemplate>
                     </ItemsRepeater>
-                </ScrollViewer>
+                </controls:CarouselPanel>
 
             </StackPanel>
         </ScrollViewer>

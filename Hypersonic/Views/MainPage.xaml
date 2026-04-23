@@ -13,7 +13,7 @@
         <!-- Main content -->
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       Visibility="{x:Bind ViewModel.HasAnyContent, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-            <StackPanel Padding="0,0,0,24">
+            <StackPanel Padding="0,0,16,24">
 
                 <!-- Recently Played -->
                 <StackPanel Visibility="{x:Bind ViewModel.HasRecentlyPlayed, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -21,10 +21,7 @@
                                Text="Recently Played"
                                Style="{StaticResource SubtitleTextBlockStyle}"
                                Margin="0,0,0,12"/>
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled"
-                                  HorizontalScrollMode="Enabled"
-                                  VerticalScrollMode="Disabled">
+                    <controls:CarouselPanel>
                         <ItemsRepeater x:Name="RecentlyPlayedRepeater"
                                        ItemsSource="{x:Bind ViewModel.RecentlyPlayed, Mode=OneWay}">
                             <ItemsRepeater.Layout>
@@ -106,7 +103,7 @@
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
-                    </ScrollViewer>
+                    </controls:CarouselPanel>
                 </StackPanel>
 
                 <!-- Recently Released -->
@@ -115,10 +112,7 @@
                                Text="Recently Released"
                                Style="{StaticResource SubtitleTextBlockStyle}"
                                Margin="0,24,0,12"/>
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled"
-                                  HorizontalScrollMode="Enabled"
-                                  VerticalScrollMode="Disabled">
+                    <controls:CarouselPanel>
                         <ItemsRepeater x:Name="RecentlyReleasedRepeater"
                                        ItemsSource="{x:Bind ViewModel.RecentlyReleased, Mode=OneWay}">
                             <ItemsRepeater.Layout>
@@ -200,7 +194,7 @@
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
-                    </ScrollViewer>
+                    </controls:CarouselPanel>
                 </StackPanel>
 
                 <!-- Recently Added -->
@@ -209,10 +203,7 @@
                                Text="Recently Added"
                                Style="{StaticResource SubtitleTextBlockStyle}"
                                Margin="0,24,0,12"/>
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled"
-                                  HorizontalScrollMode="Enabled"
-                                  VerticalScrollMode="Disabled">
+                    <controls:CarouselPanel>
                         <ItemsRepeater x:Name="RecentlyAddedRepeater"
                                        ItemsSource="{x:Bind ViewModel.RecentlyAdded, Mode=OneWay}">
                             <ItemsRepeater.Layout>
@@ -294,7 +285,7 @@
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
-                    </ScrollViewer>
+                    </controls:CarouselPanel>
                 </StackPanel>
 
                 <!-- Most Played -->
@@ -303,10 +294,7 @@
                                Text="Most Played"
                                Style="{StaticResource SubtitleTextBlockStyle}"
                                Margin="0,24,0,12"/>
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled"
-                                  HorizontalScrollMode="Enabled"
-                                  VerticalScrollMode="Disabled">
+                    <controls:CarouselPanel>
                         <ItemsRepeater x:Name="MostPlayedRepeater"
                                        ItemsSource="{x:Bind ViewModel.MostPlayed, Mode=OneWay}">
                             <ItemsRepeater.Layout>
@@ -388,7 +376,7 @@
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
-                    </ScrollViewer>
+                    </controls:CarouselPanel>
                 </StackPanel>
 
                 <!-- Random Picks -->
@@ -397,10 +385,7 @@
                                Text="Random Picks"
                                Style="{StaticResource SubtitleTextBlockStyle}"
                                Margin="0,24,0,12"/>
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled"
-                                  HorizontalScrollMode="Enabled"
-                                  VerticalScrollMode="Disabled">
+                    <controls:CarouselPanel>
                         <ItemsRepeater x:Name="RandomPicksRepeater"
                                        ItemsSource="{x:Bind ViewModel.RandomPicks, Mode=OneWay}">
                             <ItemsRepeater.Layout>
@@ -482,7 +467,7 @@
                                 </DataTemplate>
                             </ItemsRepeater.ItemTemplate>
                         </ItemsRepeater>
-                    </ScrollViewer>
+                    </controls:CarouselPanel>
                 </StackPanel>
 
             </StackPanel>

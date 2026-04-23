@@ -220,6 +220,99 @@
         </Setter>
     </Style>
 
+    <!-- Carousel arrow button: 36x36 circle with semi-transparent background -->
+    <Style x:Key="CarouselArrowButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="36"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="CornerRadius" Value="18"/>
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="RootGrid"
+                          Width="36" Height="36"
+                          Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          CornerRadius="18">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal"/>
+                                <VisualState x:Name="PointerOver">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SubtleFillColorSecondaryBrush}"/>
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SubtleFillColorTertiaryBrush}"/>
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled"/>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- CarouselPanel: button-navigated horizontal carousel -->
+    <Style TargetType="controls:CarouselPanel">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="controls:CarouselPanel">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="LeftArrowBtn"
+                                Grid.Column="0"
+                                Style="{StaticResource CarouselArrowButtonStyle}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"
+                                Visibility="Collapsed"
+                                AutomationProperties.Name="Scroll left">
+                            <FontIcon Glyph="&#xE76B;" FontSize="16"/>
+                        </Button>
+
+                        <ScrollViewer x:Name="Scroller"
+                                      Grid.Column="1"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Disabled"
+                                      HorizontalScrollMode="Disabled"
+                                      VerticalScrollMode="Disabled">
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </ScrollViewer>
+
+                        <Button x:Name="RightArrowBtn"
+                                Grid.Column="2"
+                                Style="{StaticResource CarouselArrowButtonStyle}"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0"
+                                Visibility="Collapsed"
+                                AutomationProperties.Name="Scroll right">
+                            <FontIcon Glyph="&#xE76C;" FontSize="16"/>
+                        </Button>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- MarqueeTextBlock: scrolls text on hover when it overflows -->
     <Style TargetType="controls:MarqueeTextBlock">
         <Setter Property="IsTabStop" Value="False"/>

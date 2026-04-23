@@ -57,6 +57,7 @@
 
         <!-- Artists grid -->
         <ScrollViewer Grid.Row="2">
+            <Border Padding="0,0,16,0">
             <ItemsRepeater ItemsSource="{x:Bind ViewModel.Artists, Mode=OneWay}">
                 <ItemsRepeater.Layout>
                     <UniformGridLayout MinItemWidth="200"
@@ -140,6 +141,7 @@
                     </DataTemplate>
                 </ItemsRepeater.ItemTemplate>
             </ItemsRepeater>
+            </Border>
         </ScrollViewer>
 
         <!-- Loading indicator overlay -->

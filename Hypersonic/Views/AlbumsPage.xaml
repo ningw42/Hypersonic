@@ -59,6 +59,7 @@
         <ScrollViewer Grid.Row="2"
                       x:Name="AlbumsScrollViewer"
                       ViewChanged="AlbumsScrollViewer_ViewChanged">
+            <Border Padding="0,0,16,0">
             <ItemsRepeater x:Name="AlbumsRepeater" ItemsSource="{x:Bind ViewModel.Albums, Mode=OneWay}">
                 <ItemsRepeater.Layout>
                     <UniformGridLayout MinItemWidth="200"
@@ -154,6 +155,7 @@
                     </DataTemplate>
                 </ItemsRepeater.ItemTemplate>
             </ItemsRepeater>
+            </Border>
         </ScrollViewer>
 
         <!-- Loading indicator overlay -->
