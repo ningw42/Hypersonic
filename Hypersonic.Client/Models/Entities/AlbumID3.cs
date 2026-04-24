@@ -89,6 +89,10 @@ public class AlbumID3
     [XmlElement("moods")]
     public string[]? Moods { get; set; }
 
+    [JsonPropertyName("version")]
+    [XmlAttribute("version")]
+    public string? Version { get; set; }
+
     [JsonPropertyName("sortName")]
     [XmlAttribute("sortName")]
     public string? SortName { get; set; }

@@ -8,6 +8,7 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
+using Hypersonic.Helpers;
 using Hypersonic.Models;
 
 namespace Hypersonic.ViewModels;
@@ -22,6 +23,12 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     [ObservableProperty]
     public partial string AlbumName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAlbumVersion))]
+    public partial string? AlbumVersion { get; set; }
+
+    public bool HasAlbumVersion => !string.IsNullOrEmpty(AlbumVersion);
 
     [ObservableProperty]
     public partial string AlbumArtist { get; set; } = string.Empty;
@@ -123,7 +130,9 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
             _log.Info("Album fetched", new { AlbumId = albumId, album.Name, SongCount = album.SongCount });
 
-            AlbumName = album.Name ?? string.Empty;
+            var (shortName, effectiveVersion) = AlbumMapper.SplitAlbumVersion(album.Name, album.Version);
+            AlbumName = shortName;
+            AlbumVersion = effectiveVersion;
             AlbumArtist = album.DisplayArtist ?? album.Artist ?? string.Empty;
             AlbumArtistId = album.ArtistId;
             Genre = album.Genre;
@@ -153,7 +162,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
             _allSongs = songs
                 .OrderBy(s => s.DiscNumber)
                 .ThenBy(s => s.Track)
-                .Select(s => MapSongInfo(s, client))
+                .Select(s => MapSongInfo(s, client, album.Version))
                 .ToList();
 
             var discNumbers = _allSongs.Select(s => s.DiscNumber).Distinct().ToList();
@@ -349,7 +358,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
         }).ToList();
     }
 
-    private static SongInfo MapSongInfo(Client.Models.Entities.Child song, Client.ISubsonicClient client)
+    private static SongInfo MapSongInfo(Client.Models.Entities.Child song, Client.ISubsonicClient client, string? albumVersion)
     {
         var (artists, hasStructured) = SongArtistMapper.MapArtists(
             song.Artists?.Select(a => (a.Name, (string?)a.Id)),
@@ -366,7 +375,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
             Artist = song.Artist ?? string.Empty,
             Artists = artists,
             HasStructuredArtists = hasStructured,
-            Album = song.Album ?? string.Empty,
+            Album = AlbumMapper.StripVersionSuffix(song.Album, albumVersion),
             Genre = song.Genre,
             Year = song.Year,
             CoverArt = song.CoverArt,

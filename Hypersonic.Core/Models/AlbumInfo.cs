@@ -4,6 +4,8 @@ public class AlbumInfo
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? Version { get; set; }
+    public string DisplayName => string.IsNullOrEmpty(Version) ? Name : $"{Name} ({Version})";
     public string Artist { get; set; } = string.Empty;
     public string? ArtistId { get; set; }
     public int Year { get; set; }

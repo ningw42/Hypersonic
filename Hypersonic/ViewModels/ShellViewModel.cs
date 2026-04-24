@@ -6,6 +6,7 @@ using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Helpers;
 using Hypersonic.Core.Models;
+using Hypersonic.Helpers;
 using Hypersonic.Views;
 
 using Microsoft.UI.Xaml.Navigation;
@@ -130,12 +131,19 @@ public partial class ShellViewModel : ObservableRecipient
             {
                 foreach (var album in result.Album)
                 {
+                    var (shortName, effectiveVersion) = AlbumMapper.SplitAlbumVersion(album.Name, album.Version);
+                    var secondaryText = album.Artist ?? string.Empty;
+                    if (!string.IsNullOrEmpty(effectiveVersion))
+                    {
+                        secondaryText = $"{secondaryText} · {effectiveVersion}";
+                    }
+
                     albums.Add(new SearchSuggestionItem
                     {
                         Type = SearchResultType.Album,
                         Id = album.Id,
-                        PrimaryText = album.Name ?? string.Empty,
-                        SecondaryText = album.Artist ?? string.Empty,
+                        PrimaryText = shortName,
+                        SecondaryText = secondaryText,
                         ImageUrl = !string.IsNullOrEmpty(album.CoverArt)
                             ? client.GetCoverArtUri(album.CoverArt, "100").ToString()
                             : null,

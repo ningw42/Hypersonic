@@ -15,10 +15,13 @@ public static class AlbumMapper
             album.Artist,
             album.ArtistId);
 
+        var (shortName, effectiveVersion) = SplitAlbumVersion(album.Name, album.Version);
+
         return new CoreAlbumInfo
         {
             Id = album.Id,
-            Name = album.Name ?? string.Empty,
+            Name = shortName,
+            Version = effectiveVersion,
             Artist = album.DisplayArtist ?? album.Artist ?? string.Empty,
             ArtistId = album.ArtistId,
             DisplayArtist = album.DisplayArtist,
@@ -42,5 +45,31 @@ public static class AlbumMapper
         }
 
         return albums.Select(a => Map(a, client)).ToList();
+    }
+
+    internal static (string Name, string? Version) SplitAlbumVersion(string? name, string? version)
+    {
+        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(version))
+        {
+            return (name ?? string.Empty, null);
+        }
+
+        var suffix = $" ({version})";
+        if (name.EndsWith(suffix, StringComparison.Ordinal))
+        {
+            return (name[..^suffix.Length], version);
+        }
+
+        if (!name.Contains(version, StringComparison.OrdinalIgnoreCase))
+        {
+            return (name, version);
+        }
+
+        return (name, null);
+    }
+
+    internal static string StripVersionSuffix(string? name, string? version)
+    {
+        return SplitAlbumVersion(name, version).Name;
     }
 }

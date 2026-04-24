@@ -178,7 +178,7 @@
                                                    FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis"
                                                    MaxLines="1"
-                                                   ToolTipService.ToolTip="{Binding Name}"
+                                                   ToolTipService.ToolTip="{Binding DisplayName}"
                                                    Margin="12,8,12,2"/>
 
                                         <!-- Artist name -->

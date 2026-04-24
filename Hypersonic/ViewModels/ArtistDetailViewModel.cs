@@ -439,7 +439,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
             }
 
             var semaphore = new SemaphoreSlim(5);
-            var allChildren = new List<Client.Models.Entities.Child>();
+            var allChildren = new List<(Client.Models.Entities.Child Song, string? AlbumVersion)>();
             var lockObj = new Lock();
 
             var tasks = albumIds.Select(async albumId =>
@@ -448,12 +448,16 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 try
                 {
                     var albumResponse = await client.GetAlbumAsync(albumId);
-                    var songs = albumResponse.Album?.Song;
+                    var album = albumResponse.Album;
+                    var songs = album?.Song;
                     if (songs != null)
                     {
                         lock (lockObj)
                         {
-                            allChildren.AddRange(songs);
+                            foreach (var song in songs)
+                            {
+                                allChildren.Add((song, album?.Version));
+                            }
                         }
                     }
                 }
@@ -471,12 +475,12 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 
             var artistName = ArtistName;
             var filtered = allChildren
-                .Where(c => IsArtistCredited(c, artistId, artistName) && c.PlayCount > 0)
-                .OrderByDescending(c => c.PlayCount)
+                .Where(c => IsArtistCredited(c.Song, artistId, artistName) && c.Song.PlayCount > 0)
+                .OrderByDescending(c => c.Song.PlayCount)
                 .Take(20)
                 .Select((c, i) =>
                 {
-                    var info = MapChildToSongInfo(c, client);
+                    var info = MapChildToSongInfo(c.Song, client, c.AlbumVersion);
                     info.PositionNumber = i + 1;
                     return info;
                 })
@@ -593,7 +597,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
         }).ToList();
     }
 
-    private static SongInfo MapChildToSongInfo(Client.Models.Entities.Child song, Client.ISubsonicClient client)
+    private static SongInfo MapChildToSongInfo(Client.Models.Entities.Child song, Client.ISubsonicClient client, string? albumVersion = null)
     {
         var (artists, hasStructured) = SongArtistMapper.MapArtists(
             song.Artists?.Select(a => (a.Name, (string?)a.Id)),
@@ -610,7 +614,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
             Artist = song.Artist ?? string.Empty,
             Artists = artists,
             HasStructuredArtists = hasStructured,
-            Album = song.Album ?? string.Empty,
+            Album = albumVersion != null ? AlbumMapper.StripVersionSuffix(song.Album, albumVersion) : song.Album ?? string.Empty,
             Genre = song.Genre,
             Year = song.Year,
             CoverArt = song.CoverArt,

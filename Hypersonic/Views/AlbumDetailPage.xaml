@@ -234,6 +234,11 @@
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </Grid>
 
+                        <TextBlock Text="{x:Bind ViewModel.AlbumVersion, Mode=OneWay}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Visibility="{x:Bind ViewModel.HasAlbumVersion, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                   FontSize="14"/>
+
                         <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    Text="{x:Bind ViewModel.ReleaseDateGenre, Mode=OneWay}"/>
 
