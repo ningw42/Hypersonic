@@ -8,15 +8,16 @@
 | 1.1 Shuffle & Repeat UI | S | ✅ Complete |
 | 1.2 Persistence (Credentials, Settings & State) | M | ✅ Complete |
 | **Phase 2 — Experience Essentials** | | |
-| 2.1 Home Page | M | 🔲 Not started |
+| 2.1 Home Page | M | ✅ Complete |
 | 2.2 Now Playing / Full-Window Player | L | 🔲 Not started |
 | **Phase 4 — Ecosystem & Polish** | | |
 | 4.1 Scrobbling | S | 🔲 Not started |
 | 4.2 Playlist Management UI | M | 🔲 Not started |
 | 4.3 Keyboard Shortcuts | S | 🔲 Not started |
 | 4.4 CoverflowControl for Home Carousel | M | 🔲 Not started |
-| 4.5 Carousel Scrollbar Polish | S | 🔲 Not started |
+| 4.5 Carousel Scrollbar Polish | S | ✅ Complete |
 | 4.6 Now-Playing Track Highlight | S | 🔲 Not started |
+| 4.7 Clean Album Version Display | S | ✅ Complete |
 | **── MVP ship line ──** | | |
 | **Phase 3 — Data Layer (Stretch)** | | |
 | 3.1 SQLite Metadata Cache | XL | 🔲 Not started |
@@ -127,6 +128,12 @@ Three usability issues with horizontal carousels across the app (Home Page, arti
 
 Whenever the user is browsing a page that contains a track list (album detail, artist top songs, playlist detail, search results), the currently playing track should be visually distinguished. Compare each rendered track's ID against `PlayerViewModel.CurrentTrack.Id` — if they match, apply a highlight: a left accent bar, a subtle background tint, or a small "now playing" animated icon (e.g., equalizer bars). The highlight must update reactively: when the track changes or when the user navigates to a page whose list contains the playing track. Implement this as a shared behavior or converter so every track list picks it up without per-page duplication.
 
+### 4.7 Clean Album Version Display `[S]`
+
+Navidrome (via OpenSubsonic) returns album names that include the version suffix — e.g., "OK Computer (Deluxe Edition)". This makes album cards, the player bar, queue items, and search results unnecessarily verbose. Strip the version suffix and show only the main album name everywhere in the app, except on the album detail page where the version is displayed as a subtitle row between the artist name and the release date/genre line.
+
+The OpenSubsonic `AlbumID3` entity has a dedicated `version` field (e.g., `"Deluxe Edition"`). Add deserialization support for this field, propagate it through the mapping layer, and use it to split the display: short name for compact contexts, version as subtitle on the detail page.
+
 ---
 
 ## Dependency Graph
@@ -144,6 +151,8 @@ Phase 1                Phase 2              Phase 3              Phase 4
                     └──▶ 4.3 Shortcuts                 └──▶ 4.5 Scrollbar Polish
                                             
                     4.2 Playlists ─── (standalone)      4.6 Track Highlight ── (standalone)
+
+                                                        4.7 Album Version ─── (standalone)
 ```
 
 ## Recommended Implementation Order
@@ -157,13 +166,14 @@ Phase 1                Phase 2              Phase 3              Phase 4
 | 5 | 4.4 CoverflowControl for Home Carousel | M | 2.1 |
 | 6 | 4.5 Carousel Scrollbar Polish | S | 2.1 |
 | 7 | 4.6 Now-Playing Track Highlight | S | — |
-| 8 | 4.1 Scrobbling | S | 1.2 |
-| 9 | 4.3 Keyboard Shortcuts | S | 1.1 |
-| 10 | 4.2 Playlist Management UI | M | — |
+| 8 | 4.7 Clean Album Version Display | S | — |
+| 9 | 4.1 Scrobbling | S | 1.2 |
+| 10 | 4.3 Keyboard Shortcuts | S | 1.1 |
+| 11 | 4.2 Playlist Management UI | M | — |
 | | **── MVP ship line ──** | | |
-| 11 | 3.1 SQLite Metadata Cache | XL | — |
-| 12 | 3.2 Image Cache | L | 3.1 |
-| 13 | 3.3 Audio Cache | XL | 3.1 |
+| 12 | 3.1 SQLite Metadata Cache | XL | — |
+| 13 | 3.2 Image Cache | L | 3.1 |
+| 14 | 3.3 Audio Cache | XL | 3.1 |
 
 **Size key**: S = a few hours · M = 1–2 days · L = 3–5 days · XL = 1+ weeks
 
