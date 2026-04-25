@@ -16,7 +16,7 @@
 | 4.3 Keyboard Shortcuts | S | 🔲 Not started |
 | 4.4 CoverflowControl for Home Carousel | M | 🔲 Not started |
 | 4.5 Carousel Scrollbar Polish | S | ✅ Complete |
-| 4.6 Now-Playing Track Highlight | S | 🔲 Not started |
+| 4.6 Now-Playing Track Highlight | S | ✅ Complete |
 | 4.7 Clean Album Version Display | S | ✅ Complete |
 | **── MVP ship line ──** | | |
 | **Phase 3 — Data Layer (Stretch)** | | |
