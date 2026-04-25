@@ -23,6 +23,8 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
     private List<AlbumInfo> _allAlbums = [];
     private List<SongInfo> _communityTopSongs = [];
     private List<SongInfo> _personalTopSongs = [];
+    private NowPlayingTracker? _nowPlayingTracker;
+    private bool _navigatedAway;
 
     [ObservableProperty]
     public partial string ArtistName { get; set; } = string.Empty;
@@ -126,6 +128,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 
     public async void OnNavigatedTo(object parameter)
     {
+        _navigatedAway = false;
         if (parameter is string artistId)
         {
             await LoadArtistAsync(artistId);
@@ -134,6 +137,8 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 
     public void OnNavigatedFrom()
     {
+        _navigatedAway = true;
+        _nowPlayingTracker?.Unsubscribe();
     }
 
     partial void OnSelectedSortIndexChanged(int value)
@@ -388,6 +393,15 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 SelectedTopSongsMode = IsCommunityAvailable ? 0 : 1;
                 ApplyTopSongsMode();
                 HasTopSongs = true;
+
+                if (!_navigatedAway)
+                {
+                    _nowPlayingTracker?.Unsubscribe();
+                    _nowPlayingTracker = new NowPlayingTracker(
+                        _playbackService,
+                        () => _communityTopSongs.Concat(_personalTopSongs));
+                    _nowPlayingTracker.Subscribe();
+                }
             }
         }
         catch (Exception ex)

@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:Hypersonic.Models"
+    xmlns:controls="using:Hypersonic.Controls"
     xmlns:behaviors="using:Hypersonic.Behaviors"
     mc:Ignorable="d"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
@@ -96,7 +97,7 @@
                       BorderThickness="0,0,0,1"
                       Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="56"/>
                         <ColumnDefinition Width="2*"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
@@ -181,9 +182,11 @@
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:SongInfo">
-                            <Grid ColumnSpacing="12" Padding="0,6">
+                            <Grid ColumnSpacing="12" Padding="0,6"
+                                  Background="{x:Bind IsNowPlaying, Mode=OneWay, Converter={StaticResource BoolToHighlightBrushConverter}}"
+                                  CornerRadius="4">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="56"/>
                                     <ColumnDefinition Width="2*"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -195,12 +198,19 @@
                                     <ColumnDefinition Width="36"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Position # -->
-                                <TextBlock Grid.Column="0"
-                                           Text="{x:Bind PositionNumber}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <!-- Position # / Equalizer -->
+                                <Grid Grid.Column="0" Width="56">
+                                    <controls:EqualizerBars
+                                               HorizontalAlignment="Left"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsAnimating="{x:Bind IsPlaying, Mode=OneWay}"
+                                               Visibility="{x:Bind IsNowPlaying, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBlock Text="{x:Bind PositionNumber}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
 
                                 <!-- Title -->
                                 <TextBlock Grid.Column="1"
@@ -208,6 +218,7 @@
                                            TextTrimming="CharacterEllipsis"
                                            MaxLines="1"
                                            VerticalAlignment="Center"
+                                           FontWeight="{x:Bind IsPlaying, Mode=OneWay, Converter={StaticResource BoolToFontWeightConverter}}"
                                            ToolTipService.ToolTip="{x:Bind Title}"/>
 
                                 <!-- Album -->

@@ -20,6 +20,8 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
     private readonly INavigationService _navigationService;
     private readonly ILogger _log;
     internal List<SongInfo> _allSongs = [];
+    private NowPlayingTracker? _nowPlayingTracker;
+    private bool _navigatedAway;
 
     [ObservableProperty]
     public partial string AlbumName { get; set; } = string.Empty;
@@ -97,6 +99,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     public async void OnNavigatedTo(object parameter)
     {
+        _navigatedAway = false;
         if (parameter is string albumId)
         {
             await LoadAlbumAsync(albumId);
@@ -105,6 +108,8 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
 
     public void OnNavigatedFrom()
     {
+        _navigatedAway = true;
+        _nowPlayingTracker?.Unsubscribe();
     }
 
     private async Task LoadAlbumAsync(string albumId)
@@ -195,6 +200,11 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                     TrackListItems.Add(song);
                 }
             }
+
+            if (_navigatedAway) return;
+            _nowPlayingTracker?.Unsubscribe();
+            _nowPlayingTracker = new NowPlayingTracker(_playbackService, () => _allSongs);
+            _nowPlayingTracker.Subscribe();
         }
         catch (Exception ex)
         {

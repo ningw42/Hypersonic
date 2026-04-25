@@ -42,6 +42,12 @@ public partial class SongInfo : ObservableObject
     [ObservableProperty]
     public partial bool IsStarred { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsNowPlaying { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsPlaying { get; set; }
+
     // Display helpers for zero-suppression
     public string BitRateDisplay => BitRate > 0 ? $"{BitRate}" : "";
     public string BPMDisplay => BPM > 0 ? BPM.ToString() : "";

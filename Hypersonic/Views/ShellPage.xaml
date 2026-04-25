@@ -17,8 +17,6 @@
         <converters:SecondsToTimeConverter x:Key="SecondsToTimeConverter"/>
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
-        <converters:BoolToHighlightBrushConverter x:Key="BoolToHighlightBrushConverter"/>
-        <converters:BoolToFontWeightConverter x:Key="BoolToFontWeightConverter"/>
     </Page.Resources>
 
     <Grid>

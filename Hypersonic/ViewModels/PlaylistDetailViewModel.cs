@@ -8,6 +8,7 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
+using Hypersonic.Helpers;
 using Hypersonic.Models;
 
 namespace Hypersonic.ViewModels;
@@ -18,6 +19,8 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
     private readonly IPlaybackService _playbackService;
     private readonly ILogger _log;
     internal List<SongInfo> _allSongs = [];
+    private NowPlayingTracker? _nowPlayingTracker;
+    private bool _navigatedAway;
 
     [ObservableProperty]
     public partial string PlaylistName { get; set; } = string.Empty;
@@ -57,6 +60,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
 
     public async void OnNavigatedTo(object parameter)
     {
+        _navigatedAway = false;
         if (parameter is string playlistId)
         {
             await LoadPlaylistAsync(playlistId);
@@ -65,6 +69,8 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
 
     public void OnNavigatedFrom()
     {
+        _navigatedAway = true;
+        _nowPlayingTracker?.Unsubscribe();
     }
 
     private async Task LoadPlaylistAsync(string playlistId)
@@ -114,6 +120,11 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
             {
                 TrackListItems.Add(song);
             }
+
+            if (_navigatedAway) return;
+            _nowPlayingTracker?.Unsubscribe();
+            _nowPlayingTracker = new NowPlayingTracker(_playbackService, () => _allSongs);
+            _nowPlayingTracker.Subscribe();
         }
         catch (Exception ex)
         {

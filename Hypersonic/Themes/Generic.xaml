@@ -16,6 +16,8 @@
     <converters:RepeatModeGlyphConverter x:Key="RepeatModeGlyphConverter"/>
     <converters:RepeatModeToAccentBrushConverter x:Key="RepeatModeToAccentBrushConverter"/>
     <converters:BoolToAccentBrushConverter x:Key="BoolToAccentBrushConverter"/>
+    <converters:BoolToHighlightBrushConverter x:Key="BoolToHighlightBrushConverter"/>
+    <converters:BoolToFontWeightConverter x:Key="BoolToFontWeightConverter"/>
 
     <!-- Favorite heart toggle button: nothing when unchecked, hollow heart on hover, red filled heart when checked -->
     <Style x:Key="FavoriteToggleButtonStyle" TargetType="ToggleButton">
@@ -330,6 +332,34 @@
                                    Foreground="{TemplateBinding Foreground}"
                                    TextWrapping="NoWrap"/>
                     </Canvas>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- EqualizerBars: three animated vertical bars indicating now-playing -->
+    <Style TargetType="controls:EqualizerBars">
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="controls:EqualizerBars">
+                    <Grid Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3"/>
+                            <ColumnDefinition Width="2"/>
+                            <ColumnDefinition Width="3"/>
+                            <ColumnDefinition Width="2"/>
+                            <ColumnDefinition Width="3"/>
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="PART_Bar1" Grid.Column="0"
+                                VerticalAlignment="Bottom" Height="16" CornerRadius="1"/>
+                        <Border x:Name="PART_Bar2" Grid.Column="2"
+                                VerticalAlignment="Bottom" Height="16" CornerRadius="1"/>
+                        <Border x:Name="PART_Bar3" Grid.Column="4"
+                                VerticalAlignment="Bottom" Height="16" CornerRadius="1"/>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

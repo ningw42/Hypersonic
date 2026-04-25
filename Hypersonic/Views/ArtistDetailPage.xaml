@@ -250,7 +250,7 @@
                           BorderThickness="0,0,0,1"
                           Visibility="{x:Bind ViewModel.HasTopSongs, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="56"/>
                             <ColumnDefinition Width="2*"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
@@ -305,9 +305,11 @@
                         </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:SongInfo">
-                                <Grid ColumnSpacing="12" Padding="0,6">
+                                <Grid ColumnSpacing="12" Padding="0,6"
+                                      Background="{x:Bind IsNowPlaying, Mode=OneWay, Converter={StaticResource BoolToHighlightBrushConverter}}"
+                                      CornerRadius="4">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="56"/>
                                         <ColumnDefinition Width="2*"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="*"/>
@@ -319,13 +321,21 @@
                                         <ColumnDefinition Width="36"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Column="0" Text="{x:Bind PositionNumber}"
-                                               HorizontalAlignment="Right" VerticalAlignment="Center"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <!-- Position # / Equalizer -->
+                                    <Grid Grid.Column="0" Width="56">
+                                        <controls:EqualizerBars
+                                                   HorizontalAlignment="Left" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                   IsAnimating="{x:Bind IsPlaying, Mode=OneWay}"
+                                                   Visibility="{x:Bind IsNowPlaying, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <TextBlock Text="{x:Bind PositionNumber}"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    </Grid>
 
                                     <TextBlock Grid.Column="1" Text="{x:Bind Title}"
                                                TextTrimming="CharacterEllipsis" MaxLines="1"
                                                VerticalAlignment="Center"
+                                               FontWeight="{x:Bind IsPlaying, Mode=OneWay, Converter={StaticResource BoolToFontWeightConverter}}"
                                                ToolTipService.ToolTip="{x:Bind Title}"/>
 
                                     <RichTextBlock Grid.Column="2"
