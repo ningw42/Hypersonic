@@ -1,6 +1,6 @@
 # Hypersonic MVP Roadmap
 
-> **Goal**: Ship a polished Subsonic desktop music player with complete playback controls, session persistence, and a rich listening experience. Offline caching (Phase 3) is a stretch goal — the MVP is fully functional online-only; the data layer is planned here so the architecture accounts for it from the start.
+> **Goal**: Ship a polished Subsonic desktop music player with complete playback controls, session persistence, and a rich listening experience. Offline caching is a stretch goal — the MVP is fully functional online-only; the data layer is planned here so the architecture accounts for it from the start.
 
 | Item | Size | Status |
 |------|------|--------|
@@ -10,19 +10,21 @@
 | **Phase 2 — Experience Essentials** | | |
 | 2.1 Home Page | M | ✅ Complete |
 | 2.2 Now Playing / Full-Window Player | L | 🔲 Not started |
-| **Phase 4 — Ecosystem & Polish** | | |
-| 4.1 Scrobbling | S | ✅ Complete |
-| 4.2 Playlist Management UI | M | 🔲 Not started |
-| 4.3 Keyboard Shortcuts | S | 🔲 Not started |
-| 4.4 CoverflowControl for Home Carousel | M | 🔲 Not started |
-| 4.5 Carousel Scrollbar Polish | S | ✅ Complete |
-| 4.6 Now-Playing Track Highlight | S | ✅ Complete |
-| 4.7 Clean Album Version Display | S | ✅ Complete |
+| 2.3 All Tracks Page | M | 🔲 Not started |
+| **Phase 3 — Ecosystem & Polish** | | |
+| 3.1 Scrobbling | S | ✅ Complete |
+| 3.2 CoverflowControl for Home Carousel | M | 🔲 Not started |
+| 3.3 Carousel Scrollbar Polish | S | ✅ Complete |
+| 3.4 Now-Playing Track Highlight | S | ✅ Complete |
+| 3.5 Clean Album Version Display | S | ✅ Complete |
 | **── MVP ship line ──** | | |
-| **Phase 3 — Data Layer (Stretch)** | | |
-| 3.1 SQLite Metadata Cache | XL | 🔲 Not started |
-| 3.2 Image Cache | L | 🔲 Not started |
-| 3.3 Audio Cache | XL | 🔲 Not started |
+| **Phase 4 — Post-MVP Enhancements** | | |
+| 4.1 Playlist Management UI | M | 🔲 Not started |
+| 4.2 Keyboard Shortcuts | S | 🔲 Not started |
+| **Phase 5 — Data Layer (Stretch)** | | |
+| 5.1 SQLite Metadata Cache | XL | 🔲 Not started |
+| 5.2 Image Cache | L | 🔲 Not started |
+| 5.3 Audio Cache | XL | 🔲 Not started |
 
 ---
 
@@ -64,57 +66,34 @@ The page should share playback state with the existing singleton `PlayerViewMode
 
 **Depends on**: 1.1
 
----
+### 2.3 All Tracks Page `[M]`
 
-## Phase 3 — Data Layer (Stretch)
+A browsable page listing all tracks from the server. Uses the `search3` API with pagination (the Subsonic API has no dedicated "get all songs" endpoint). The page should include:
 
-> Phase 3 is a stretch goal, not a gate for MVP ship. It's planned here so architecture decisions in Phases 1–2 don't paint us into a corner.
+- **Incremental loading** — paginated fetching similar to `IncrementalAlbumCollection`, loading tracks in batches as the user scrolls.
+- **Sortable columns** — sort by title, artist, album, duration, and year. Client-side sorting within loaded data, with server-side sort parameter when supported.
+- **On-page search** — a filter text box that narrows the displayed track list in real time (client-side filtering of loaded results, plus a server `search3` query for broader matches).
+- **Track list integration** — reuse the existing track list patterns (now-playing highlight, context menus, play/queue actions).
 
-This is a **cross-cutting change** — all browsing ViewModels currently call the Subsonic API client directly, and playback streams directly from server URIs. Introducing a cache layer means inserting a new service between every ViewModel and the API client, and reworking media source creation to support local files.
-
-### 3.1 SQLite Metadata Cache `[XL]`
-
-Local SQLite database as a read-through cache for artists, albums, songs, and playlists. Configurable TTL-based staleness, background incremental sync on app launch.
-
-### 3.2 Image Cache `[L]`
-
-Disk-backed cache for cover art with LRU eviction. Replaces direct server URI loading with a cache service that serves local files when available.
-
-**Depends on**: 3.1
-
-### 3.3 Audio Cache `[XL]`
-
-Two strategies: automatic stream-through caching (played tracks saved to disk transparently) and explicit user-initiated downloads (pinned, excluded from LRU eviction). Pre-caches the next 1–2 tracks in the queue to reduce gaps between tracks. Cache management UI in Settings.
-
-**Depends on**: 3.1
+Add the page to the sidebar navigation between Artists and Playlists. Register the View, ViewModel, and page mapping per the standard navigation pattern.
 
 ---
 
-## Phase 4 — Ecosystem & Polish
+## Phase 3 — Ecosystem & Polish
 
-### 4.1 Scrobbling `[S]`
+### 3.1 Scrobbling `[S]`
 
 Report playback to the Subsonic server for listening history tracking (recently played, most played, Last.fm integration). Scrobble when a track has played ≥ 30 seconds or ≥ 50% of its duration, whichever comes first. Respects a user-configurable toggle from persistence (1.2).
 
 **Depends on**: 1.2
 
-### 4.2 Playlist Management UI `[M]`
-
-The API client already supports create/update/delete — add the UI: new playlist dialog, edit/delete on playlist detail, "Add to Playlist" context menus on track lists across the app, and remove-from-playlist on playlist detail.
-
-### 4.3 Keyboard Shortcuts `[S]`
-
-Global keyboard accelerators: Space (play/pause), Ctrl+arrows (next/prev/volume), Ctrl+M (mute), Ctrl+S (shuffle), Ctrl+R (repeat), Ctrl+Q (queue flyout). Ctrl+K for search focus already exists.
-
-**Depends on**: 1.1
-
-### 4.4 CoverflowControl for Home Page Carousel `[M]`
+### 3.2 CoverflowControl for Home Page Carousel `[M]`
 
 The Home Page's top carousel (e.g., recently played, featured albums) should use a custom CoverflowControl — a 3D perspective carousel where the centered item is enlarged and flanked by tilted, receding neighbors. Built as a reusable WinUI control using Composition API transforms (rotation, translation, scale) driven by a `ScrollViewer` or pointer/touch input. The control should support item templates, keyboard/gamepad navigation, and smooth spring animations between positions. This replaces a flat horizontal list with a visually rich hero element that draws attention to the featured content.
 
 **Depends on**: 2.1
 
-### 4.5 Carousel Scrollbar Polish `[S]`
+### 3.3 Carousel Scrollbar Polish `[S]`
 
 Three usability issues with horizontal carousels across the app (Home Page, artist detail, etc.):
 
@@ -124,11 +103,11 @@ Three usability issues with horizontal carousels across the app (Home Page, arti
 
 **Depends on**: 2.1
 
-### 4.6 Now-Playing Track Highlight in Track Lists `[S]`
+### 3.4 Now-Playing Track Highlight in Track Lists `[S]`
 
 Whenever the user is browsing a page that contains a track list (album detail, artist top songs, playlist detail, search results), the currently playing track should be visually distinguished. Compare each rendered track's ID against `PlayerViewModel.CurrentTrack.Id` — if they match, apply a highlight: a left accent bar, a subtle background tint, or a small "now playing" animated icon (e.g., equalizer bars). The highlight must update reactively: when the track changes or when the user navigates to a page whose list contains the playing track. Implement this as a shared behavior or converter so every track list picks it up without per-page duplication.
 
-### 4.7 Clean Album Version Display `[S]`
+### 3.5 Clean Album Version Display `[S]`
 
 Navidrome (via OpenSubsonic) returns album names that include the version suffix — e.g., "OK Computer (Deluxe Edition)". This makes album cards, the player bar, queue items, and search results unnecessarily verbose. Strip the version suffix and show only the main album name everywhere in the app, except on the album detail page where the version is displayed as a subtitle row between the artist name and the release date/genre line.
 
@@ -136,23 +115,66 @@ The OpenSubsonic `AlbumID3` entity has a dedicated `version` field (e.g., `"Delu
 
 ---
 
+## Phase 4 — Post-MVP Enhancements
+
+### 4.1 Playlist Management UI `[M]`
+
+The API client already supports create/update/delete — add the UI: new playlist dialog, edit/delete on playlist detail, "Add to Playlist" context menus on track lists across the app, and remove-from-playlist on playlist detail.
+
+### 4.2 Keyboard Shortcuts `[S]`
+
+Global keyboard accelerators: Space (play/pause), Ctrl+arrows (next/prev/volume), Ctrl+M (mute), Ctrl+S (shuffle), Ctrl+R (repeat), Ctrl+Q (queue flyout). Ctrl+K for search focus already exists.
+
+**Depends on**: 1.1
+
+---
+
+## Phase 5 — Data Layer (Stretch)
+
+> Phase 5 is a stretch goal. It's planned here so architecture decisions in earlier phases don't paint us into a corner.
+
+This is a **cross-cutting change** — all browsing ViewModels currently call the Subsonic API client directly, and playback streams directly from server URIs. Introducing a cache layer means inserting a new service between every ViewModel and the API client, and reworking media source creation to support local files.
+
+### 5.1 SQLite Metadata Cache `[XL]`
+
+Local SQLite database as a read-through cache for artists, albums, songs, and playlists. Configurable TTL-based staleness, background incremental sync on app launch.
+
+### 5.2 Image Cache `[L]`
+
+Disk-backed cache for cover art with LRU eviction. Replaces direct server URI loading with a cache service that serves local files when available.
+
+**Depends on**: 5.1
+
+### 5.3 Audio Cache `[XL]`
+
+Two strategies: automatic stream-through caching (played tracks saved to disk transparently) and explicit user-initiated downloads (pinned, excluded from LRU eviction). Pre-caches the next 1–2 tracks in the queue to reduce gaps between tracks. Cache management UI in Settings.
+
+**Depends on**: 5.1
+
+---
+
 ## Dependency Graph
 
 ```
-Phase 1                Phase 2              Phase 3              Phase 4
-─────────────────────────────────────────────────────────────────────────
+Phase 1                Phase 2              Phase 3
+─────────────────────────────────────────────────────
 
-1.1 Shuffle/Repeat ─┬─▶ 1.2 Persistence    3.1 SQLite ─┬──▶ 3.2 Image Cache
-                    │        │                          │
-                    │        └──▶ 4.1 Scrobble          └──▶ 3.3 Audio Cache
+1.1 Shuffle/Repeat ─┬─▶ 1.2 Persistence ──▶ 3.1 Scrobble
                     │
-                    ├──▶ 2.2 Now Playing    2.1 Home ──┬──▶ 4.4 Coverflow
-                    │                                  │
-                    └──▶ 4.3 Shortcuts                 └──▶ 4.5 Scrollbar Polish
-                                            
-                    4.2 Playlists ─── (standalone)      4.6 Track Highlight ── (standalone)
+                    └──▶ 2.2 Now Playing    2.1 Home ──┬──▶ 3.2 Coverflow
+                                                       └──▶ 3.3 Scrollbar Polish
+                    2.3 All Tracks ─── (standalone)
+                                            3.4 Track Highlight ── (standalone)
+                                            3.5 Album Version ─── (standalone)
 
-                                                        4.7 Album Version ─── (standalone)
+                         ── MVP ship line ──
+
+Phase 4                Phase 5
+──────────────────────────────────
+
+4.1 Playlists ─── (standalone)    5.1 SQLite ─┬──▶ 5.2 Image Cache
+                                              └──▶ 5.3 Audio Cache
+1.1 ──▶ 4.2 Shortcuts
 ```
 
 ## Recommended Implementation Order
@@ -162,18 +184,19 @@ Phase 1                Phase 2              Phase 3              Phase 4
 | 1 | 1.1 Shuffle & Repeat UI | S | — |
 | 2 | 1.2 Persistence (Settings & State) | M | 1.1 |
 | 3 | 2.1 Home Page | M | — |
-| 4 | 2.2 Now Playing / Full-Window Player | L | 1.1 |
-| 5 | 4.4 CoverflowControl for Home Carousel | M | 2.1 |
-| 6 | 4.5 Carousel Scrollbar Polish | S | 2.1 |
-| 7 | 4.6 Now-Playing Track Highlight | S | — |
-| 8 | 4.7 Clean Album Version Display | S | — |
-| 9 | 4.1 Scrobbling | S | 1.2 |
-| 10 | 4.3 Keyboard Shortcuts | S | 1.1 |
-| 11 | 4.2 Playlist Management UI | M | — |
+| 4 | 3.1 Scrobbling | S | 1.2 |
+| 5 | 3.3 Carousel Scrollbar Polish | S | 2.1 |
+| 6 | 3.4 Now-Playing Track Highlight | S | — |
+| 7 | 3.5 Clean Album Version Display | S | — |
+| 8 | 2.2 Now Playing / Full-Window Player | L | 1.1 |
+| 9 | 2.3 All Tracks Page | M | — |
+| 10 | 3.2 CoverflowControl for Home Carousel | M | 2.1 |
 | | **── MVP ship line ──** | | |
-| 12 | 3.1 SQLite Metadata Cache | XL | — |
-| 13 | 3.2 Image Cache | L | 3.1 |
-| 14 | 3.3 Audio Cache | XL | 3.1 |
+| 11 | 4.1 Playlist Management UI | M | — |
+| 12 | 4.2 Keyboard Shortcuts | S | 1.1 |
+| 13 | 5.1 SQLite Metadata Cache | XL | — |
+| 14 | 5.2 Image Cache | L | 5.1 |
+| 15 | 5.3 Audio Cache | XL | 5.1 |
 
 **Size key**: S = a few hours · M = 1–2 days · L = 3–5 days · XL = 1+ weeks
 
