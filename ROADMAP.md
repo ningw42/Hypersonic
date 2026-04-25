@@ -11,7 +11,7 @@
 | 2.1 Home Page | M | ✅ Complete |
 | 2.2 Now Playing / Full-Window Player | L | 🔲 Not started |
 | **Phase 4 — Ecosystem & Polish** | | |
-| 4.1 Scrobbling | S | 🔲 Not started |
+| 4.1 Scrobbling | S | ✅ Complete |
 | 4.2 Playlist Management UI | M | 🔲 Not started |
 | 4.3 Keyboard Shortcuts | S | 🔲 Not started |
 | 4.4 CoverflowControl for Home Carousel | M | 🔲 Not started |

@@ -48,6 +48,11 @@ public class ActivationService : IActivationService
         // Execute tasks before activation.
         await InitializeAsync();
 
+        // Initialize scrobbling after app state is loaded.
+        // Must run on the UI thread (not inside InitializeAsync which
+        // uses ConfigureAwait(false) and may resume on a thread pool thread).
+        await App.GetService<IScrobblingService>().InitializeAsync();
+
         // Restore window geometry from saved state.
         RestoreWindowState();
 

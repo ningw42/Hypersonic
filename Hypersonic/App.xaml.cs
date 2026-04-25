@@ -102,6 +102,9 @@ public partial class App : Application
             services.AddSingleton<ICredentialService, CredentialService>();
             services.AddSingleton<IAppStateService, AppStateService>();
 
+            services.AddSingleton<TimeProvider>(TimeProvider.System);
+            services.AddSingleton<IScrobblingService, ScrobblingService>();
+
             // Views and ViewModels
             services.AddSingleton<PlayerViewModel>();
             services.AddTransient<SettingsViewModel>();

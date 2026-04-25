@@ -210,4 +210,43 @@
   <data name="Home_Empty.Text" xml:space="preserve">
     <value>Your library is waiting — start playing some music!</value>
   </data>
+  <data name="Settings_Scrobbling.Text" xml:space="preserve">
+    <value>Scrobbling</value>
+  </data>
+  <data name="Settings_ScrobblingEnabled.Header" xml:space="preserve">
+    <value>Enable scrobbling</value>
+  </data>
+  <data name="Settings_NowPlaying.Header" xml:space="preserve">
+    <value>Send "Now Playing" notifications</value>
+  </data>
+  <data name="Settings_PlaytimeThreshold.Text" xml:space="preserve">
+    <value>Playtime threshold</value>
+  </data>
+  <data name="Settings_PercentageThreshold.Text" xml:space="preserve">
+    <value>Percentage threshold</value>
+  </data>
+  <data name="Settings_ConditionMode.Text" xml:space="preserve">
+    <value>Condition mode</value>
+  </data>
+  <data name="Settings_ConditionMode_Or.Content" xml:space="preserve">
+    <value>Either threshold (OR)</value>
+  </data>
+  <data name="Settings_ConditionMode_And.Content" xml:space="preserve">
+    <value>Both thresholds (AND)</value>
+  </data>
+  <data name="Settings_PlaytimePreset_15Seconds" xml:space="preserve">
+    <value>15 seconds</value>
+  </data>
+  <data name="Settings_PlaytimePreset_30Seconds" xml:space="preserve">
+    <value>30 seconds</value>
+  </data>
+  <data name="Settings_PlaytimePreset_1Minute" xml:space="preserve">
+    <value>1 minute</value>
+  </data>
+  <data name="Settings_PlaytimePreset_2Minutes" xml:space="preserve">
+    <value>2 minutes</value>
+  </data>
+  <data name="Settings_PlaytimePreset_4Minutes" xml:space="preserve">
+    <value>4 minutes</value>
+  </data>
 </root>

@@ -124,6 +124,7 @@ public class ArtistDetailViewModelAlbumMappingTests
         public IReadOnlyList<PlaybackTrack> History => Array.Empty<PlaybackTrack>();
         public event EventHandler? PlaybackStateChanged;
         public event EventHandler? TrackChanged;
+        public event EventHandler<TrackEndedEventArgs>? TrackEnded;
         public event EventHandler? PositionChanged;
         public event EventHandler? QueueChanged;
         public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null) { }

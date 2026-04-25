@@ -94,6 +94,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public event EventHandler? PlaybackStateChanged;
     public event EventHandler? TrackChanged;
+    public event EventHandler<TrackEndedEventArgs>? TrackEnded;
     public event EventHandler? PositionChanged;
     public event EventHandler? QueueChanged;
 
@@ -448,6 +449,15 @@ public class PlaybackService : IPlaybackService, IDisposable
     {
         _dispatcherQueue.TryEnqueue(() =>
         {
+            if (NowPlaying != null)
+            {
+                TrackEnded?.Invoke(this, new TrackEndedEventArgs
+                {
+                    TrackId = NowPlaying.Id,
+                    Duration = Duration
+                });
+            }
+
             var prevHasNext = HasNext;
             var prevHasPrevious = HasPrevious;
             var next = _playbackQueue.Advance();

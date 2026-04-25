@@ -2,6 +2,12 @@ using Hypersonic.Core.Models;
 
 namespace Hypersonic.Core.Contracts.Services;
 
+public class TrackEndedEventArgs : EventArgs
+{
+    public required string TrackId { get; init; }
+    public double Duration { get; init; }
+}
+
 public interface IPlaybackService
 {
     PlaybackTrack? NowPlaying { get; }
@@ -22,6 +28,7 @@ public interface IPlaybackService
 
     event EventHandler? PlaybackStateChanged;
     event EventHandler? TrackChanged;
+    event EventHandler<TrackEndedEventArgs>? TrackEnded;
     event EventHandler? PositionChanged;
     event EventHandler? QueueChanged;
 

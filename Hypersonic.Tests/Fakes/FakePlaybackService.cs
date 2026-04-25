@@ -10,10 +10,10 @@ public class FakePlaybackService : IPlaybackService
     public int QueueIndex => throw new NotImplementedException();
     public int EffectiveQueueIndex => throw new NotImplementedException();
     public bool IsPlaying { get; set; }
-    public double Position { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public double Duration { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public double Volume { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public bool IsMuted { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+    public double Position { get; set; }
+    public double Duration { get; set; }
+    public double Volume { get; set; }
+    public bool IsMuted { get; set; }
     public bool HasNext => throw new NotImplementedException();
     public bool HasPrevious => throw new NotImplementedException();
     public QueueSource? Source => throw new NotImplementedException();
@@ -23,11 +23,15 @@ public class FakePlaybackService : IPlaybackService
 
     public event EventHandler? PlaybackStateChanged;
     public event EventHandler? TrackChanged;
+    public event EventHandler<TrackEndedEventArgs>? TrackEnded;
     public event EventHandler? PositionChanged;
     public event EventHandler? QueueChanged;
 
     public void RaiseTrackChanged() => TrackChanged?.Invoke(this, EventArgs.Empty);
     public void RaisePlaybackStateChanged() => PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+    public void RaisePositionChanged() => PositionChanged?.Invoke(this, EventArgs.Empty);
+    public void RaiseTrackEnded(string trackId, double duration) =>
+        TrackEnded?.Invoke(this, new TrackEndedEventArgs { TrackId = trackId, Duration = duration });
 
     public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null) => throw new NotImplementedException();
     public void Resume() => throw new NotImplementedException();
