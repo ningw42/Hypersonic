@@ -14,3 +14,6 @@ TestResults/
 
 # MSIX output artifacts
 AppPackages/
+
+# Agents
+.claude
