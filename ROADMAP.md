@@ -17,6 +17,7 @@
 | 3.3 Carousel Scrollbar Polish | S | ✅ Complete |
 | 3.4 Now-Playing Track Highlight | S | ✅ Complete |
 | 3.5 Clean Album Version Display | S | ✅ Complete |
+| 3.6 Unified TrackListControl | M | 🔲 Not started |
 | **── MVP ship line ──** | | |
 | **Phase 4 — Post-MVP Enhancements** | | |
 | 4.1 Playlist Management UI | M | 🔲 Not started |
@@ -114,6 +115,12 @@ Navidrome (via OpenSubsonic) returns album names that include the version suffix
 
 The OpenSubsonic `AlbumID3` entity has a dedicated `version` field (e.g., `"Deluxe Edition"`). Add deserialization support for this field, propagate it through the mapping layer, and use it to split the display: short name for compact contexts, version as subtitle on the detail page.
 
+### 3.6 Unified TrackListControl `[M]`
+
+Extract a reusable `TrackListControl` from the duplicated track list XAML across AlbumDetailPage, ArtistDetailPage, PlaylistDetailPage, and AllTracksPage. The control should expose configuration properties for column visibility (e.g., `ShowAlbumColumn`, `ShowDiscHeaders`, `ShowMetadataColumns`), bindable commands (`ItemClickCommand`, `FavoriteCommand`), and an `ItemsSource` accepting `SongInfo` items optionally mixed with `DiscHeaderItem` for disc grouping. Consolidate the duplicated artist/album link rendering code-behind into the control. The queue popup stays separate — its compact layout and different data model (`QueueItem`) don't justify the added abstraction.
+
+**Depends on**: 2.3
+
 ---
 
 ## Phase 4 — Post-MVP Enhancements
@@ -168,7 +175,7 @@ Phase 1                Phase 2              Phase 3
                     │
                     └──▶ 2.2 Now Playing    2.1 Home ──┬──▶ 3.2 Coverflow
                                                        └──▶ 3.3 Scrollbar Polish
-                    2.3 All Tracks ─── (standalone)
+                    2.3 All Tracks ──▶ 3.6 Unified TrackListControl
                                             3.4 Track Highlight ── (standalone)
                                             3.5 Album Version ─── (standalone)
 
@@ -197,13 +204,14 @@ Phase 4                Phase 5
 | 8 | 2.2 Now Playing / Full-Window Player | L | 1.1 |
 | 9 | 2.3 All Tracks Page | M | — |
 | 10 | 3.2 CoverflowControl for Home Carousel | M | 2.1 |
+| 11 | 3.6 Unified TrackListControl | M | 2.3 |
 | | **── MVP ship line ──** | | |
-| 11 | 4.1 Playlist Management UI | M | — |
-| 12 | 4.2 Keyboard Shortcuts | S | 1.1 |
-| 13 | 4.3 Playback Signal Pipeline | M | — |
-| 14 | 5.1 SQLite Metadata Cache | XL | — |
-| 15 | 5.2 Image Cache | L | 5.1 |
-| 16 | 5.3 Audio Cache | XL | 5.1 |
+| 12 | 4.1 Playlist Management UI | M | — |
+| 13 | 4.2 Keyboard Shortcuts | S | 1.1 |
+| 14 | 4.3 Playback Signal Pipeline | M | — |
+| 15 | 5.1 SQLite Metadata Cache | XL | — |
+| 16 | 5.2 Image Cache | L | 5.1 |
+| 17 | 5.3 Audio Cache | XL | 5.1 |
 
 **Size key**: S = a few hours · M = 1–2 days · L = 3–5 days · XL = 1+ weeks
 
