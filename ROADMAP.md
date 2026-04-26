@@ -21,6 +21,7 @@
 | **Phase 4 — Post-MVP Enhancements** | | |
 | 4.1 Playlist Management UI | M | 🔲 Not started |
 | 4.2 Keyboard Shortcuts | S | 🔲 Not started |
+| 4.3 Playback Signal Pipeline | M | 🔲 Not started |
 | **Phase 5 — Data Layer (Stretch)** | | |
 | 5.1 SQLite Metadata Cache | XL | 🔲 Not started |
 | 5.2 Image Cache | L | 🔲 Not started |
@@ -127,6 +128,10 @@ Global keyboard accelerators: Space (play/pause), Ctrl+arrows (next/prev/volume)
 
 **Depends on**: 1.1
 
+### 4.3 Playback Signal Pipeline `[M]`
+
+Refactor playback control into an explicit dispatcher-owned signal pipeline or actor. Every playback input — UI commands, taskbar/SMTC commands, and `MediaPlayer` callbacks — should be represented as a typed signal and processed through one serialized path before it can mutate `PlaybackQueue` or player state. Media callbacks should continue to carry a source generation/token so stale events from old `MediaPlaybackItem` instances are rejected before queue navigation.
+
 ---
 
 ## Phase 5 — Data Layer (Stretch)
@@ -173,8 +178,9 @@ Phase 4                Phase 5
 ──────────────────────────────────
 
 4.1 Playlists ─── (standalone)    5.1 SQLite ─┬──▶ 5.2 Image Cache
-                                              └──▶ 5.3 Audio Cache
+                                               └──▶ 5.3 Audio Cache
 1.1 ──▶ 4.2 Shortcuts
+4.3 Playback Signal Pipeline ─── (standalone)
 ```
 
 ## Recommended Implementation Order
@@ -194,9 +200,10 @@ Phase 4                Phase 5
 | | **── MVP ship line ──** | | |
 | 11 | 4.1 Playlist Management UI | M | — |
 | 12 | 4.2 Keyboard Shortcuts | S | 1.1 |
-| 13 | 5.1 SQLite Metadata Cache | XL | — |
-| 14 | 5.2 Image Cache | L | 5.1 |
-| 15 | 5.3 Audio Cache | XL | 5.1 |
+| 13 | 4.3 Playback Signal Pipeline | M | — |
+| 14 | 5.1 SQLite Metadata Cache | XL | — |
+| 15 | 5.2 Image Cache | L | 5.1 |
+| 16 | 5.3 Audio Cache | XL | 5.1 |
 
 **Size key**: S = a few hours · M = 1–2 days · L = 3–5 days · XL = 1+ weeks
 

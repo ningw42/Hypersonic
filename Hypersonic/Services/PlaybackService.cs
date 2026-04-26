@@ -20,6 +20,15 @@ public class PlaybackService : IPlaybackService, IDisposable
     private readonly PlaybackQueue _playbackQueue = new();
     private readonly ILogger _log;
     private QueueSource? _source;
+    // MediaPlayer events can arrive after the app has already switched sources.
+    // Each playback source transition increments this generation; handlers capture
+    // it when the event fires and ignore the callback after dispatch if it no longer
+    // matches. If playback races keep growing, move these signals into an explicit
+    // dispatcher-owned playback command pipeline while keeping this as the source token.
+    private int _playbackSourceGeneration;
+    private bool _pendingPlayOnOpen;
+    private MediaPlaybackItem? _currentPlaybackItem;
+    private MediaSource? _currentMediaSource;
 
     public PlaybackTrack? NowPlaying => _playbackQueue.CurrentTrack;
     public IReadOnlyList<PlaybackTrack> Queue => _playbackQueue.Tracks;
@@ -138,10 +147,8 @@ public class PlaybackService : IPlaybackService, IDisposable
         }
         else
         {
-            // NowPlaying changed but track can't be played — still notify consumers.
-            Duration = NowPlaying?.Duration ?? 0;
-            Position = 0;
-            TrackChanged?.Invoke(this, EventArgs.Empty);
+            ClearCurrentPlaybackMedia();
+            UpdateCurrentTrackWithoutPlayback(NowPlaying);
         }
 
         QueueChanged?.Invoke(this, EventArgs.Empty);
@@ -151,7 +158,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void Resume()
     {
-        if (NowPlaying != null)
+        if (NowPlaying?.StreamUri != null && _currentPlaybackItem != null)
         {
             _mediaPlayer.Play();
         }
@@ -159,15 +166,18 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void Pause()
     {
+        _pendingPlayOnOpen = false;
         _mediaPlayer.Pause();
     }
 
     public void Stop()
     {
+        _pendingPlayOnOpen = false;
         _mediaPlayer.Pause();
         _mediaPlayer.Position = TimeSpan.Zero;
         Position = 0;
         IsPlaying = false;
+        _positionTimer.Stop();
         PositionChanged?.Invoke(this, EventArgs.Empty);
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         UpdateSmtcState();
@@ -255,18 +265,16 @@ public class PlaybackService : IPlaybackService, IDisposable
             }
             else
             {
-                // New current track exists but can't be played — still notify consumers.
-                Duration = newCurrent.Duration;
-                Position = 0;
-                TrackChanged?.Invoke(this, EventArgs.Empty);
+                ClearCurrentPlaybackMedia();
+                UpdateCurrentTrackWithoutPlayback(newCurrent);
             }
         }
         else if (_playbackQueue.CurrentTrack == null && _playbackQueue.Tracks.Count == 0)
         {
             // Queue is empty after removal — full teardown.
-            _mediaPlayer.Pause();
-            _mediaPlayer.Source = null;
+            ClearCurrentPlaybackMedia();
             IsPlaying = false;
+            _positionTimer.Stop();
             Position = 0;
             Duration = 0;
             _source = null;
@@ -302,11 +310,11 @@ public class PlaybackService : IPlaybackService, IDisposable
     public void ClearAll()
     {
         _log.Info("Queue cleared");
-        _mediaPlayer.Pause();
-        _mediaPlayer.Source = null;
+        ClearCurrentPlaybackMedia();
         _source = null;
         _playbackQueue.ClearAll();
         IsPlaying = false;
+        _positionTimer.Stop();
         Position = 0;
         Duration = 0;
         ClearSmtcDisplay();
@@ -341,18 +349,20 @@ public class PlaybackService : IPlaybackService, IDisposable
         var track = NowPlaying;
         if (track?.StreamUri == null)
         {
+            ClearCurrentPlaybackMedia();
+            UpdateCurrentTrackWithoutPlayback(track);
             return;
         }
 
-        _log.Info("Playing track", new { TrackId = track.Id, track.Title });
+        ClearCurrentPlaybackMedia();
 
         Duration = track.Duration;
         Position = 0;
 
-        var source = MediaSource.CreateFromUri(track.StreamUri);
-        var playbackItem = new MediaPlaybackItem(source);
+        _currentMediaSource = MediaSource.CreateFromUri(track.StreamUri);
+        _currentPlaybackItem = new MediaPlaybackItem(_currentMediaSource);
 
-        var displayProperties = playbackItem.GetDisplayProperties();
+        var displayProperties = _currentPlaybackItem.GetDisplayProperties();
         displayProperties.Type = MediaPlaybackType.Music;
         displayProperties.MusicProperties.Title = track.Title ?? string.Empty;
         displayProperties.MusicProperties.Artist = track.FlatArtistText;
@@ -361,15 +371,102 @@ public class PlaybackService : IPlaybackService, IDisposable
         {
             displayProperties.Thumbnail = RandomAccessStreamReference.CreateFromUri(track.CoverArtUri);
         }
-        playbackItem.ApplyDisplayProperties(displayProperties);
+        _currentPlaybackItem.ApplyDisplayProperties(displayProperties);
 
-        _mediaPlayer.Source = playbackItem;
-        _mediaPlayer.Play();
+        var gen = Interlocked.Increment(ref _playbackSourceGeneration);
+        _log.Info("Playing track", new { TrackId = track.Id, track.Title, Generation = gen });
 
-        // Fire TrackChanged after source is set — consumers can read NowPlaying.
+        _pendingPlayOnOpen = true;
+        _mediaPlayer.Source = _currentPlaybackItem;
+
         TrackChanged?.Invoke(this, EventArgs.Empty);
 
         UpdateSmtcState();
+    }
+
+    private void ClearCurrentPlaybackMedia()
+    {
+        Interlocked.Increment(ref _playbackSourceGeneration);
+        _pendingPlayOnOpen = false;
+        _mediaPlayer.Pause();
+        _mediaPlayer.Source = null;
+        DisposeCurrentSource();
+    }
+
+    private void UpdateCurrentTrackWithoutPlayback(PlaybackTrack? track)
+    {
+        Duration = track?.Duration ?? 0;
+        Position = 0;
+        IsPlaying = false;
+        _positionTimer.Stop();
+        ClearSmtcDisplay();
+        TrackChanged?.Invoke(this, EventArgs.Empty);
+        PositionChanged?.Invoke(this, EventArgs.Empty);
+        PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+        UpdateSmtcState();
+    }
+
+    private void DisposeCurrentSource()
+    {
+        _currentPlaybackItem = null;
+
+        if (_currentMediaSource != null)
+        {
+            try
+            {
+                _currentMediaSource.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _log.Warning("MediaSource dispose failed", exception: ex);
+            }
+            _currentMediaSource = null;
+        }
+    }
+
+    private bool IsCurrentMediaEvent(int generation, string eventName)
+    {
+        var currentGeneration = Volatile.Read(ref _playbackSourceGeneration);
+        if (PlaybackMediaEventGuard.IsEventForCurrentSource(
+            generation,
+            currentGeneration,
+            _currentPlaybackItem != null))
+        {
+            return true;
+        }
+
+        if (eventName != nameof(MediaPlayer.CurrentStateChanged))
+        {
+            _log.Debug("Ignoring stale media event", new
+            {
+                EventName = eventName,
+                EventGeneration = generation,
+                CurrentGeneration = currentGeneration,
+                HasCurrentItem = _currentPlaybackItem != null,
+                TrackId = NowPlaying?.Id
+            });
+        }
+        return false;
+    }
+
+    private void UpdatePlaybackState(bool isPlaying)
+    {
+        var wasPlaying = IsPlaying;
+        IsPlaying = isPlaying;
+
+        if (IsPlaying)
+        {
+            _positionTimer.Start();
+        }
+        else
+        {
+            _positionTimer.Stop();
+        }
+
+        if (wasPlaying != IsPlaying)
+        {
+            PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private void UpdateSmtcState()
@@ -435,20 +532,81 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     private void OnMediaOpened(MediaPlayer sender, object args)
     {
+        var genAtFire = Volatile.Read(ref _playbackSourceGeneration);
+        var naturalDurationSeconds = sender.NaturalDuration.TotalSeconds;
         _dispatcherQueue.TryEnqueue(() =>
         {
-            if (sender.NaturalDuration.TotalSeconds > 0)
+            if (!IsCurrentMediaEvent(genAtFire, nameof(MediaPlayer.MediaOpened)))
             {
-                Duration = sender.NaturalDuration.TotalSeconds;
+                return;
             }
+
+            if (naturalDurationSeconds > 0)
+            {
+                Duration = naturalDurationSeconds;
+            }
+
+            if (_pendingPlayOnOpen)
+            {
+                _pendingPlayOnOpen = false;
+                if (!IsCurrentMediaEvent(genAtFire, nameof(MediaPlayer.MediaOpened)))
+                {
+                    return;
+                }
+
+                _mediaPlayer.Position = TimeSpan.Zero;
+                _mediaPlayer.Play();
+            }
+
             PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         });
     }
 
     private void OnMediaEnded(MediaPlayer sender, object args)
     {
+        var genAtFire = Volatile.Read(ref _playbackSourceGeneration);
+        var posAtFire = sender.Position.TotalSeconds;
         _dispatcherQueue.TryEnqueue(() =>
         {
+            if (!IsCurrentMediaEvent(genAtFire, nameof(MediaPlayer.MediaEnded)))
+            {
+                return;
+            }
+
+            var mediaEndedGuardResult = PlaybackMediaEventGuard.EvaluateMediaEnded(
+                _pendingPlayOnOpen,
+                posAtFire,
+                Duration);
+
+            if (mediaEndedGuardResult == MediaEndedGuardResult.IgnorePendingOpen)
+            {
+                _log.Debug("Ignoring MediaEnded while current track is still opening", new
+                {
+                    TrackId = NowPlaying?.Id,
+                    Position = posAtFire,
+                    Duration
+                });
+                return;
+            }
+
+            if (mediaEndedGuardResult == MediaEndedGuardResult.IgnoreBeforeDuration)
+            {
+                _log.Debug("Ignoring MediaEnded before current track duration", new
+                {
+                    TrackId = NowPlaying?.Id,
+                    Position = posAtFire,
+                    Duration
+                });
+                return;
+            }
+
+            _log.Info("Track ended", new
+            {
+                TrackId = NowPlaying?.Id,
+                Position = posAtFire,
+                Duration
+            });
+
             if (NowPlaying != null)
             {
                 TrackEnded?.Invoke(this, new TrackEndedEventArgs
@@ -456,6 +614,12 @@ public class PlaybackService : IPlaybackService, IDisposable
                     TrackId = NowPlaying.Id,
                     Duration = Duration
                 });
+            }
+
+            // TrackEnded subscribers may start another transition; do not also auto-advance.
+            if (!IsCurrentMediaEvent(genAtFire, nameof(MediaPlayer.MediaEnded)))
+            {
+                return;
             }
 
             var prevHasNext = HasNext;
@@ -474,6 +638,7 @@ public class PlaybackService : IPlaybackService, IDisposable
                 // NowPlaying remains set so the UI shows what was last playing.
                 _log.Info("Queue ended");
                 IsPlaying = false;
+                _positionTimer.Stop();
                 Position = 0;
                 Duration = 0;
                 PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
@@ -485,14 +650,24 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     private void OnMediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args)
     {
+        var genAtFire = Volatile.Read(ref _playbackSourceGeneration);
+        var errorCode = args.ExtendedErrorCode.HResult;
+        var errorMessage = args.ErrorMessage;
         _dispatcherQueue.TryEnqueue(() =>
         {
+            if (!IsCurrentMediaEvent(genAtFire, nameof(MediaPlayer.MediaFailed)))
+            {
+                return;
+            }
+
+            _pendingPlayOnOpen = false;
             IsPlaying = false;
+            _positionTimer.Stop();
             PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
             _log.Error("Media playback failed", new
             {
-                ErrorCode = args.ExtendedErrorCode.HResult,
-                ErrorMessage = args.ErrorMessage,
+                ErrorCode = errorCode,
+                ErrorMessage = errorMessage,
                 TrackId = NowPlaying?.Id,
             });
         });
@@ -500,24 +675,15 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     private void OnCurrentStateChanged(MediaPlayer sender, object args)
     {
+        var genAtFire = Volatile.Read(ref _playbackSourceGeneration);
         _dispatcherQueue.TryEnqueue(() =>
         {
-            var wasPlaying = IsPlaying;
-            IsPlaying = sender.CurrentState == MediaPlayerState.Playing;
-
-            if (IsPlaying)
+            if (!IsCurrentMediaEvent(genAtFire, nameof(MediaPlayer.CurrentStateChanged)))
             {
-                _positionTimer.Start();
-            }
-            else
-            {
-                _positionTimer.Stop();
+                return;
             }
 
-            if (wasPlaying != IsPlaying)
-            {
-                PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
-            }
+            UpdatePlaybackState(sender.CurrentState == MediaPlayerState.Playing);
         });
     }
 
@@ -536,6 +702,8 @@ public class PlaybackService : IPlaybackService, IDisposable
         _mediaPlayer.CurrentStateChanged -= OnCurrentStateChanged;
         _mediaPlayer.CommandManager.NextReceived -= OnCommandManagerNextReceived;
         _mediaPlayer.CommandManager.PreviousReceived -= OnCommandManagerPreviousReceived;
+        _mediaPlayer.Source = null;
+        DisposeCurrentSource();
         _mediaPlayer.Dispose();
     }
 }
