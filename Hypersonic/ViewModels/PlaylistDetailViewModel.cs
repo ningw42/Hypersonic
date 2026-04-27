@@ -107,7 +107,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
 
             var entries = playlist.Entry ?? [];
             _allSongs = entries
-                .Select(s => MapSongInfo(s, client))
+                .Select(s => SongMapper.MapFromChild(s, client))
                 .ToList();
 
             for (var i = 0; i < _allSongs.Count; i++)
@@ -226,49 +226,6 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
                 StreamUri = s.StreamUri,
             };
         }).ToList();
-    }
-
-    private static SongInfo MapSongInfo(Client.Models.Entities.Child song, Client.ISubsonicClient client)
-    {
-        var (artists, hasStructured) = SongArtistMapper.MapArtists(
-            song.Artists?.Select(a => (a.Name, (string?)a.Id)),
-            song.Artist,
-            song.ArtistId);
-
-        return new SongInfo
-        {
-            Id = song.Id,
-            TrackNumber = song.Track,
-            Title = song.Title ?? string.Empty,
-            Duration = song.Duration,
-            DiscNumber = song.DiscNumber,
-            Artist = song.Artist ?? string.Empty,
-            Artists = artists,
-            HasStructuredArtists = hasStructured,
-            Album = song.Album ?? string.Empty,
-            Genre = song.Genre,
-            Year = song.Year,
-            CoverArt = song.CoverArt,
-            CoverArtUrl = !string.IsNullOrEmpty(song.CoverArt)
-                ? client.GetCoverArtUri(song.CoverArt, "300").ToString()
-                : null,
-            BitRate = song.BitRate,
-            BitDepth = song.BitDepth,
-            SamplingRate = song.SamplingRate,
-            Suffix = song.Suffix,
-            Size = song.Size,
-            Path = song.Path,
-            AlbumId = song.AlbumId,
-            ArtistId = song.ArtistId,
-            DisplayArtist = song.DisplayArtist,
-            StreamUri = client.GetStreamUri(song.Id),
-            CoverArtUri = !string.IsNullOrEmpty(song.CoverArt)
-                ? client.GetCoverArtUri(song.CoverArt, "300")
-                : null,
-            PlayCount = song.PlayCount,
-            BPM = song.BPM,
-            IsStarred = !string.IsNullOrEmpty(song.Starred),
-        };
     }
 
     private static string FormatDuration(int totalSeconds)

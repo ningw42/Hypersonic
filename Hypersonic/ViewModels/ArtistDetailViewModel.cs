@@ -427,7 +427,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 
             var result = songs.Select((s, i) =>
             {
-                var info = MapChildToSongInfo(s, client);
+                var info = SongMapper.MapFromChild(s, client);
                 info.PositionNumber = i + 1;
                 return info;
             }).ToList();
@@ -494,7 +494,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 .Take(20)
                 .Select((c, i) =>
                 {
-                    var info = MapChildToSongInfo(c.Song, client, c.AlbumVersion);
+                    var info = SongMapper.MapFromChild(c.Song, client, c.AlbumVersion);
                     info.PositionNumber = i + 1;
                     return info;
                 })
@@ -609,49 +609,6 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 StreamUri = s.StreamUri,
             };
         }).ToList();
-    }
-
-    private static SongInfo MapChildToSongInfo(Client.Models.Entities.Child song, Client.ISubsonicClient client, string? albumVersion = null)
-    {
-        var (artists, hasStructured) = SongArtistMapper.MapArtists(
-            song.Artists?.Select(a => (a.Name, (string?)a.Id)),
-            song.Artist,
-            song.ArtistId);
-
-        return new SongInfo
-        {
-            Id = song.Id,
-            TrackNumber = song.Track,
-            Title = song.Title ?? string.Empty,
-            Duration = song.Duration,
-            DiscNumber = song.DiscNumber,
-            Artist = song.Artist ?? string.Empty,
-            Artists = artists,
-            HasStructuredArtists = hasStructured,
-            Album = albumVersion != null ? AlbumMapper.StripVersionSuffix(song.Album, albumVersion) : song.Album ?? string.Empty,
-            Genre = song.Genre,
-            Year = song.Year,
-            CoverArt = song.CoverArt,
-            CoverArtUrl = !string.IsNullOrEmpty(song.CoverArt)
-                ? client.GetCoverArtUri(song.CoverArt, "300").ToString()
-                : null,
-            BitRate = song.BitRate,
-            BitDepth = song.BitDepth,
-            SamplingRate = song.SamplingRate,
-            Suffix = song.Suffix,
-            Size = song.Size,
-            Path = song.Path,
-            AlbumId = song.AlbumId,
-            ArtistId = song.ArtistId,
-            DisplayArtist = song.DisplayArtist,
-            StreamUri = client.GetStreamUri(song.Id),
-            CoverArtUri = !string.IsNullOrEmpty(song.CoverArt)
-                ? client.GetCoverArtUri(song.CoverArt, "300")
-                : null,
-            PlayCount = song.PlayCount,
-            BPM = song.BPM,
-            IsStarred = !string.IsNullOrEmpty(song.Starred),
-        };
     }
 
     private void ApplySorting()

@@ -26,6 +26,7 @@ public partial class ShellViewModel : ObservableRecipient
         typeof(MainViewModel).FullName!,
         typeof(AlbumsViewModel).FullName!,
         typeof(ArtistsViewModel).FullName!,
+        typeof(TracksViewModel).FullName!,
         typeof(PlaylistsViewModel).FullName!,
         typeof(SettingsViewModel).FullName!,
     };

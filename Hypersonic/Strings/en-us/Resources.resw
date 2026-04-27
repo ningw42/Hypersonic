@@ -141,11 +141,17 @@
   <data name="Shell_Artists.Content" xml:space="preserve">
     <value>Artists</value>
   </data>
+  <data name="Shell_Tracks.Content" xml:space="preserve">
+    <value>Tracks</value>
+  </data>
   <data name="Shell_Playlists.Content" xml:space="preserve">
     <value>Playlists</value>
   </data>
   <data name="Artists_Title.Text" xml:space="preserve">
     <value>Artists</value>
+  </data>
+  <data name="Tracks_Title.Text" xml:space="preserve">
+    <value>Tracks</value>
   </data>
   <data name="Artists_Error.Title" xml:space="preserve">
     <value>Error loading artists</value>

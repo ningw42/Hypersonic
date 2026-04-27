@@ -10,7 +10,7 @@
 | **Phase 2 — Experience Essentials** | | |
 | 2.1 Home Page | M | ✅ Complete |
 | 2.2 Now Playing / Full-Window Player | L | 🔲 Not started |
-| 2.3 All Tracks Page | M | 🔲 Not started |
+| 2.3 All Tracks Page | M | ✅ Complete |
 | **Phase 3 — Ecosystem & Polish** | | |
 | 3.1 Scrobbling | S | ✅ Complete |
 | 3.2 CoverflowControl for Home Carousel | M | 🔲 Not started |
@@ -227,3 +227,9 @@ Phase 4                Phase 5
 - Music folder browsing
 - CI/CD pipeline
 - Localization beyond en-us
+
+---
+
+## Known Issues
+
+- **WinUI test host crash with `[UITestMethod]`**: The MSTest WinUI test host (`Hypersonic.Tests`) crashes before `[UITestMethod]` tests execute, preventing tests that require a DispatcherQueue or UI thread context. Affected areas use internal test-only code paths as workarounds: `NowPlayingTracker` has a `synchronous: true` constructor, and `IncrementalSongCollection` exposes `LoadBatchCoreAsync()` to bypass `AsyncInfo.Run`. Revisit when the upstream test host issue is resolved.

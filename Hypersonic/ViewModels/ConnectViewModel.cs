@@ -53,6 +53,7 @@ public partial class ConnectViewModel : ObservableRecipient
         typeof(MainViewModel).FullName!,
         typeof(AlbumsViewModel).FullName!,
         typeof(ArtistsViewModel).FullName!,
+        typeof(TracksViewModel).FullName!,
         typeof(PlaylistsViewModel).FullName!,
         typeof(SettingsViewModel).FullName!,
     };

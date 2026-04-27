@@ -39,7 +39,7 @@ public class Search3Request : SubsonicRequest
     {
         StringBuilder sb = new StringBuilder(base.ToQueryString());
 
-        sb.Append($"&query={this.Query}");
+        sb.Append($"&query={Uri.EscapeDataString(this.Query)}");
 
         if (this.ArtistCount.HasValue)
         {

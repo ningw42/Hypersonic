@@ -16,6 +16,7 @@ public class DefaultActivationHandler : ActivationHandler<LaunchActivatedEventAr
         typeof(MainViewModel).FullName!,
         typeof(AlbumsViewModel).FullName!,
         typeof(ArtistsViewModel).FullName!,
+        typeof(TracksViewModel).FullName!,
         typeof(PlaylistsViewModel).FullName!,
         typeof(SettingsViewModel).FullName!,
     };
