@@ -46,6 +46,7 @@ public class PlayerViewModelMetadataTests
         public void ClearUpcoming() { }
         public void ClearAll() { }
         public void JumpToTrack(string trackId) { }
+        public void JumpToQueueIndex(int effectiveIndex) { }
         public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
 
         public void RaiseTrackChanged() => TrackChanged?.Invoke(this, EventArgs.Empty);

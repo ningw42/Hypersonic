@@ -229,15 +229,16 @@ public partial class PlayerViewModel : ObservableRecipient
         var effective = _playbackService.GetEffectiveQueue();
         var currentIndex = _playbackService.EffectiveQueueIndex;
 
-        // Check if the queue contents match the existing list (same tracks, same order).
-        // If so, update IsCurrent in-place to avoid replacing the ItemsSource and resetting scroll.
+        // Fast path: only when every position's wrapper still references the
+        // exact same PlaybackTrack instance. ID-equality is insufficient — see
+        // the Refresh contract in the now-playing design doc.
         var existing = QueueItems;
         if (existing.Count == effective.Count)
         {
             var match = true;
             for (var i = 0; i < effective.Count; i++)
             {
-                if (existing[i].Track.Id != effective[i].Id)
+                if (!ReferenceEquals(existing[i].Track, effective[i]))
                 {
                     match = false;
                     break;
@@ -278,9 +279,26 @@ public partial class PlayerViewModel : ObservableRecipient
             : string.Empty;
     }
 
-    public void JumpToQueueTrack(QueueItem item)
+    public void JumpToQueueIndex(QueueItem item)
     {
-        _playbackService.JumpToTrack(item.Track.Id);
+        var index = IndexOfQueueItem(item);
+        if (index >= 0)
+        {
+            _playbackService.JumpToQueueIndex(index);
+        }
+    }
+
+    private int IndexOfQueueItem(QueueItem item)
+    {
+        var queue = QueueItems;
+        for (var i = 0; i < queue.Count; i++)
+        {
+            if (ReferenceEquals(queue[i], item))
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// <summary>

@@ -607,6 +607,10 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 DiscNumber = s.DiscNumber,
                 CoverArtUri = s.CoverArtUri,
                 StreamUri = s.StreamUri,
+                Suffix = s.Suffix,
+                BitRate = s.BitRate,
+                BitDepth = s.BitDepth,
+                SamplingRate = s.SamplingRate,
             };
         }).ToList();
     }

@@ -47,5 +47,7 @@ public class FakePlaybackService : IPlaybackService
     public void ClearUpcoming() => throw new NotImplementedException();
     public void ClearAll() => throw new NotImplementedException();
     public void JumpToTrack(string trackId) => throw new NotImplementedException();
+    public int? LastJumpToQueueIndex { get; private set; }
+    public void JumpToQueueIndex(int effectiveIndex) => LastJumpToQueueIndex = effectiveIndex;
     public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => throw new NotImplementedException();
 }

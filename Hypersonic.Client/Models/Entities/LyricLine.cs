@@ -7,7 +7,7 @@ namespace Hypersonic.Client.Models.Entities;
 public class LyricLine
 {
     [JsonPropertyName("start")]
-    [XmlAttribute("start")]
+    [XmlIgnore]
     public long? Start { get; set; }
 
     [JsonPropertyName("value")]

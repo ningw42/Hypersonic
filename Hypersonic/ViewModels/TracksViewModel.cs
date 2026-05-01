@@ -440,6 +440,10 @@ public partial class TracksViewModel : ObservableRecipient, INavigationAware
                 DiscNumber = s.DiscNumber,
                 CoverArtUri = s.CoverArtUri,
                 StreamUri = s.StreamUri,
+                Suffix = s.Suffix,
+                BitRate = s.BitRate,
+                BitDepth = s.BitDepth,
+                SamplingRate = s.SamplingRate,
             };
         }).ToList();
     }

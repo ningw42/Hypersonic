@@ -17,4 +17,8 @@ public class PlaybackTrack
     public Uri? StreamUri { get; set; }
     public int TrackNumber { get; set; }
     public int DiscNumber { get; set; }
+    public string? Suffix { get; set; }
+    public int BitRate { get; set; }
+    public int BitDepth { get; set; }
+    public int SamplingRate { get; set; }
 }

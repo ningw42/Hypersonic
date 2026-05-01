@@ -48,6 +48,8 @@ public class ArtistDetailViewModelTopSongsTests
 
     private sealed class NullPlaybackService : IPlaybackService
     {
+        public List<PlaybackTrack> LastPlayedTracks { get; } = [];
+
         public PlaybackTrack? NowPlaying => null;
         public IReadOnlyList<PlaybackTrack> Queue => Array.Empty<PlaybackTrack>();
         public int QueueIndex => -1;
@@ -68,7 +70,11 @@ public class ArtistDetailViewModelTopSongsTests
         public event EventHandler<TrackEndedEventArgs>? TrackEnded;
         public event EventHandler? PositionChanged;
         public event EventHandler? QueueChanged;
-        public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null) { }
+        public void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null)
+        {
+            LastPlayedTracks.Clear();
+            LastPlayedTracks.AddRange(tracks);
+        }
         public void Resume() { }
         public void Pause() { }
         public void Stop() { }
@@ -82,6 +88,7 @@ public class ArtistDetailViewModelTopSongsTests
         public void ClearUpcoming() { }
         public void ClearAll() { }
         public void JumpToTrack(string trackId) { }
+        public void JumpToQueueIndex(int effectiveIndex) { }
         public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
     }
 
@@ -632,6 +639,44 @@ public class ArtistDetailViewModelTopSongsTests
         vm.ApplyTopSongsMode();
 
         Assert.IsFalse(vm.TopSongs[0].IsStarred);
+    }
+
+    #endregion
+
+    #region BuildTopSongsPlaybackTracks (technical-field propagation)
+
+    [TestMethod]
+    public void PlayFromTopSong_PropagatesTechnicalFieldsToPlaybackTrack()
+    {
+        var playback = new NullPlaybackService();
+        var vm = new ArtistDetailViewModel(
+            new FakeSubsonicClientService { Client = new FakeSubsonicClient() },
+            new FakeNavigationService(),
+            playback,
+            new NullLoggingService());
+
+        var song = new SongInfo
+        {
+            Id = "s9",
+            Title = "FLAC Track",
+            Artist = "Artist",
+            ArtistId = "a1",
+            Album = "Album",
+            Suffix = "flac",
+            BitRate = 4608,
+            BitDepth = 24,
+            SamplingRate = 96000,
+        };
+        vm.TopSongs.Add(song);
+
+        vm.PlayFromTopSongCommand.Execute(song);
+
+        Assert.AreEqual(1, playback.LastPlayedTracks.Count);
+        var t = playback.LastPlayedTracks[0];
+        Assert.AreEqual("flac", t.Suffix);
+        Assert.AreEqual(4608, t.BitRate);
+        Assert.AreEqual(24, t.BitDepth);
+        Assert.AreEqual(96000, t.SamplingRate);
     }
 
     #endregion

@@ -457,6 +457,40 @@ public class PlaybackQueue
         return CurrentTrack;
     }
 
+    /// <summary>
+    /// Jump to the track at <paramref name="effectiveIndex"/> within
+    /// <see cref="GetEffectiveQueue"/>. When shuffle is enabled, the effective
+    /// index is translated through <c>_shuffleOrder</c> and
+    /// <c>_shufflePosition</c> is updated together with <c>_currentIndex</c>
+    /// so the queue's two-part shuffled cursor stays consistent. Returns the
+    /// new <see cref="CurrentTrack"/> on success, or <c>null</c> on no-op
+    /// (out-of-range or already-current).
+    /// </summary>
+    public PlaybackTrack? JumpToQueueIndex(int effectiveIndex)
+    {
+        var effectiveCount = _shuffleEnabled ? _shuffleOrder.Count : _tracks.Count;
+        if (effectiveIndex < 0 || effectiveIndex >= effectiveCount)
+        {
+            return null;
+        }
+
+        var targetUnderlyingIndex = _shuffleEnabled ? _shuffleOrder[effectiveIndex] : effectiveIndex;
+        if (targetUnderlyingIndex == _currentIndex)
+        {
+            return null;
+        }
+
+        PushCurrentToHistory();
+
+        _currentIndex = targetUnderlyingIndex;
+        if (_shuffleEnabled)
+        {
+            _shufflePosition = effectiveIndex;
+        }
+
+        return CurrentTrack;
+    }
+
     public void SetShuffle(bool enabled)
     {
         if (_shuffleEnabled == enabled)

@@ -26,4 +26,8 @@ public class SearchSuggestionItem
     public int Duration { get; set; }
     public Uri? StreamUri { get; set; }
     public Uri? CoverArtUri { get; set; }
+    public string? Suffix { get; set; }
+    public int BitRate { get; set; }
+    public int BitDepth { get; set; }
+    public int SamplingRate { get; set; }
 }

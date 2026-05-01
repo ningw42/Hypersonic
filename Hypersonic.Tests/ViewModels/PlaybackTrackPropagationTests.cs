@@ -70,6 +70,7 @@ public class PlaybackTrackPropagationTests
         public void ClearUpcoming() { }
         public void ClearAll() { }
         public void JumpToTrack(string trackId) { }
+        public void JumpToQueueIndex(int effectiveIndex) { }
         public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
     }
 
@@ -190,5 +191,51 @@ public class PlaybackTrackPropagationTests
         Assert.AreEqual("Solo Artist", track.FlatArtistText);
         Assert.AreEqual(1, track.Artists.Count);
         Assert.AreEqual("Solo Artist", track.Artists[0].Name);
+    }
+
+    private static SongInfo CreateTechnicalSong() => new()
+    {
+        Id = "s9",
+        Title = "FLAC Track",
+        Artist = "Artist",
+        Album = "Album",
+        Suffix = "flac",
+        BitRate = 4608,
+        BitDepth = 24,
+        SamplingRate = 96000,
+    };
+
+    [TestMethod]
+    public void AlbumDetailViewModel_BuildPlaybackTracks_PropagatesTechnicalFields()
+    {
+        var vm = new AlbumDetailViewModel(
+            new FakeSubsonicClientService(),
+            new FakePlaybackService(),
+            new FakeNavigationService(),
+            new NullLoggingService());
+        vm._allSongs = [CreateTechnicalSong()];
+        vm.AlbumName = "Album";
+
+        var t = vm.BuildPlaybackTracks()[0];
+        Assert.AreEqual("flac", t.Suffix);
+        Assert.AreEqual(4608, t.BitRate);
+        Assert.AreEqual(24, t.BitDepth);
+        Assert.AreEqual(96000, t.SamplingRate);
+    }
+
+    [TestMethod]
+    public void PlaylistDetailViewModel_BuildPlaybackTracks_PropagatesTechnicalFields()
+    {
+        var vm = new PlaylistDetailViewModel(
+            new FakeSubsonicClientService(),
+            new FakePlaybackService(),
+            new NullLoggingService());
+        vm._allSongs = [CreateTechnicalSong()];
+
+        var t = vm.BuildPlaybackTracks()[0];
+        Assert.AreEqual("flac", t.Suffix);
+        Assert.AreEqual(4608, t.BitRate);
+        Assert.AreEqual(24, t.BitDepth);
+        Assert.AreEqual(96000, t.SamplingRate);
     }
 }

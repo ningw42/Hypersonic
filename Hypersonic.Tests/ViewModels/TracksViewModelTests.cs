@@ -75,6 +75,7 @@ public class TracksViewModelTests
         public void ClearUpcoming() { }
         public void ClearAll() { }
         public void JumpToTrack(string trackId) { }
+        public void JumpToQueueIndex(int effectiveIndex) { }
         public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
     }
 
@@ -590,6 +591,33 @@ public class TracksViewModelTests
         Assert.IsTrue(s2.IsPlaying, "Now-playing track loaded in later batch should show as playing");
 
         vm._nowPlayingTracker.Unsubscribe();
+    }
+
+    [TestMethod]
+    public void BuildPlaybackTracks_PropagatesTechnicalFields()
+    {
+        var vm = CreateVm(new FakeSubsonicClient());
+        vm._allSongs = new List<SongInfo>
+        {
+            new SongInfo
+            {
+                Id = "s9",
+                Title = "FLAC Track",
+                Artist = "Artist",
+                Album = "Album",
+                Suffix = "flac",
+                BitRate = 4608,
+                BitDepth = 24,
+                SamplingRate = 96000,
+            },
+        };
+
+        var t = vm.BuildPlaybackTracks()[0];
+
+        Assert.AreEqual("flac", t.Suffix);
+        Assert.AreEqual(4608, t.BitRate);
+        Assert.AreEqual(24, t.BitDepth);
+        Assert.AreEqual(96000, t.SamplingRate);
     }
 
     #endregion

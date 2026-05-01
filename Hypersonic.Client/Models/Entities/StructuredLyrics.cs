@@ -19,7 +19,7 @@ public class StructuredLyrics
     public string? Lang { get; set; }
 
     [JsonPropertyName("offset")]
-    [XmlAttribute("offset")]
+    [XmlIgnore]
     public long? Offset { get; set; }
 
     [JsonPropertyName("synced")]

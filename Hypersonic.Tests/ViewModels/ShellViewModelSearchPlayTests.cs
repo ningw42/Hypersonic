@@ -56,6 +56,7 @@ public class ShellViewModelSearchPlayTests
         public void ClearUpcoming() { }
         public void ClearAll() { }
         public void JumpToTrack(string trackId) { }
+        public void JumpToQueueIndex(int effectiveIndex) { }
         public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
     }
 
@@ -161,5 +162,40 @@ public class ShellViewModelSearchPlayTests
         Assert.AreEqual("Dr. Dre feat. Eminem", track.FlatArtistText);
         Assert.AreEqual("Test Album", track.Album);
         Assert.AreEqual("alb1", track.AlbumId);
+    }
+
+    [TestMethod]
+    public void HandleSuggestionChosen_Song_PropagatesTechnicalFieldsToPlaybackTrack()
+    {
+        var playback = new CapturingPlaybackService();
+        var vm = new ShellViewModel(
+            new FakeNavigationService(),
+            new FakeNavigationViewService(),
+            new FakeSubsonicClientService(),
+            playback,
+            new FakeAppStateService(),
+            new NullLoggingService());
+
+        var item = new SearchSuggestionItem
+        {
+            Type = SearchResultType.Song,
+            Id = "s9",
+            PrimaryText = "FLAC Track",
+            Artist = "Artist",
+            Album = "Album",
+            Suffix = "flac",
+            BitRate = 4608,
+            BitDepth = 24,
+            SamplingRate = 96000,
+        };
+
+        vm.HandleSuggestionChosen(item);
+
+        Assert.AreEqual(1, playback.LastPlayedTracks.Count);
+        var track = playback.LastPlayedTracks[0];
+        Assert.AreEqual("flac", track.Suffix);
+        Assert.AreEqual(4608, track.BitRate);
+        Assert.AreEqual(24, track.BitDepth);
+        Assert.AreEqual(96000, track.SamplingRate);
     }
 }

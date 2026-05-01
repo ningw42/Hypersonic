@@ -73,6 +73,10 @@ public sealed partial class ShellPage : Page
 
         Player.NowPlayingMetadataChanged += (_, _) => RenderNowPlaying();
 
+        // Hand cursor on the player-bar tap targets so they look clickable.
+        SetHandCursorOnHover(PlayerCoverArtContainer);
+        SetHandCursorOnHover(PlayerTrackTitle);
+
         QueuePopup.Closed += (_, _) =>
         {
             Player.IsQueueOpen = false;
@@ -308,8 +312,64 @@ public sealed partial class ShellPage : Page
 
         if (element?.DataContext is Models.QueueItem item)
         {
-            Player.JumpToQueueTrack(item);
+            Player.JumpToQueueIndex(item);
         }
+    }
+
+    private void PlayerCoverArtContainer_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        TryNavigateToNowPlaying();
+    }
+
+    private void PlayerTrackTitle_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        TryNavigateToNowPlaying();
+    }
+
+    private static void SetHandCursorOnHover(UIElement element)
+    {
+        // ProtectedCursor is protected on UIElement; reach it via reflection
+        // (standard WinUI 3 workaround for setting cursors on Grid/TextBlock).
+        var prop = typeof(UIElement).GetProperty("ProtectedCursor",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        if (prop == null)
+        {
+            return;
+        }
+        var hand = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+        element.PointerEntered += (_, _) => prop.SetValue(element, hand);
+    }
+
+    private void TryNavigateToNowPlaying()
+    {
+        var navigationService = ViewModel.NavigationService;
+        var frame = navigationService.Frame;
+        if (frame == null)
+        {
+            return;
+        }
+
+        var currentPageType = frame.Content?.GetType();
+        var backStackTypes = frame.BackStack
+            .Select(entry => entry.SourcePageType)
+            .ToList();
+
+        var decision = NowPlayingTapPolicy.Decide(Player.HasTrack, currentPageType, backStackTypes);
+        if (!decision.ShouldNavigate)
+        {
+            return;
+        }
+
+        for (var i = decision.BackStackIndicesToRemove.Count - 1; i >= 0; i--)
+        {
+            var index = decision.BackStackIndicesToRemove[i];
+            if (index >= 0 && index < frame.BackStack.Count)
+            {
+                frame.BackStack.RemoveAt(index);
+            }
+        }
+
+        navigationService.NavigateTo(typeof(NowPlayingViewModel).FullName!);
     }
 
     private async void SearchBox_TextChanged(object sender, TextChangedEventArgs args)

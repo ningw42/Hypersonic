@@ -21,16 +21,6 @@ public partial class ShellViewModel : ObservableRecipient
     private readonly ILogger _log;
     private CancellationTokenSource? _searchCts;
 
-    private static readonly HashSet<string> TopLevelPages = new()
-    {
-        typeof(MainViewModel).FullName!,
-        typeof(AlbumsViewModel).FullName!,
-        typeof(ArtistsViewModel).FullName!,
-        typeof(TracksViewModel).FullName!,
-        typeof(PlaylistsViewModel).FullName!,
-        typeof(SettingsViewModel).FullName!,
-    };
-
     [ObservableProperty]
     public partial bool IsBackEnabled { get; set; }
 
@@ -183,6 +173,10 @@ public partial class ShellViewModel : ObservableRecipient
                         CoverArtUri = !string.IsNullOrEmpty(song.CoverArt)
                             ? client.GetCoverArtUri(song.CoverArt, "300")
                             : null,
+                        Suffix = song.Suffix,
+                        BitRate = song.BitRate,
+                        BitDepth = song.BitDepth,
+                        SamplingRate = song.SamplingRate,
                     });
                 }
             }
@@ -258,6 +252,10 @@ public partial class ShellViewModel : ObservableRecipient
                     Duration = item.Duration,
                     StreamUri = item.StreamUri,
                     CoverArtUri = item.CoverArtUri,
+                    Suffix = item.Suffix,
+                    BitRate = item.BitRate,
+                    BitDepth = item.BitDepth,
+                    SamplingRate = item.SamplingRate,
                 };
                 _playbackService.PlayQueue([track], 0);
                 break;
@@ -273,30 +271,21 @@ public partial class ShellViewModel : ObservableRecipient
         if (e.SourcePageType == typeof(SettingsPage))
         {
             Selected = NavigationViewService.SettingsItem;
-
-            // Settings is a top-level page — persist it.
-            _appStateService.State.Navigation.LastPage = typeof(SettingsViewModel).FullName!;
-            _ = _appStateService.SaveNavigationAsync();
-            return;
         }
-
-        var selectedItem = NavigationViewService.GetSelectedItem(e.SourcePageType);
-        if (selectedItem != null)
+        else
         {
-            Selected = selectedItem;
-        }
-
-        // Persist navigation state for top-level parameterless pages only.
-        var pageKey = e.SourcePageType?.FullName;
-        if (pageKey != null)
-        {
-            // Map page type name to ViewModel type name by convention: replace "Page" suffix with "ViewModel".
-            var vmKey = pageKey.Replace("Views.", "ViewModels.").Replace("Page", "ViewModel");
-            if (TopLevelPages.Contains(vmKey))
+            var selectedItem = NavigationViewService.GetSelectedItem(e.SourcePageType);
+            if (selectedItem != null)
             {
-                _appStateService.State.Navigation.LastPage = vmKey;
-                _ = _appStateService.SaveNavigationAsync();
+                Selected = selectedItem;
             }
+        }
+
+        var vmKey = LastPagePersistencePolicy.GetPersistableViewModelKey(e.SourcePageType);
+        if (vmKey != null)
+        {
+            _appStateService.State.Navigation.LastPage = vmKey;
+            _ = _appStateService.SaveNavigationAsync();
         }
     }
 }

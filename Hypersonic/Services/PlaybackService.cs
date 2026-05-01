@@ -344,6 +344,23 @@ public class PlaybackService : IPlaybackService, IDisposable
         FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
     }
 
+    public void JumpToQueueIndex(int effectiveIndex)
+    {
+        var prevHasNext = HasNext;
+        var prevHasPrevious = HasPrevious;
+        var result = _playbackQueue.JumpToQueueIndex(effectiveIndex);
+        if (result == null)
+        {
+            _log.Debug("JumpToQueueIndex ignored", new { EffectiveIndex = effectiveIndex });
+            return;
+        }
+
+        _log.Info("Jumped to queue index", new { EffectiveIndex = effectiveIndex });
+
+        PlayCurrent();
+        FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
+    }
+
     private void PlayCurrent()
     {
         var track = NowPlaying;

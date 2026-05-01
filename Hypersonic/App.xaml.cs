@@ -125,6 +125,8 @@ public partial class App : Application
             services.AddTransient<PlaylistsPage>();
             services.AddTransient<PlaylistDetailViewModel>();
             services.AddTransient<PlaylistDetailPage>();
+            services.AddTransient<NowPlayingViewModel>();
+            services.AddTransient<NowPlayingPage>();
             services.AddTransient<ConnectViewModel>();
             services.AddTransient<ConnectPage>();
             services.AddTransient<ShellPage>();

@@ -364,6 +364,10 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                 DiscNumber = s.DiscNumber,
                 CoverArtUri = s.CoverArtUri ?? (CoverArtUrl != null ? new Uri(CoverArtUrl) : null),
                 StreamUri = s.StreamUri,
+                Suffix = s.Suffix,
+                BitRate = s.BitRate,
+                BitDepth = s.BitDepth,
+                SamplingRate = s.SamplingRate,
             };
         }).ToList();
     }

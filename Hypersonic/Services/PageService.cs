@@ -22,6 +22,7 @@ public class PageService : IPageService
         Configure<TracksViewModel, TracksPage>();
         Configure<PlaylistsViewModel, PlaylistsPage>();
         Configure<PlaylistDetailViewModel, PlaylistDetailPage>();
+        Configure<NowPlayingViewModel, NowPlayingPage>();
         Configure<SettingsViewModel, SettingsPage>();
     }
 
