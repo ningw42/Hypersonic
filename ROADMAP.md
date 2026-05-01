@@ -23,6 +23,8 @@
 | 4.1 Playlist Management UI | M | 🔲 Not started |
 | 4.2 Keyboard Shortcuts | S | 🔲 Not started |
 | 4.3 Playback Signal Pipeline | M | 🔲 Not started |
+| 4.4 Position-Aware Navigation History | S | 🔲 Not started |
+| 4.5 Time-Synced Lyrics | M | 🔲 Not started |
 | **Phase 5 — Data Layer (Stretch)** | | |
 | 5.1 SQLite Metadata Cache | XL | 🔲 Not started |
 | 5.2 Image Cache | L | 🔲 Not started |
@@ -60,9 +62,9 @@ The home page is currently an empty stub. Fill it with curated horizontal carous
 
 ### 2.2 Now Playing / Full-Window Player `[L]`
 
-A dedicated full-content page (not a separate window) with three regions: large album art + metadata, time-synced lyrics, and an embedded queue list. Accessible by clicking the album art or track title in the player bar.
+A dedicated full-content page (not a separate window) with three regions: large album art + metadata, lyrics, and an embedded queue list. Accessible by clicking the album art or track title in the player bar.
 
-The lyrics engine fetches structured lyrics from the OpenSubsonic API (`GetLyricsBySongIdAsync`), syncs the active line to playback position, and falls back to plain lyrics for servers that don't support the structured format.
+The lyrics engine fetches structured lyrics from the OpenSubsonic API (`GetLyricsBySongIdAsync`) and falls back to the legacy `getLyrics` endpoint for servers that don't support the structured format. **v1 renders lyrics as plain text**, ignoring per-line timestamps; time-synced active-line highlighting (and any click-to-seek interaction it would enable) is a separate follow-up — see 4.5 below.
 
 The page should share playback state with the existing singleton `PlayerViewModel` rather than duplicating transport/queue ownership — it only needs to own lyrics and presentation state.
 
@@ -139,6 +141,30 @@ Global keyboard accelerators: Space (play/pause), Ctrl+arrows (next/prev/volume)
 
 Refactor playback control into an explicit dispatcher-owned signal pipeline or actor. Every playback input — UI commands, taskbar/SMTC commands, and `MediaPlayer` callbacks — should be represented as a typed signal and processed through one serialized path before it can mutate `PlaybackQueue` or player state. Media callbacks should continue to carry a source generation/token so stale events from old `MediaPlaybackItem` instances are rejected before queue navigation.
 
+### 4.4 Position-Aware Navigation History `[S]`
+
+`PlaybackQueue._navigationHistory` currently stores a `Stack<string>` of track IDs, and `GoBack()` resolves via `FindIndex(t => t.Id == previousTrackId)`. After a position-aware queue jump on a queue containing duplicate track IDs (introduced by 2.2 Now Playing), Previous can land on the wrong occurrence — it always finds the *first* occurrence by ID, not the position the user actually came from.
+
+Change the navigation-history representation to capture both the track ID and the queue position at push time (e.g. `Stack<(int occurrenceIndex, string trackId)>` or an equivalent), so `GoBack()` can return to the exact position. A safe fallback is required for queue mutations that invalidate the stored position — fall back to the existing `FindIndex(byId)` lookup when the recorded position no longer holds the same track.
+
+Add `PlaybackQueue` tests covering the duplicate-Previous scenario and the queue-mutation fallback path.
+
+**Depends on**: 2.2 (introduces the user-visible duplicate-jump path that surfaces this limitation)
+
+### 4.5 Time-Synced Lyrics `[M]`
+
+2.2 ships lyrics as plain text — the OpenSubsonic `StructuredLyrics.Line[]` already exposes per-line `Start` offsets, but v1 ignores them. This item turns those offsets into a synced lyrics view: highlight the active line based on playback position, auto-scroll it into view, and (optionally) seek to a tapped line's offset on click.
+
+Scope:
+
+- Subscribe to `IPlaybackService.PositionChanged` while the lyrics tab is active; map the current position to the active `LyricLine` index.
+- Highlight the active line; dim the others. Smooth scroll to keep the active line near the vertical center.
+- Click-to-seek on a synced line (`IPlaybackService.Seek(start)`).
+- Respect `StructuredLyrics.Synced == false` — if the chosen entry is unsynced, fall through to v1's plain rendering (no highlight, no click-to-seek).
+- The legacy `getLyrics` fallback path stays unsynced (legacy `Lyrics` has no per-line timestamps).
+
+**Depends on**: 2.2
+
 ---
 
 ## Phase 5 — Data Layer (Stretch)
@@ -188,6 +214,8 @@ Phase 4                Phase 5
                                                └──▶ 5.3 Audio Cache
 1.1 ──▶ 4.2 Shortcuts
 4.3 Playback Signal Pipeline ─── (standalone)
+2.2 ──▶ 4.4 Position-Aware Nav History
+2.2 ──▶ 4.5 Time-Synced Lyrics
 ```
 
 ## Recommended Implementation Order
@@ -209,9 +237,11 @@ Phase 4                Phase 5
 | 12 | 4.1 Playlist Management UI | M | — |
 | 13 | 4.2 Keyboard Shortcuts | S | 1.1 |
 | 14 | 4.3 Playback Signal Pipeline | M | — |
-| 15 | 5.1 SQLite Metadata Cache | XL | — |
-| 16 | 5.2 Image Cache | L | 5.1 |
-| 17 | 5.3 Audio Cache | XL | 5.1 |
+| 15 | 4.4 Position-Aware Navigation History | S | 2.2 |
+| 16 | 4.5 Time-Synced Lyrics | M | 2.2 |
+| 17 | 5.1 SQLite Metadata Cache | XL | — |
+| 18 | 5.2 Image Cache | L | 5.1 |
+| 19 | 5.3 Audio Cache | XL | 5.1 |
 
 **Size key**: S = a few hours · M = 1–2 days · L = 3–5 days · XL = 1+ weeks
 
