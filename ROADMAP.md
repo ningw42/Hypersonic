@@ -9,7 +9,7 @@
 | 1.2 Persistence (Credentials, Settings & State) | M | ✅ Complete |
 | **Phase 2 — Experience Essentials** | | |
 | 2.1 Home Page | M | ✅ Complete |
-| 2.2 Now Playing / Full-Window Player | L | 🔲 Not started |
+| 2.2 Now Playing / Full-Window Player | L | ✅ Not started |
 | 2.3 All Tracks Page | M | ✅ Complete |
 | **Phase 3 — Ecosystem & Polish** | | |
 | 3.1 Scrobbling | S | ✅ Complete |
