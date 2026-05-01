@@ -11,7 +11,9 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Navigation;
 
 namespace Hypersonic.Views;
 
@@ -26,6 +28,7 @@ public sealed partial class NowPlayingPage : Page
     private readonly QueueTabSubscriptionGate _queueTabGate;
     private bool _pageActive;
     private bool _initialized;
+    private CoverArtAnimator? _coverArtAnimator;
 
     public NowPlayingPage()
     {
@@ -58,7 +61,9 @@ public sealed partial class NowPlayingPage : Page
         _pageActive = true;
 
         Player.NowPlayingMetadataChanged += OnPlayerMetadataChanged;
+        Player.PropertyChanged += OnPlayerPropertyChanged;
         ActualThemeChanged += OnActualThemeChanged;
+        Loaded += OnPageLoaded;
         RenderNowPlaying();
 
         // Now that all subscriptions and helpers are wired, allow the
@@ -71,8 +76,128 @@ public sealed partial class NowPlayingPage : Page
             _queueTabGate.Detach();
             _scrollCoordinator.OnTabSelected(NowPlayingTab.Lyrics, -1);
             Player.NowPlayingMetadataChanged -= OnPlayerMetadataChanged;
+            Player.PropertyChanged -= OnPlayerPropertyChanged;
             ActualThemeChanged -= OnActualThemeChanged;
+            _coverArtAnimator?.Dispose();
         };
+    }
+
+    private void OnPageLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_coverArtAnimator is not null) return;
+
+        _coverArtAnimator = new CoverArtAnimator(
+            primaryWrapper: LargeCoverArtWrapper,
+            primary: LargeCoverArt,
+            outgoingWrapper: LargeCoverArtOutgoingWrapper,
+            outgoing: LargeCoverArtOutgoing,
+            player: Player,
+            playingScale: 1.0f,
+            pausedScale: 0.92f,
+            cameraOutScale: 0.72f,
+            // Slide distance = wrapper visible width (cameraOutScale=0.72) + gap.
+            // The wrappers stay centered relative to each other in flight, so
+            // their edge-to-edge gap during phase 2 equals (slideDistance -
+            // cameraOutScale * containerWidth). 0.85 here gives a ~13% gap.
+            slideDistance: () => LargeCoverArtClip.ActualWidth * 0.85,
+            transition: CoverArtTransition.CameraSlide);
+        _coverArtAnimator.Initialize();
+    }
+
+    private void LargeCoverArtClip_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var w = e.NewSize.Width;
+        var h = e.NewSize.Height;
+        if (w > 0 && h > 0)
+        {
+            LargeCoverArtClip.Clip = new Microsoft.UI.Xaml.Media.RectangleGeometry
+            {
+                Rect = new Windows.Foundation.Rect(0, 0, w, h),
+            };
+        }
+    }
+
+    private void OnPlayerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Player.IsPlaying))
+        {
+            _pageDispatcher.TryEnqueue(() =>
+            {
+                if (!_pageActive) return;
+                _coverArtAnimator?.OnIsPlayingChanged();
+            });
+        }
+        else if (e.PropertyName == nameof(Player.CoverArtUrl))
+        {
+            // Capture direction synchronously here. The PropertyChanged event
+            // fires inside PlayerViewModel.OnTrackChanged, which resets
+            // LastChangeDirection back to None at its end. Reading it inside
+            // the queued callback below would race and lose the direction.
+            var direction = Player.LastChangeDirection;
+            _pageDispatcher.TryEnqueue(() =>
+            {
+                if (!_pageActive) return;
+                if (_coverArtAnimator is not null)
+                {
+                    _coverArtAnimator.OnCoverArtUrlChanged(direction);
+                }
+                else
+                {
+                    UpdateCoverArtFallback();
+                }
+            });
+        }
+    }
+
+
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+
+        var anim = ConnectedAnimationService.GetForCurrentView().GetAnimation("CoverArtForward");
+        if (anim is null) return;
+
+        // Pass the rounded wrapper (not the inner Image) so the snapshot's
+        // shape matches the player-bar wrapper's rounded corners. See the
+        // matching comment in ShellPage.TryNavigateToNowPlaying.
+        if (LargeCoverArt.Source is null)
+        {
+            // Wait until the cover art is set before starting (renderer also runs
+            // RenderNowPlaying on first paint via the metadata path).
+            void Started(object? s, RoutedEventArgs args)
+            {
+                LargeCoverArt.ImageOpened -= Started;
+                anim.TryStart(LargeCoverArtWrapper);
+            }
+            LargeCoverArt.ImageOpened += Started;
+
+            // Safety: if no image loads in a short window, drop the animation
+            // so it doesn't sit forever waiting.
+            var dispatcher = _pageDispatcher;
+            _ = Task.Delay(800).ContinueWith(_ =>
+            {
+                dispatcher.TryEnqueue(() =>
+                {
+                    LargeCoverArt.ImageOpened -= Started;
+                    anim?.Cancel();
+                });
+            });
+        }
+        else
+        {
+            anim.TryStart(LargeCoverArtWrapper);
+        }
+    }
+
+    protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
+    {
+        base.OnNavigatingFrom(e);
+
+        if (LargeCoverArt.Source is not null)
+        {
+            ConnectedAnimationService.GetForCurrentView()
+                .PrepareToAnimate("CoverArtBack", LargeCoverArtWrapper);
+        }
     }
 
     private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
@@ -106,10 +231,16 @@ public sealed partial class NowPlayingPage : Page
     {
         RenderArtist();
         RenderAlbum();
-        UpdateCoverArt();
+        // Cover art swap is driven by Player.PropertyChanged (CoverArtUrl), so
+        // it's not invoked here — that channel uses the animator and avoids a
+        // double source-set when both events fire for the same change.
+        if (_coverArtAnimator is null)
+        {
+            UpdateCoverArtFallback();
+        }
     }
 
-    private void UpdateCoverArt()
+    private void UpdateCoverArtFallback()
     {
         LargeCoverArt.Source = !string.IsNullOrEmpty(Player.CoverArtUrl)
             ? new BitmapImage(new Uri(Player.CoverArtUrl))

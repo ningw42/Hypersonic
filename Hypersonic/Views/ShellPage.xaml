@@ -416,19 +416,24 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Cover art -->
-                <Grid x:Name="PlayerCoverArtContainer" Grid.Column="0" Width="48" Height="48" CornerRadius="4" Margin="0,0,12,0"
+                <Grid x:Name="PlayerCoverArtContainer" Grid.Column="0" Width="48" Height="48" Margin="0,0,12,0"
                       Tapped="PlayerCoverArtContainer_Tapped">
-                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4"
+                            Visibility="{x:Bind Player.HasCoverArt, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                         <FontIcon Glyph="&#xE8D6;" FontSize="20"
                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <Image x:Name="PlayerCoverArt"
-                           Stretch="UniformToFill" Width="48" Height="48"/>
+                    <Grid x:Name="PlayerCoverArtOutgoingWrapper" Width="48" Height="48" CornerRadius="4" Opacity="0" IsHitTestVisible="False">
+                        <Image x:Name="PlayerCoverArtOutgoing" Stretch="UniformToFill"/>
+                    </Grid>
+                    <Grid x:Name="PlayerCoverArtWrapper" Width="48" Height="48" CornerRadius="4">
+                        <Image x:Name="PlayerCoverArt" Stretch="UniformToFill"/>
+                    </Grid>
                 </Grid>
 
                 <!-- Track info -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                <StackPanel x:Name="PlayerTrackInfoPanel" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                     <TextBlock Text="{x:Bind Player.TrackTitle, Mode=OneWay}"
                                x:Name="PlayerTrackTitle"
                                Tapped="PlayerTrackTitle_Tapped"

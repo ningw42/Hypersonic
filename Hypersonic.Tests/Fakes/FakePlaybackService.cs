@@ -22,12 +22,13 @@ public class FakePlaybackService : IPlaybackService
     public IReadOnlyList<PlaybackTrack> History => throw new NotImplementedException();
 
     public event EventHandler? PlaybackStateChanged;
-    public event EventHandler? TrackChanged;
+    public event EventHandler<TrackChangedEventArgs>? TrackChanged;
     public event EventHandler<TrackEndedEventArgs>? TrackEnded;
     public event EventHandler? PositionChanged;
     public event EventHandler? QueueChanged;
 
-    public void RaiseTrackChanged() => TrackChanged?.Invoke(this, EventArgs.Empty);
+    public void RaiseTrackChanged() => TrackChanged?.Invoke(this, new TrackChangedEventArgs(TrackChangeDirection.Jump));
+    public void RaiseTrackChanged(TrackChangeDirection direction) => TrackChanged?.Invoke(this, new TrackChangedEventArgs(direction));
     public void RaisePlaybackStateChanged() => PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
     public void RaisePositionChanged() => PositionChanged?.Invoke(this, EventArgs.Empty);
     public void RaiseTrackEnded(string trackId, double duration) =>

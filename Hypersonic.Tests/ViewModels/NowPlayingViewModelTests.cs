@@ -59,7 +59,7 @@ public class NowPlayingViewModelTests
         public IReadOnlyList<PlaybackTrack> History => Array.Empty<PlaybackTrack>();
 
         public event EventHandler? PlaybackStateChanged;
-        public event EventHandler? TrackChanged;
+        public event EventHandler<TrackChangedEventArgs>? TrackChanged;
         public event EventHandler<TrackEndedEventArgs>? TrackEnded;
         public event EventHandler? PositionChanged;
         public event EventHandler? QueueChanged;
@@ -81,7 +81,7 @@ public class NowPlayingViewModelTests
         public void JumpToQueueIndex(int effectiveIndex) { }
         public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
 
-        public void RaiseTrackChanged() => TrackChanged?.Invoke(this, EventArgs.Empty);
+        public void RaiseTrackChanged() => TrackChanged?.Invoke(this, new TrackChangedEventArgs(TrackChangeDirection.Jump));
 
         public void Touch()
         {

@@ -12,6 +12,8 @@ using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Navigation;
 
 using System.Numerics;
 
@@ -31,6 +33,23 @@ public sealed partial class ShellPage : Page
         get;
     }
 
+    private CoverArtAnimator? _coverArtAnimator;
+
+    /// <summary>
+    /// True when the player-bar cover and a parallel translation on the
+    /// metadata panel have been applied for navigation to NowPlayingPage.
+    /// Used to scope the restore on back navigation.
+    /// </summary>
+    private bool _playerCoverHiddenForNowPlaying;
+
+    /// <summary>
+    /// Width of the cover-art slot (Width=48 + Margin.Right=12). When the
+    /// container collapses, the metadata column shifts left by this much in
+    /// layout — we offset the metadata's composition translation by the same
+    /// amount and animate it back to zero so it visually slides into place.
+    /// </summary>
+    private const float PlayerCoverSlotWidth = 60f;
+
     public ShellPage(ShellViewModel viewModel)
     {
         ViewModel = viewModel;
@@ -49,13 +68,22 @@ public sealed partial class ShellPage : Page
         {
             if (e.PropertyName == nameof(Player.IsPlaying))
             {
+                _coverArtAnimator?.OnIsPlayingChanged();
                 PlayPauseIcon.Glyph = Player.IsPlaying ? "\uE769" : "\uE768";
             }
             else if (e.PropertyName == nameof(Player.CoverArtUrl))
             {
-                PlayerCoverArt.Source = !string.IsNullOrEmpty(Player.CoverArtUrl)
-                    ? new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Player.CoverArtUrl))
-                    : null;
+                var direction = Player.LastChangeDirection;
+                if (_coverArtAnimator is not null)
+                {
+                    _coverArtAnimator.OnCoverArtUrlChanged(direction);
+                }
+                else
+                {
+                    PlayerCoverArt.Source = !string.IsNullOrEmpty(Player.CoverArtUrl)
+                        ? new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Player.CoverArtUrl))
+                        : null;
+                }
             }
             else if (e.PropertyName == nameof(Player.IsQueueOpen))
             {
@@ -225,6 +253,85 @@ public sealed partial class ShellPage : Page
             Player.NotifyThemeChanged();
             RenderNowPlaying();
         };
+
+        // Cover-art animator. Built here (post-Loaded) so element sizes are real.
+        // Player bar uses a quick crossfade for track changes; the rounded
+        // wrapper Grid scales with the artwork on play/pause so the corner
+        // radius stays flush with the image.
+        _coverArtAnimator = new CoverArtAnimator(
+            primaryWrapper: PlayerCoverArtWrapper,
+            primary: PlayerCoverArt,
+            outgoingWrapper: PlayerCoverArtOutgoingWrapper,
+            outgoing: PlayerCoverArtOutgoing,
+            player: Player,
+            playingScale: 1.0f,
+            pausedScale: 0.88f,
+            cameraOutScale: 0.88f, // unused for Crossfade
+            slideDistance: () => 0.0,
+            transition: CoverArtTransition.Crossfade);
+        _coverArtAnimator.Initialize();
+
+        ElementCompositionPreview.SetIsTranslationEnabled(PlayerTrackInfoPanel, true);
+
+        NavigationFrame.Navigated += NavigationFrame_Navigated;
+    }
+
+    private void NavigationFrame_Navigated(object sender, NavigationEventArgs e)
+    {
+        // Keep NowPlayingPage off the back stack on the way OUT, the same way
+        // NowPlayingTapPolicy keeps it off on the way IN. Together: Back never
+        // lands on NowPlayingPage — it's an overlay that only lives at the top.
+        if (e.SourcePageType != typeof(NowPlayingPage))
+        {
+            var backStack = NavigationFrame.BackStack
+                .Select(entry => new NavEntry(entry.SourcePageType, entry.Parameter))
+                .ToList();
+            var current = e.SourcePageType is null
+                ? (NavEntry?)null
+                : new NavEntry(e.SourcePageType, e.Parameter);
+            var indicesToRemove = NowPlayingBackStackPolicy.IndicesToRemove(current, backStack);
+            for (var i = indicesToRemove.Count - 1; i >= 0; i--)
+            {
+                var index = indicesToRemove[i];
+                if (index >= 0 && index < NavigationFrame.BackStack.Count)
+                {
+                    NavigationFrame.BackStack.RemoveAt(index);
+                }
+            }
+
+            // ShellViewModel.OnNavigated runs BEFORE this handler in the
+            // multicast Frame.Navigated chain (NavigationService is wired up
+            // first in the ShellPage ctor; this handler in OnLoaded). It set
+            // IsBackEnabled from the pre-prune stack. Resync to the post-prune
+            // truth so the NavigationView's back arrow doesn't sit enabled
+            // pointing at nothing.
+            if (indicesToRemove.Count > 0)
+            {
+                ViewModel.IsBackEnabled = NavigationFrame.CanGoBack;
+            }
+        }
+
+        // Back from NowPlayingPage → restore the player-bar cover and slide
+        // metadata back into its native column. Order matters: make the cover
+        // visible BEFORE TryStart so the connected animation has a real
+        // destination element with non-zero size.
+        if (e.SourcePageType != typeof(NowPlayingPage))
+        {
+            RestorePlayerCoverAfterNavigation();
+
+            var anim = ConnectedAnimationService.GetForCurrentView().GetAnimation("CoverArtBack");
+            if (anim is not null)
+            {
+                if (PlayerCoverArt.Source is not null)
+                {
+                    anim.TryStart(PlayerCoverArtWrapper);
+                }
+                else
+                {
+                    anim.Cancel();
+                }
+            }
+        }
     }
 
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
@@ -369,7 +476,69 @@ public sealed partial class ShellPage : Page
             }
         }
 
+        // Connected animation: morph the player-bar art into the big art on NowPlayingPage.
+        // We pass the rounded wrapper (not the inner Image) so the snapshot
+        // includes the wrapper's CornerRadius clip. The corners scale
+        // proportionally during flight, so the landed radius is larger than
+        // the destination's static 8 px — accepted as Option A's tradeoff.
+        if (PlayerCoverArt.Source is not null)
+        {
+            ConnectedAnimationService.GetForCurrentView()
+                .PrepareToAnimate("CoverArtForward", PlayerCoverArtWrapper);
+        }
+
+        // Drop the player-bar cover; let the metadata slide left to fill the
+        // freed space. The two animations run concurrently with the connected
+        // animation, telling a single visual story: art lifts up to NowPlaying,
+        // metadata fills in.
+        HidePlayerCoverForNavigation();
+
         navigationService.NavigateTo(typeof(NowPlayingViewModel).FullName!);
+    }
+
+    private void HidePlayerCoverForNavigation()
+    {
+        // Snapshot whether we actually hid the cover so the back-navigation
+        // restore is symmetric with what we did on the way out.
+        if (PlayerCoverArtContainer.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        PlayerCoverArtContainer.Visibility = Visibility.Collapsed;
+        AnimateMetadataSlide(fromX: PlayerCoverSlotWidth, toX: 0f);
+        _playerCoverHiddenForNowPlaying = true;
+    }
+
+    private void RestorePlayerCoverAfterNavigation()
+    {
+        if (!_playerCoverHiddenForNowPlaying)
+        {
+            return;
+        }
+        _playerCoverHiddenForNowPlaying = false;
+
+        // Make the cover visible first (layout shifts metadata to its native
+        // position), then immediately offset metadata by -slotWidth and animate
+        // back to zero so it visually slides right to its original spot.
+        PlayerCoverArtContainer.Visibility = Visibility.Visible;
+        AnimateMetadataSlide(fromX: -PlayerCoverSlotWidth, toX: 0f);
+    }
+
+    private void AnimateMetadataSlide(float fromX, float toX)
+    {
+        var visual = ElementCompositionPreview.GetElementVisual(PlayerTrackInfoPanel);
+        var compositor = visual.Compositor;
+
+        // Park at the start offset before animating so the first frame doesn't flash.
+        visual.Properties.InsertVector3("Translation", new Vector3(fromX, 0f, 0f));
+
+        var animation = compositor.CreateScalarKeyFrameAnimation();
+        animation.InsertKeyFrame(0f, fromX);
+        animation.InsertKeyFrame(1f, toX,
+            compositor.CreateCubicBezierEasingFunction(new Vector2(0.1f, 0.9f), new Vector2(0.2f, 1f)));
+        animation.Duration = TimeSpan.FromMilliseconds(280);
+        visual.StartAnimation("Translation.X", animation);
     }
 
     private async void SearchBox_TextChanged(object sender, TextChangedEventArgs args)

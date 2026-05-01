@@ -18,6 +18,25 @@ public partial class PlayerViewModel : ObservableRecipient
     private bool _isSavingFromExternal;
     private readonly DispatcherQueueTimer? _volumeSaveTimer;
 
+    /// <summary>
+    /// Direction of the most recent track change. Mirrors
+    /// <see cref="TrackChangedEventArgs.Direction"/> from the playback layer
+    /// — the authoritative source. Reset to <see cref="TrackChangeDirection.None"/>
+    /// at the end of <see cref="OnTrackChanged"/> so it's only valid during
+    /// the synchronous handler chain. Views that need to observe it should
+    /// subscribe to <see cref="TrackChangedWithDirection"/> instead of reading
+    /// this field after the fact.
+    /// </summary>
+    public TrackChangeDirection LastChangeDirection { get; private set; } = TrackChangeDirection.None;
+
+    /// <summary>
+    /// Raised at the end of <see cref="OnTrackChanged"/> with the direction
+    /// from the playback layer. This is the channel views should use to drive
+    /// direction-aware animations (e.g. cover-art camera slide). It carries
+    /// the direction in args so consumers don't have to read mutable VM state.
+    /// </summary>
+    public event EventHandler<TrackChangedEventArgs>? TrackChangedWithDirection;
+
     [ObservableProperty]
     public partial string TrackTitle { get; set; } = string.Empty;
 
@@ -39,7 +58,21 @@ public partial class PlayerViewModel : ObservableRecipient
     public partial string? AlbumId { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCoverArt))]
     public partial string? CoverArtUrl { get; set; }
+
+    /// <summary>
+    /// True only when there's a non-empty <see cref="CoverArtUrl"/>. Distinct
+    /// from <see cref="HasTrack"/>: a track may exist without artwork (server
+    /// returned no <c>CoverArt</c> field). UI uses this to keep the music-glyph
+    /// placeholder showing for art-less tracks instead of going blank.
+    ///
+    /// Note: this does NOT cover load failures (404, decode error) on a URL
+    /// that is present — the placeholder will hide and the Image element will
+    /// render empty in that case. Add ImageFailed handling if that becomes a
+    /// real-world issue.
+    /// </summary>
+    public bool HasCoverArt => !string.IsNullOrEmpty(CoverArtUrl);
 
     [ObservableProperty]
     public partial bool IsPlaying { get; set; }
@@ -183,6 +216,10 @@ public partial class PlayerViewModel : ObservableRecipient
     [RelayCommand]
     private void Next()
     {
+        // Direction is owned by the playback layer and surfaced via
+        // TrackChangedEventArgs — see OnTrackChanged. The VM no longer tracks
+        // direction itself; it just delegates the call. This means SMTC and
+        // taskbar buttons that bypass the VM still produce correct directions.
         _playbackService.NextTrack();
     }
 
@@ -366,8 +403,12 @@ public partial class PlayerViewModel : ObservableRecipient
         _isSavingFromExternal = false;
     }
 
-    private void OnTrackChanged(object? sender, EventArgs e)
+    private void OnTrackChanged(object? sender, TrackChangedEventArgs e)
     {
+        // Direction is authoritative from the playback layer — works the same
+        // for VM commands, SMTC, taskbar buttons, and auto-advance.
+        LastChangeDirection = e.Direction;
+
         var track = _playbackService.NowPlaying;
         HasTrack = track != null;
         TrackTitle = track?.Title ?? string.Empty;
@@ -388,6 +429,16 @@ public partial class PlayerViewModel : ObservableRecipient
         HasPrevious = _playbackService.HasPrevious;
         RefreshQueue();
         NowPlayingMetadataChanged?.Invoke(this, EventArgs.Empty);
+
+        // Surface the direction-aware event for views that need to drive
+        // direction-based animations. Carries the direction in args so consumers
+        // don't have to read VM state at the right moment in time.
+        TrackChangedWithDirection?.Invoke(this, e);
+
+        // Reset LastChangeDirection so anyone reading it outside the synchronous
+        // chain (e.g. via a queued dispatcher callback) sees None instead of a
+        // stale value from a prior change.
+        LastChangeDirection = TrackChangeDirection.None;
     }
 
     private void OnQueueChanged(object? sender, EventArgs e)

@@ -36,14 +36,24 @@
                 The outer StackPanel must be Stretch (not Center) for SquarePanel
                 to receive the full column width during measure.
             -->
-            <controls:SquarePanel HorizontalAlignment="Center" MaxWidth="400">
-                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8">
-                    <FontIcon Glyph="&#xE8D6;" FontSize="96"
-                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <Image x:Name="LargeCoverArt" Stretch="UniformToFill"/>
-            </controls:SquarePanel>
+            <Grid x:Name="LargeCoverArtClip" HorizontalAlignment="Center" SizeChanged="LargeCoverArtClip_SizeChanged">
+                <controls:SquarePanel HorizontalAlignment="Center" MaxWidth="400">
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8"
+                            Visibility="{x:Bind Player.HasCoverArt, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                        <FontIcon Glyph="&#xE8D6;" FontSize="96"
+                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <Grid x:Name="LargeCoverArtContainer">
+                        <Grid x:Name="LargeCoverArtOutgoingWrapper" CornerRadius="8" Opacity="0" IsHitTestVisible="False">
+                            <Image x:Name="LargeCoverArtOutgoing" Stretch="UniformToFill"/>
+                        </Grid>
+                        <Grid x:Name="LargeCoverArtWrapper" CornerRadius="8">
+                            <Image x:Name="LargeCoverArt" Stretch="UniformToFill"/>
+                        </Grid>
+                    </Grid>
+                </controls:SquarePanel>
+            </Grid>
 
             <StackPanel HorizontalAlignment="Center" Spacing="2" MaxWidth="500">
                 <TextBlock Text="{x:Bind Player.TrackTitle, Mode=OneWay}"

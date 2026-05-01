@@ -8,6 +8,21 @@ public class TrackEndedEventArgs : EventArgs
     public double Duration { get; init; }
 }
 
+/// <summary>
+/// Event payload for <see cref="IPlaybackService.TrackChanged"/>. Carries the
+/// direction of the change so consumers (e.g. cover-art animations) can pick
+/// the right transition without having to read mutable state on the source.
+/// </summary>
+public sealed class TrackChangedEventArgs : EventArgs
+{
+    public TrackChangeDirection Direction { get; }
+
+    public TrackChangedEventArgs(TrackChangeDirection direction)
+    {
+        Direction = direction;
+    }
+}
+
 public interface IPlaybackService
 {
     PlaybackTrack? NowPlaying { get; }
@@ -27,7 +42,7 @@ public interface IPlaybackService
     IReadOnlyList<PlaybackTrack> History { get; }
 
     event EventHandler? PlaybackStateChanged;
-    event EventHandler? TrackChanged;
+    event EventHandler<TrackChangedEventArgs>? TrackChanged;
     event EventHandler<TrackEndedEventArgs>? TrackEnded;
     event EventHandler? PositionChanged;
     event EventHandler? QueueChanged;

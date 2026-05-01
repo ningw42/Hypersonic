@@ -102,7 +102,7 @@ public class PlaybackService : IPlaybackService, IDisposable
     }
 
     public event EventHandler? PlaybackStateChanged;
-    public event EventHandler? TrackChanged;
+    public event EventHandler<TrackChangedEventArgs>? TrackChanged;
     public event EventHandler<TrackEndedEventArgs>? TrackEnded;
     public event EventHandler? PositionChanged;
     public event EventHandler? QueueChanged;
@@ -143,12 +143,12 @@ public class PlaybackService : IPlaybackService, IDisposable
 
         if (NowPlaying?.StreamUri != null)
         {
-            PlayCurrent();
+            PlayCurrent(TrackChangeDirection.Jump);
         }
         else
         {
             ClearCurrentPlaybackMedia();
-            UpdateCurrentTrackWithoutPlayback(NowPlaying);
+            UpdateCurrentTrackWithoutPlayback(NowPlaying, TrackChangeDirection.Jump);
         }
 
         QueueChanged?.Invoke(this, EventArgs.Empty);
@@ -190,7 +190,7 @@ public class PlaybackService : IPlaybackService, IDisposable
         var next = _playbackQueue.AdvanceManual();
         if (next != null)
         {
-            PlayCurrent();
+            PlayCurrent(TrackChangeDirection.Next);
         }
         // If null: at end of queue, no movement happened, no state to clean up.
         FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
@@ -210,7 +210,7 @@ public class PlaybackService : IPlaybackService, IDisposable
         var previous = _playbackQueue.GoBack();
         if (previous != null)
         {
-            PlayCurrent();
+            PlayCurrent(TrackChangeDirection.Previous);
         }
         else
         {
@@ -261,12 +261,12 @@ public class PlaybackService : IPlaybackService, IDisposable
             // Current track was removed and we advanced to next.
             if (newCurrent.StreamUri != null)
             {
-                PlayCurrent();
+                PlayCurrent(TrackChangeDirection.Jump);
             }
             else
             {
                 ClearCurrentPlaybackMedia();
-                UpdateCurrentTrackWithoutPlayback(newCurrent);
+                UpdateCurrentTrackWithoutPlayback(newCurrent, TrackChangeDirection.Jump);
             }
         }
         else if (_playbackQueue.CurrentTrack == null && _playbackQueue.Tracks.Count == 0)
@@ -279,7 +279,7 @@ public class PlaybackService : IPlaybackService, IDisposable
             Duration = 0;
             _source = null;
             ClearSmtcDisplay();
-            TrackChanged?.Invoke(this, EventArgs.Empty);
+            TrackChanged?.Invoke(this, new TrackChangedEventArgs(TrackChangeDirection.Jump));
             PositionChanged?.Invoke(this, EventArgs.Empty);
             PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
             UpdateSmtcState();
@@ -319,7 +319,7 @@ public class PlaybackService : IPlaybackService, IDisposable
         Duration = 0;
         ClearSmtcDisplay();
         QueueChanged?.Invoke(this, EventArgs.Empty);
-        TrackChanged?.Invoke(this, EventArgs.Empty);
+        TrackChanged?.Invoke(this, new TrackChangedEventArgs(TrackChangeDirection.Jump));
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         PositionChanged?.Invoke(this, EventArgs.Empty);
         UpdateSmtcState();
@@ -340,7 +340,7 @@ public class PlaybackService : IPlaybackService, IDisposable
 
         _log.Info("Jumped to track", new { TrackId = trackId });
 
-        PlayCurrent();
+        PlayCurrent(TrackChangeDirection.Jump);
         FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
     }
 
@@ -357,17 +357,17 @@ public class PlaybackService : IPlaybackService, IDisposable
 
         _log.Info("Jumped to queue index", new { EffectiveIndex = effectiveIndex });
 
-        PlayCurrent();
+        PlayCurrent(TrackChangeDirection.Jump);
         FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
     }
 
-    private void PlayCurrent()
+    private void PlayCurrent(TrackChangeDirection direction)
     {
         var track = NowPlaying;
         if (track?.StreamUri == null)
         {
             ClearCurrentPlaybackMedia();
-            UpdateCurrentTrackWithoutPlayback(track);
+            UpdateCurrentTrackWithoutPlayback(track, direction);
             return;
         }
 
@@ -396,7 +396,7 @@ public class PlaybackService : IPlaybackService, IDisposable
         _pendingPlayOnOpen = true;
         _mediaPlayer.Source = _currentPlaybackItem;
 
-        TrackChanged?.Invoke(this, EventArgs.Empty);
+        TrackChanged?.Invoke(this, new TrackChangedEventArgs(direction));
 
         UpdateSmtcState();
     }
@@ -410,14 +410,14 @@ public class PlaybackService : IPlaybackService, IDisposable
         DisposeCurrentSource();
     }
 
-    private void UpdateCurrentTrackWithoutPlayback(PlaybackTrack? track)
+    private void UpdateCurrentTrackWithoutPlayback(PlaybackTrack? track, TrackChangeDirection direction)
     {
         Duration = track?.Duration ?? 0;
         Position = 0;
         IsPlaying = false;
         _positionTimer.Stop();
         ClearSmtcDisplay();
-        TrackChanged?.Invoke(this, EventArgs.Empty);
+        TrackChanged?.Invoke(this, new TrackChangedEventArgs(direction));
         PositionChanged?.Invoke(this, EventArgs.Empty);
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
         UpdateSmtcState();
@@ -646,7 +646,7 @@ public class PlaybackService : IPlaybackService, IDisposable
             if (next != null)
             {
                 _log.Debug("Auto-advancing to next track");
-                PlayCurrent();
+                PlayCurrent(TrackChangeDirection.Next);
                 FirePlaybackStateChangedIfHasChanged(prevHasNext, prevHasPrevious);
             }
             else

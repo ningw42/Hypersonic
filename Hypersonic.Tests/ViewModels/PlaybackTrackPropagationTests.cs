@@ -51,7 +51,7 @@ public class PlaybackTrackPropagationTests
         public IReadOnlyList<PlaybackTrack> History => Array.Empty<PlaybackTrack>();
 
         public event EventHandler? PlaybackStateChanged;
-        public event EventHandler? TrackChanged;
+        public event EventHandler<TrackChangedEventArgs>? TrackChanged;
         public event EventHandler<TrackEndedEventArgs>? TrackEnded;
         public event EventHandler? PositionChanged;
         public event EventHandler? QueueChanged;
