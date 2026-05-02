@@ -117,6 +117,35 @@ public sealed partial class NowPlayingPage : Page
         }
     }
 
+    // Dynamically caps the artwork's MaxHeight so the artwork+metadata block
+    // shrinks vertically with the window. The parent StackPanel passes
+    // Infinity along its stack axis, so without this the SquarePanel ignores
+    // available height. We read the root Grid's height (not the left
+    // StackPanel's, which has VerticalAlignment=Center and so reports its own
+    // desired height — circular).
+    private const double MaxArtworkSide = 600.0;
+    private const double LeftStackSpacing = 16.0;
+    private const double RootVerticalPadding = 32.0;
+
+    private void RootContentGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        => UpdateArtworkMaxHeight();
+
+    private void MetadataStack_SizeChanged(object sender, SizeChangedEventArgs e)
+        => UpdateArtworkMaxHeight();
+
+    private void UpdateArtworkMaxHeight()
+    {
+        var cellHeight = RootContentGrid.ActualHeight - RootVerticalPadding;
+        if (cellHeight <= 0) return;
+
+        var available = cellHeight - MetadataStack.ActualHeight - LeftStackSpacing;
+        var target = Math.Max(0.0, Math.Min(MaxArtworkSide, available));
+        if (Math.Abs(LargeCoverArtSquarePanel.MaxHeight - target) > 0.5)
+        {
+            LargeCoverArtSquarePanel.MaxHeight = target;
+        }
+    }
+
     private void OnPlayerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(Player.IsPlaying))

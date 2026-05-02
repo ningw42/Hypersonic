@@ -20,7 +20,7 @@
         <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
     </Page.Resources>
 
-    <Grid Padding="32,16,32,16" ColumnSpacing="32">
+    <Grid x:Name="RootContentGrid" Padding="32,16,32,16" ColumnSpacing="32" SizeChanged="RootContentGrid_SizeChanged">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*"/>
@@ -37,7 +37,7 @@
                 to receive the full column width during measure.
             -->
             <Grid x:Name="LargeCoverArtClip" HorizontalAlignment="Center" SizeChanged="LargeCoverArtClip_SizeChanged">
-                <controls:SquarePanel HorizontalAlignment="Center" MaxWidth="400">
+                <controls:SquarePanel x:Name="LargeCoverArtSquarePanel" HorizontalAlignment="Center" MaxWidth="600" MaxHeight="600">
                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8"
                             Visibility="{x:Bind Player.HasCoverArt, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                         <FontIcon Glyph="&#xE8D6;" FontSize="96"
@@ -55,7 +55,7 @@
                 </controls:SquarePanel>
             </Grid>
 
-            <StackPanel HorizontalAlignment="Center" Spacing="2" MaxWidth="500">
+            <StackPanel x:Name="MetadataStack" HorizontalAlignment="Center" Spacing="2" MaxWidth="500" SizeChanged="MetadataStack_SizeChanged">
                 <TextBlock Text="{x:Bind Player.TrackTitle, Mode=OneWay}"
                            FontSize="24" FontWeight="SemiBold"
                            HorizontalAlignment="Center"

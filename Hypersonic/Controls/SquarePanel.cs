@@ -12,7 +12,27 @@ public class SquarePanel : Panel
 {
     protected override Size MeasureOverride(Size availableSize)
     {
-        var side = double.IsInfinity(availableSize.Width) ? availableSize.Height : availableSize.Width;
+        double side;
+        var widthInf = double.IsInfinity(availableSize.Width);
+        var heightInf = double.IsInfinity(availableSize.Height);
+
+        if (widthInf && heightInf)
+        {
+            side = 0;
+        }
+        else if (widthInf)
+        {
+            side = availableSize.Height;
+        }
+        else if (heightInf)
+        {
+            side = availableSize.Width;
+        }
+        else
+        {
+            side = Math.Min(availableSize.Width, availableSize.Height);
+        }
+
         var childSize = new Size(side, side);
 
         foreach (var child in Children)
