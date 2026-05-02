@@ -73,7 +73,7 @@
         <!-- Track list column headers -->
         <Grid Grid.Row="2"
               ColumnSpacing="12"
-              Padding="12,8,12,4"
+              Padding="12,8,28,4"
               BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
               BorderThickness="0,0,0,1"
               Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
