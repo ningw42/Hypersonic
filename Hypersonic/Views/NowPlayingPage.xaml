@@ -20,10 +20,10 @@
         <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
     </Page.Resources>
 
-    <Grid x:Name="RootContentGrid" Padding="32,16,32,16" ColumnSpacing="32" SizeChanged="RootContentGrid_SizeChanged">
+    <Grid x:Name="RootContentGrid" Padding="32,16,32,16" ColumnSpacing="64" SizeChanged="RootContentGrid_SizeChanged">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="3*"/>
         </Grid.ColumnDefinitions>
 
         <!-- Left column: art + metadata -->
