@@ -7,9 +7,17 @@
     xmlns:helpers="using:Hypersonic.Helpers"
     xmlns:models="using:Hypersonic.Core.Models"
     xmlns:xaml="using:Microsoft.UI.Xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     mc:Ignorable="d">
     <Page.Resources>
         <helpers:EnumToBooleanConverter x:Key="EnumToBooleanConverter" />
+        <!-- Kill the 8px reserved Header area at the top of TokenizingTextBox.
+             Default TextBoxTopHeaderMargin is "0,0,0,8" so even with no Header
+             content the inner Header ContentPresenter measures 8px tall and
+             pushes the visible input down. Our font pickers don't use Header,
+             so we want zero. Scoped to this Page; SettingsPage has no other
+             TextBox-derived controls, so no collateral effect. -->
+        <Thickness x:Key="TextBoxTopHeaderMargin">0</Thickness>
     </Page.Resources>
     <Grid>
         <StackPanel
@@ -98,6 +106,166 @@
                     </RadioButton>
                 </StackPanel>
             </StackPanel>
+
+            <!-- Fonts (UI + Lyrics + UI scale). Persisted only — currently inert
+                 until a follow-up change wires the values into resource dictionaries
+                 and visual element overrides. -->
+            <controls:SettingsExpander
+                x:Uid="Settings_Fonts"
+                Margin="{StaticResource SmallTopBottomMargin}"
+                IsExpanded="True"
+                IsEnabled="{x:Bind ViewModel.IsFontSettingsInitialized, Mode=OneWay}">
+                <controls:SettingsExpander.HeaderIcon>
+                    <FontIcon Glyph="&#xE8D2;" />
+                </controls:SettingsExpander.HeaderIcon>
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard
+                        x:Uid="Settings_UiFonts"
+                        ContentAlignment="Vertical">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <controls:TokenizingTextBox
+                                Grid.Column="0"
+                                x:Name="UiFontPicker"
+                                ItemsSource="{x:Bind ViewModel.UiFontFamilies, Mode=OneWay}"
+                                SuggestedItemsSource="{x:Bind UiFontSuggestions, Mode=OneWay}"
+                                x:Uid="Settings_FontPicker"
+                                TokenDelimiter=","
+                                TextChanged="OnUiFontTextChanged"
+                                TokenItemAdding="OnFontTokenAdding">
+                                <controls:TokenizingTextBox.QueryIcon>
+                                    <FontIconSource
+                                        Glyph="&#xE721;"
+                                        FontSize="12" />
+                                </controls:TokenizingTextBox.QueryIcon>
+                                <controls:TokenizingTextBox.TokenItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{x:Bind}" FontFamily="{x:Bind}" />
+                                    </DataTemplate>
+                                </controls:TokenizingTextBox.TokenItemTemplate>
+                                <controls:TokenizingTextBox.SuggestedItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{x:Bind}" FontFamily="{x:Bind}" />
+                                    </DataTemplate>
+                                </controls:TokenizingTextBox.SuggestedItemTemplate>
+                            </controls:TokenizingTextBox>
+                            <Button
+                                Grid.Column="1"
+                                x:Name="ResetUiFontsButton"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Command="{x:Bind ViewModel.ResetUiFontsCommand}"
+                                VerticalAlignment="Stretch"
+                                HorizontalAlignment="Right"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                MinHeight="0"
+                                MinWidth="32"
+                                Width="32"
+                                Padding="0">
+                                <FontIcon
+                                    Glyph="&#xE777;"
+                                    FontSize="14"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+                    </controls:SettingsCard>
+                    <controls:SettingsCard
+                        x:Uid="Settings_LyricsFonts"
+                        ContentAlignment="Vertical">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <controls:TokenizingTextBox
+                                Grid.Column="0"
+                                x:Name="LyricsFontPicker"
+                                ItemsSource="{x:Bind ViewModel.LyricsFontFamilies, Mode=OneWay}"
+                                SuggestedItemsSource="{x:Bind LyricsFontSuggestions, Mode=OneWay}"
+                                x:Uid="Settings_FontPicker"
+                                TokenDelimiter=","
+                                TextChanged="OnLyricsFontTextChanged"
+                                TokenItemAdding="OnFontTokenAdding">
+                                <controls:TokenizingTextBox.QueryIcon>
+                                    <FontIconSource
+                                        Glyph="&#xE721;"
+                                        FontSize="12" />
+                                </controls:TokenizingTextBox.QueryIcon>
+                                <controls:TokenizingTextBox.TokenItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{x:Bind}" FontFamily="{x:Bind}" />
+                                    </DataTemplate>
+                                </controls:TokenizingTextBox.TokenItemTemplate>
+                                <controls:TokenizingTextBox.SuggestedItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{x:Bind}" FontFamily="{x:Bind}" />
+                                    </DataTemplate>
+                                </controls:TokenizingTextBox.SuggestedItemTemplate>
+                            </controls:TokenizingTextBox>
+                            <Button
+                                Grid.Column="1"
+                                x:Name="ResetLyricsFontsButton"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Command="{x:Bind ViewModel.ResetLyricsFontsCommand}"
+                                VerticalAlignment="Stretch"
+                                HorizontalAlignment="Right"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                MinHeight="0"
+                                MinWidth="32"
+                                Width="32"
+                                Padding="0">
+                                <FontIcon
+                                    Glyph="&#xE777;"
+                                    FontSize="14"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+                    </controls:SettingsCard>
+                    <controls:SettingsCard x:Uid="Settings_UiScale">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <controls:Segmented SelectedIndex="{x:Bind ViewModel.UiScaleIndex, Mode=TwoWay}">
+                                <controls:SegmentedItem Content="90%" />
+                                <controls:SegmentedItem Content="100%" />
+                                <controls:SegmentedItem Content="115%" />
+                                <controls:SegmentedItem Content="125%" />
+                                <controls:SegmentedItem Content="150%" />
+                            </controls:Segmented>
+                            <Button
+                                x:Name="ResetUiScaleButton"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Command="{x:Bind ViewModel.ResetUiScaleCommand}"
+                                MinWidth="32"
+                                Width="32"
+                                Height="32"
+                                Padding="0">
+                                <FontIcon Glyph="&#xE777;" FontSize="14" />
+                            </Button>
+                        </StackPanel>
+                    </controls:SettingsCard>
+                    <controls:SettingsCard
+                        x:Uid="Settings_FontsRestart"
+                        Visibility="{x:Bind ViewModel.IsFontRestartRequired, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Grid
+                            ColumnDefinitions="Auto,Auto"
+                            ColumnSpacing="8">
+                            <Button
+                                Grid.Column="0"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="OnRestartAppClicked">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        Glyph="&#xE72C;"
+                                        FontSize="14" />
+                                    <TextBlock
+                                        x:Uid="Settings_FontsRestartButtonText"
+                                        VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Grid
+                                Grid.Column="1"
+                                Width="32" />
+                        </Grid>
+                    </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
 
             <!-- Scrobbling -->
             <TextBlock x:Uid="Settings_Scrobbling"

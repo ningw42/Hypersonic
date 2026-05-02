@@ -104,6 +104,7 @@ public partial class App : Application
 
             services.AddSingleton<TimeProvider>(TimeProvider.System);
             services.AddSingleton<IScrobblingService, ScrobblingService>();
+            services.AddSingleton<ISystemFontCatalog, SystemFontCatalog>();
 
             // Views and ViewModels
             services.AddSingleton<PlayerViewModel>();

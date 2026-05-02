@@ -255,4 +255,43 @@
   <data name="Settings_PlaytimePreset_4Minutes" xml:space="preserve">
     <value>4 minutes</value>
   </data>
+  <data name="Settings_Fonts.Header" xml:space="preserve">
+    <value>Fonts</value>
+  </data>
+  <data name="Settings_Fonts.Description" xml:space="preserve">
+    <value>Customize the fonts used throughout the app and in the lyrics view. Changes take effect after restart.</value>
+  </data>
+  <data name="Settings_UiFonts.Header" xml:space="preserve">
+    <value>UI fonts</value>
+  </data>
+  <data name="Settings_UiFonts.Description" xml:space="preserve">
+    <value>Order matters — the first installed font is used; subsequent fonts cover any missing glyphs.</value>
+  </data>
+  <data name="Settings_LyricsFonts.Header" xml:space="preserve">
+    <value>Lyrics fonts</value>
+  </data>
+  <data name="Settings_LyricsFonts.Description" xml:space="preserve">
+    <value>Order matters — the first installed font is used; subsequent fonts cover any missing glyphs.</value>
+  </data>
+  <data name="Settings_FontPicker.PlaceholderText" xml:space="preserve">
+    <value>Type a font name…</value>
+  </data>
+  <data name="Settings_UiScale.Header" xml:space="preserve">
+    <value>UI scale</value>
+  </data>
+  <data name="Settings_UiScale.Description" xml:space="preserve">
+    <value>Adjust the overall size of UI text.</value>
+  </data>
+  <data name="Settings_FontsRestart.Header" xml:space="preserve">
+    <value>Restart required</value>
+  </data>
+  <data name="Settings_FontsRestart.Description" xml:space="preserve">
+    <value>Font changes are saved and will apply after the app restarts.</value>
+  </data>
+  <data name="Settings_FontsRestartButtonText.Text" xml:space="preserve">
+    <value>Restart now</value>
+  </data>
+  <data name="Settings_ResetTooltip" xml:space="preserve">
+    <value>Reset to default</value>
+  </data>
 </root>
