@@ -10,6 +10,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
+using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -29,6 +30,16 @@ public sealed partial class NowPlayingPage : Page
     private bool _pageActive;
     private bool _initialized;
     private CoverArtAnimator? _coverArtAnimator;
+
+    // Single source of truth for the NowPlaying paused/playing scales. Used
+    // both by CoverArtAnimator (for the breathing pulse) and by the
+    // connected-animation pin/restore helpers — keep these in lockstep.
+    private const float LargeCoverPlayingScale = 1.0f;
+    private const float LargeCoverPausedScale = 0.92f;
+
+    // Set true only between Prepare…() and Restore…() — guards layout
+    // restore against a spurious second Completed callback.
+    private bool _connectedAnimationDestinationPinned;
 
     public NowPlayingPage()
     {
@@ -84,6 +95,11 @@ public sealed partial class NowPlayingPage : Page
 
     private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
+        EnsureCoverArtAnimator();
+    }
+
+    private void EnsureCoverArtAnimator()
+    {
         if (_coverArtAnimator is not null) return;
 
         _coverArtAnimator = new CoverArtAnimator(
@@ -92,8 +108,8 @@ public sealed partial class NowPlayingPage : Page
             outgoingWrapper: LargeCoverArtOutgoingWrapper,
             outgoing: LargeCoverArtOutgoing,
             player: Player,
-            playingScale: 1.0f,
-            pausedScale: 0.92f,
+            playingScale: LargeCoverPlayingScale,
+            pausedScale: LargeCoverPausedScale,
             cameraOutScale: 0.72f,
             // Slide distance = wrapper visible width (cameraOutScale=0.72) + gap.
             // The wrappers stay centered relative to each other in flight, so
@@ -183,38 +199,149 @@ public sealed partial class NowPlayingPage : Page
     {
         base.OnNavigatedTo(e);
 
+        // Build/init the animator BEFORE the connected animation starts so
+        // it's ready to take over the wrapper's resting Scale once the
+        // flight ends (Restore…() snaps Scale into the value the animator
+        // would otherwise have set on its own). Also wires the wrapper's
+        // CenterPoint via SizeChanged.
+        EnsureCoverArtAnimator();
+
         var anim = ConnectedAnimationService.GetForCurrentView().GetAnimation("CoverArtForward");
         if (anim is null) return;
 
-        // Pass the rounded wrapper (not the inner Image) so the snapshot's
-        // shape matches the player-bar wrapper's rounded corners. See the
-        // matching comment in ShellPage.TryNavigateToNowPlaying.
+        // Two gates must close before TryStart:
+        //   (a) layout has run — SquarePanel.ActualWidth > 0 — so
+        //       PrepareConnectedAnimationDestination can pin the wrapper to
+        //       a visually-correct size. OnNavigatedTo runs BEFORE the
+        //       page's first layout pass, so this is 0 here on every
+        //       navigation (verified by logging).
+        //   (b) image is set — LargeCoverArt.Source != null — so the
+        //       destination has pixels to land into.
+        // Both must close before we touch the animation; otherwise the pin
+        // sees a 0 width and silently skips, reproducing the original
+        // "land big, snap small" behavior.
+        var started = false;
+
+        void TryStartIfReady()
+        {
+            if (started) return;
+            if (LargeCoverArtSquarePanel.ActualWidth <= 0) return;
+            if (LargeCoverArt.Source is null) return;
+            started = true;
+            LargeCoverArtSquarePanel.SizeChanged -= OnSquarePanelSized;
+            LargeCoverArt.ImageOpened -= OnImageOpened;
+            StartCoverArtForwardAnimation(anim);
+        }
+
+        void OnSquarePanelSized(object sender, SizeChangedEventArgs args) => TryStartIfReady();
+        void OnImageOpened(object? sender, RoutedEventArgs args) => TryStartIfReady();
+
+        if (LargeCoverArtSquarePanel.ActualWidth <= 0)
+        {
+            LargeCoverArtSquarePanel.SizeChanged += OnSquarePanelSized;
+        }
         if (LargeCoverArt.Source is null)
         {
-            // Wait until the cover art is set before starting (renderer also runs
-            // RenderNowPlaying on first paint via the metadata path).
-            void Started(object? s, RoutedEventArgs args)
-            {
-                LargeCoverArt.ImageOpened -= Started;
-                anim.TryStart(LargeCoverArtWrapper);
-            }
-            LargeCoverArt.ImageOpened += Started;
-
-            // Safety: if no image loads in a short window, drop the animation
-            // so it doesn't sit forever waiting.
-            var dispatcher = _pageDispatcher;
-            _ = Task.Delay(800).ContinueWith(_ =>
-            {
-                dispatcher.TryEnqueue(() =>
-                {
-                    LargeCoverArt.ImageOpened -= Started;
-                    anim?.Cancel();
-                });
-            });
+            LargeCoverArt.ImageOpened += OnImageOpened;
         }
-        else
+        // Both gates may already be closed on a re-navigation where layout
+        // happened to be cached and the image is already set; cover that
+        // path without waiting for either event to fire.
+        TryStartIfReady();
+
+        // Safety: if either gate never closes (e.g. the image fails to
+        // load), drop the animation and the handlers so we don't sit on
+        // stale subscriptions forever.
+        //
+        // Residual risk if the user navigates away within this 800ms
+        // window: the closure keeps the page alive until the timeout
+        // fires (bounded, ~800ms — not a leak). The subscriptions sit on
+        // detached elements that no longer raise events, so the handlers
+        // never fire. The captured `anim` is either already Completed
+        // (Cancel is a no-op) or has been superseded by the next
+        // navigation's PrepareToAnimate (which creates a fresh instance —
+        // Cancel here can't touch it). Untidy, not a correctness bug;
+        // tightening would mean hooking Unloaded to detach+cancel
+        // synchronously, which is more code than the symptom warrants.
+        var dispatcher = _pageDispatcher;
+        _ = Task.Delay(800).ContinueWith(_ =>
         {
-            anim.TryStart(LargeCoverArtWrapper);
+            dispatcher.TryEnqueue(() =>
+            {
+                if (started) return;
+                LargeCoverArtSquarePanel.SizeChanged -= OnSquarePanelSized;
+                LargeCoverArt.ImageOpened -= OnImageOpened;
+                anim?.Cancel();
+            });
+        });
+    }
+
+    private void PrepareConnectedAnimationDestination()
+    {
+        // SquarePanel is the actual visible artwork bounds (capped by
+        // MaxWidth=600); the parent clip can be wider than that on wide
+        // windows, which would over-pin the destination.
+        var targetScale = Player.IsPlaying ? LargeCoverPlayingScale : LargeCoverPausedScale;
+        var pinnedSide = LargeCoverArtSquarePanel.ActualWidth * targetScale;
+        if (pinnedSide <= 0) return; // Caller's gate should have prevented this.
+
+        LargeCoverArtWrapper.Width = pinnedSide;
+        LargeCoverArtWrapper.Height = pinnedSide;
+        // A smaller explicit size inside LargeCoverArtContainer needs explicit
+        // centering — Stretch is the wrong arrange when Width/Height are set.
+        LargeCoverArtWrapper.HorizontalAlignment = HorizontalAlignment.Center;
+        LargeCoverArtWrapper.VerticalAlignment = VerticalAlignment.Center;
+        // Composition Scale must be 1.0 for the duration of the flight: layout
+        // already encodes the visual size, so any extra scale would double-apply.
+        var visual = ElementCompositionPreview.GetElementVisual(LargeCoverArtWrapper);
+        visual.Scale = new System.Numerics.Vector3(1f, 1f, 1f);
+
+        // TryStart reads the layout rect at call time. Width/Height changes
+        // invalidate layout but don't run measure/arrange synchronously.
+        LargeCoverArtWrapper.UpdateLayout();
+
+        _connectedAnimationDestinationPinned = true;
+    }
+
+    private void RestoreAfterConnectedAnimation()
+    {
+        // Layout restore is gated on whether we actually pinned — idempotent,
+        // and skips work when Prepare…() bailed on a zero-width clip.
+        if (_connectedAnimationDestinationPinned)
+        {
+            _connectedAnimationDestinationPinned = false;
+            LargeCoverArtWrapper.Width = double.NaN;
+            LargeCoverArtWrapper.Height = double.NaN;
+            LargeCoverArtWrapper.HorizontalAlignment = HorizontalAlignment.Stretch;
+            LargeCoverArtWrapper.VerticalAlignment = VerticalAlignment.Stretch;
+        }
+
+        // Scale restore ALWAYS runs so the play/pause pulse starts from the
+        // right value. Snap directly; do NOT call OnIsPlayingChanged(),
+        // which animates 1.0 → 0.92 and reproduces the snap-as-shrink the
+        // pin was supposed to eliminate.
+        var targetScale = Player.IsPlaying ? LargeCoverPlayingScale : LargeCoverPausedScale;
+        ElementCompositionPreview.GetElementVisual(LargeCoverArtWrapper).Scale =
+            new System.Numerics.Vector3(targetScale, targetScale, 1f);
+    }
+
+    private void StartCoverArtForwardAnimation(ConnectedAnimation anim)
+    {
+        PrepareConnectedAnimationDestination();
+
+        // Named local so we can unsubscribe — keeps a stale subscription
+        // from outliving its purpose if TryStart returned false.
+        void Completed(ConnectedAnimation s, object? a)
+        {
+            s.Completed -= Completed;
+            RestoreAfterConnectedAnimation();
+        }
+        anim.Completed += Completed;
+
+        if (!anim.TryStart(LargeCoverArtWrapper))
+        {
+            anim.Completed -= Completed;
+            RestoreAfterConnectedAnimation();
         }
     }
 
@@ -231,6 +358,7 @@ public sealed partial class NowPlayingPage : Page
 
     private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
     private Brush TertiaryBrush => TertiaryBrushProvider.Foreground;
+    private Brush PrimaryBrush => PrimaryBrushProvider.Foreground;
 
     private void OnPlayerMetadataChanged(object? sender, EventArgs e)
     {
@@ -258,6 +386,8 @@ public sealed partial class NowPlayingPage : Page
 
     private void RenderNowPlaying()
     {
+        // Resolve through the brush provider so theme changes refresh Hyperlink.Foreground without overriding native hover styling.
+        MetaTrackTitleLink.Foreground = PrimaryBrush;
         RenderArtist();
         RenderAlbum();
         // Cover art swap is driven by Player.PropertyChanged (CoverArtUrl), so
@@ -415,5 +545,14 @@ public sealed partial class NowPlayingPage : Page
         {
             Player.JumpToQueueIndex(item);
         }
+    }
+
+    private void MetaTrackTitleLink_Click(Hyperlink sender, HyperlinkClickEventArgs args)
+    {
+        // Page-local intent: tapping the title here means "close me." We skip
+        // NowPlayingTapPolicy because the page already knows it's the one
+        // being dismissed — consulting the shell-side policy would just
+        // round-trip back to GoBack.
+        App.GetService<INavigationService>().GoBack();
     }
 }

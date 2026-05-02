@@ -7,24 +7,24 @@ namespace Hypersonic.Tests.Helpers;
 public class NowPlayingTapPolicyTests
 {
     [TestMethod]
-    public void NoTrack_DoesNotNavigate()
+    public void NoTrack_NoneAction()
     {
         var d = NowPlayingTapPolicy.Decide(
             hasTrack: false,
             currentPageType: typeof(MainPage),
             backStackPageTypes: Array.Empty<Type>());
-        Assert.IsFalse(d.ShouldNavigate);
+        Assert.AreEqual(NowPlayingTapAction.None, d.Action);
         Assert.AreEqual(0, d.BackStackIndicesToRemove.Count);
     }
 
     [TestMethod]
-    public void AlreadyOnNowPlaying_NoOp()
+    public void AlreadyOnNowPlaying_GoBack()
     {
         var d = NowPlayingTapPolicy.Decide(
             hasTrack: true,
             currentPageType: typeof(NowPlayingPage),
             backStackPageTypes: new[] { typeof(MainPage) });
-        Assert.IsFalse(d.ShouldNavigate);
+        Assert.AreEqual(NowPlayingTapAction.GoBack, d.Action);
         Assert.AreEqual(0, d.BackStackIndicesToRemove.Count);
     }
 
@@ -35,7 +35,7 @@ public class NowPlayingTapPolicyTests
             hasTrack: true,
             currentPageType: typeof(MainPage),
             backStackPageTypes: Array.Empty<Type>());
-        Assert.IsTrue(d.ShouldNavigate);
+        Assert.AreEqual(NowPlayingTapAction.Navigate, d.Action);
         Assert.AreEqual(0, d.BackStackIndicesToRemove.Count);
     }
 
@@ -46,7 +46,7 @@ public class NowPlayingTapPolicyTests
             hasTrack: true,
             currentPageType: typeof(AlbumsPage),
             backStackPageTypes: new[] { typeof(MainPage), typeof(NowPlayingPage) });
-        Assert.IsTrue(d.ShouldNavigate);
+        Assert.AreEqual(NowPlayingTapAction.Navigate, d.Action);
         CollectionAssert.AreEqual(new[] { 1 }, d.BackStackIndicesToRemove.ToArray());
     }
 
@@ -63,7 +63,7 @@ public class NowPlayingTapPolicyTests
                 typeof(AlbumDetailPage),
                 typeof(NowPlayingPage),
             });
-        Assert.IsTrue(d.ShouldNavigate);
+        Assert.AreEqual(NowPlayingTapAction.Navigate, d.Action);
         CollectionAssert.AreEqual(new[] { 1, 3 }, d.BackStackIndicesToRemove.ToArray());
     }
 
@@ -75,7 +75,7 @@ public class NowPlayingTapPolicyTests
             hasTrack: true,
             currentPageType: typeof(AlbumsPage),
             backStackPageTypes: new[] { typeof(MainPage), typeof(NowPlayingPage) });
-        Assert.IsTrue(d.ShouldNavigate);
+        Assert.AreEqual(NowPlayingTapAction.Navigate, d.Action);
         CollectionAssert.AreEqual(new[] { 1 }, d.BackStackIndicesToRemove.ToArray());
     }
 }

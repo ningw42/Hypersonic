@@ -14,9 +14,26 @@
     Loaded="OnLoaded">
 
     <Page.Resources>
-        <converters:SecondsToTimeConverter x:Key="SecondsToTimeConverter"/>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+        <ResourceDictionary>
+            <converters:SecondsToTimeConverter x:Key="SecondsToTimeConverter"/>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <!-- Black tint reads well on the typically lighter Light-theme surfaces. -->
+                    <SolidColorBrush x:Key="PlayerCoverArtHoverOverlayBrush" Color="Black"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <!-- White tint reads well on the typically darker Dark-theme surfaces. -->
+                    <SolidColorBrush x:Key="PlayerCoverArtHoverOverlayBrush" Color="White"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="PlayerCoverArtHoverOverlayBrush"
+                                     Color="{ThemeResource SystemColorHighlightColor}"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
     </Page.Resources>
 
     <Grid>
@@ -417,7 +434,12 @@
 
                 <!-- Cover art -->
                 <Grid x:Name="PlayerCoverArtContainer" Grid.Column="0" Width="48" Height="48" Margin="0,0,12,0"
-                      Tapped="PlayerCoverArtContainer_Tapped">
+                      IsHitTestVisible="{x:Bind Player.HasTrack, Mode=OneWay}"
+                      Tapped="PlayerCoverArtContainer_Tapped"
+                      PointerEntered="PlayerCoverArtContainer_PointerEntered"
+                      PointerExited="PlayerCoverArtContainer_PointerExited"
+                      PointerCanceled="PlayerCoverArtContainer_PointerExited"
+                      PointerCaptureLost="PlayerCoverArtContainer_PointerExited">
                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4"
                             Visibility="{x:Bind Player.HasCoverArt, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}">
                         <FontIcon Glyph="&#xE8D6;" FontSize="20"
@@ -429,15 +451,34 @@
                     </Grid>
                     <Grid x:Name="PlayerCoverArtWrapper" Width="48" Height="48" CornerRadius="4">
                         <Image x:Name="PlayerCoverArt" Stretch="UniformToFill"/>
+                        <!-- Inside the scaling wrapper so the tint shrinks with the artwork
+                             in paused state and inherits the wrapper's rounded clip. -->
+                        <Border x:Name="PlayerCoverArtHoverOverlay"
+                                Background="{ThemeResource PlayerCoverArtHoverOverlayBrush}"
+                                Opacity="0" IsHitTestVisible="False"/>
                     </Grid>
                 </Grid>
 
                 <!-- Track info -->
                 <StackPanel x:Name="PlayerTrackInfoPanel" Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                    <TextBlock Text="{x:Bind Player.TrackTitle, Mode=OneWay}"
-                               x:Name="PlayerTrackTitle"
-                               Tapped="PlayerTrackTitle_Tapped"
-                               FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+                    <RichTextBlock x:Name="PlayerTrackTitle"
+                                   IsHitTestVisible="{x:Bind Player.HasTrack, Mode=OneWay}"
+                                   IsTextSelectionEnabled="False"
+                                   FontFamily="{ThemeResource ContentControlThemeFontFamily}"
+                                   FontSize="14"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxLines="1">
+                        <Paragraph>
+                            <Hyperlink x:Name="PlayerTrackTitleLink"
+                                       UnderlineStyle="None"
+                                       Click="PlayerTrackTitleLink_Click">
+                                <!-- Foreground is set in code-behind on the Hyperlink, not the Run, so theme refreshes keep native hover styling. -->
+                                <Run x:Name="PlayerTrackTitleRun"
+                                     Text="{x:Bind Player.TrackTitle, Mode=OneWay}"
+                                     FontWeight="SemiBold"/>
+                            </Hyperlink>
+                        </Paragraph>
+                    </RichTextBlock>
                     <RichTextBlock x:Name="NowPlayingArtistText"
                                    Margin="0,-2,0,-2"
                                    HorizontalAlignment="Left"
@@ -453,7 +494,7 @@
                 </StackPanel>
 
                 <!-- Controls + progress -->
-                <Grid Grid.Column="2" VerticalAlignment="Center" Margin="0,0,0,0">
+                <Grid x:Name="PlayerControlsGrid" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
@@ -543,6 +584,7 @@
             </Grid>
         </Grid>
         <!-- Brush providers for code-behind rendering -->
+        <TextBlock x:Name="PrimaryBrushProvider" Foreground="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="SecondaryBrushProvider" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="TertiaryBrushProvider" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="Collapsed"/>
     </Grid>

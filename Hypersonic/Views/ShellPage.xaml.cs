@@ -47,6 +47,8 @@ public sealed partial class ShellPage : Page
     /// container collapses, the metadata column shifts left by this much in
     /// layout — we offset the metadata's composition translation by the same
     /// amount and animate it back to zero so it visually slides into place.
+    /// The same value is applied as a left margin on PlayerControlsGrid to
+    /// reserve the freed space and keep the playback controls visually anchored.
     /// </summary>
     private const float PlayerCoverSlotWidth = 60f;
 
@@ -85,6 +87,13 @@ public sealed partial class ShellPage : Page
                         : null;
                 }
             }
+            else if (e.PropertyName == nameof(Player.HasTrack))
+            {
+                if (!Player.HasTrack)
+                {
+                    ResetCoverArtHoverOverlay();
+                }
+            }
             else if (e.PropertyName == nameof(Player.IsQueueOpen))
             {
                 if (Player.IsQueueOpen)
@@ -101,9 +110,10 @@ public sealed partial class ShellPage : Page
 
         Player.NowPlayingMetadataChanged += (_, _) => RenderNowPlaying();
 
-        // Hand cursor on the player-bar tap targets so they look clickable.
+        // Hand cursor on the cover-art tap target so it looks clickable. The
+        // track-title is a Hyperlink and gets the cursor + hover color shift
+        // for free.
         SetHandCursorOnHover(PlayerCoverArtContainer);
-        SetHandCursorOnHover(PlayerTrackTitle);
 
         QueuePopup.Closed += (_, _) =>
         {
@@ -120,9 +130,12 @@ public sealed partial class ShellPage : Page
 
     private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
     private Brush TertiaryBrush => TertiaryBrushProvider.Foreground;
+    private Brush PrimaryBrush => PrimaryBrushProvider.Foreground;
 
     private void RenderNowPlaying()
     {
+        // Resolve through the brush provider so theme changes refresh Hyperlink.Foreground without overriding native hover styling.
+        PlayerTrackTitleLink.Foreground = PrimaryBrush;
         RenderNowPlayingArtist();
         RenderNowPlayingAlbum();
     }
@@ -428,9 +441,47 @@ public sealed partial class ShellPage : Page
         TryNavigateToNowPlaying();
     }
 
-    private void PlayerTrackTitle_Tapped(object sender, TappedRoutedEventArgs e)
+    private void PlayerTrackTitleLink_Click(Hyperlink sender, HyperlinkClickEventArgs args)
     {
         TryNavigateToNowPlaying();
+    }
+
+    private void PlayerCoverArtContainer_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        // 0.25 over a solid black/white tint reads clearly on most artwork
+        // without washing out the image. The brush itself flips per theme
+        // (see ShellPage.xaml ThemeDictionaries), so light/dark are
+        // perceptually balanced rather than the SubtleFill brush's ~6% alpha
+        // which all but disappeared in dark mode.
+        AnimateCoverArtHoverOverlay(0.25f);
+    }
+
+    private void PlayerCoverArtContainer_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        AnimateCoverArtHoverOverlay(0f);
+    }
+
+    private void AnimateCoverArtHoverOverlay(float toOpacity)
+    {
+        var visual = ElementCompositionPreview.GetElementVisual(PlayerCoverArtHoverOverlay);
+        var compositor = visual.Compositor;
+        var ease = compositor.CreateCubicBezierEasingFunction(
+            new Vector2(0.1f, 0.9f), new Vector2(0.2f, 1f));
+
+        var animation = compositor.CreateScalarKeyFrameAnimation();
+        // Pick up from the in-flight value so quick enter/exit doesn't snap.
+        animation.InsertExpressionKeyFrame(0f, "this.StartingValue");
+        animation.InsertKeyFrame(1f, toOpacity, ease);
+        animation.Duration = TimeSpan.FromMilliseconds(120);
+        visual.StartAnimation("Opacity", animation);
+    }
+
+    private void ResetCoverArtHoverOverlay()
+    {
+        // Stop first, otherwise an in-flight fade keeps writing past the snap.
+        var visual = ElementCompositionPreview.GetElementVisual(PlayerCoverArtHoverOverlay);
+        visual.StopAnimation("Opacity");
+        visual.Opacity = 0f;
     }
 
     private static void SetHandCursorOnHover(UIElement element)
@@ -462,9 +513,20 @@ public sealed partial class ShellPage : Page
             .ToList();
 
         var decision = NowPlayingTapPolicy.Decide(Player.HasTrack, currentPageType, backStackTypes);
-        if (!decision.ShouldNavigate)
+        switch (decision.Action)
         {
-            return;
+            case NowPlayingTapAction.None:
+                return;
+
+            case NowPlayingTapAction.GoBack:
+                // Policy guarantees BackStackIndicesToRemove is empty here, and
+                // there's no outgoing connected animation to prepare — we're
+                // dismissing NowPlayingPage, not navigating to it.
+                navigationService.GoBack();
+                return;
+
+            case NowPlayingTapAction.Navigate:
+                break;
         }
 
         for (var i = decision.BackStackIndicesToRemove.Count - 1; i >= 0; i--)
@@ -475,6 +537,14 @@ public sealed partial class ShellPage : Page
                 frame.BackStack.RemoveAt(index);
             }
         }
+
+        // Clear the hover tint before the connected-animation snapshot so it
+        // isn't baked into the source frame (the overlay lives inside the
+        // wrapper that PrepareToAnimate snapshots). Also primes a clean state
+        // for when the player-bar cover comes back on the way home — pointer
+        // events stop firing once the container collapses, so PointerExited
+        // would otherwise never run.
+        ResetCoverArtHoverOverlay();
 
         // Connected animation: morph the player-bar art into the big art on NowPlayingPage.
         // We pass the rounded wrapper (not the inner Image) so the snapshot
@@ -505,7 +575,14 @@ public sealed partial class ShellPage : Page
             return;
         }
 
+        // Defensive: any caller that didn't already reset the overlay (and
+        // therefore wouldn't snapshot it via PrepareToAnimate either) still
+        // needs a clean state when the cover comes back, since PointerExited
+        // can't fire on a collapsed container.
+        ResetCoverArtHoverOverlay();
+
         PlayerCoverArtContainer.Visibility = Visibility.Collapsed;
+        SetLeftMargin(PlayerControlsGrid, PlayerCoverSlotWidth);
         AnimateMetadataSlide(fromX: PlayerCoverSlotWidth, toX: 0f);
         _playerCoverHiddenForNowPlaying = true;
     }
@@ -522,7 +599,14 @@ public sealed partial class ShellPage : Page
         // position), then immediately offset metadata by -slotWidth and animate
         // back to zero so it visually slides right to its original spot.
         PlayerCoverArtContainer.Visibility = Visibility.Visible;
+        SetLeftMargin(PlayerControlsGrid, 0);
         AnimateMetadataSlide(fromX: -PlayerCoverSlotWidth, toX: 0f);
+    }
+
+    private static void SetLeftMargin(FrameworkElement element, double left)
+    {
+        var m = element.Margin;
+        element.Margin = new Thickness(left, m.Top, m.Right, m.Bottom);
     }
 
     private void AnimateMetadataSlide(float fromX, float toX)

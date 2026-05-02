@@ -56,11 +56,24 @@
             </Grid>
 
             <StackPanel x:Name="MetadataStack" HorizontalAlignment="Center" Spacing="2" MaxWidth="500" SizeChanged="MetadataStack_SizeChanged">
-                <TextBlock Text="{x:Bind Player.TrackTitle, Mode=OneWay}"
-                           FontSize="24" FontWeight="SemiBold"
-                           HorizontalAlignment="Center"
-                           TextAlignment="Center"
-                           TextTrimming="CharacterEllipsis" MaxLines="2"/>
+                <RichTextBlock x:Name="MetaTrackTitle"
+                               IsHitTestVisible="{x:Bind Player.HasTrack, Mode=OneWay}"
+                               IsTextSelectionEnabled="False"
+                               FontFamily="{ThemeResource ContentControlThemeFontFamily}"
+                               FontSize="24"
+                               TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               MaxLines="2">
+                    <Paragraph>
+                        <Hyperlink x:Name="MetaTrackTitleLink"
+                                   UnderlineStyle="None"
+                                   Click="MetaTrackTitleLink_Click">
+                            <!-- Foreground is set in code-behind on the Hyperlink, not the Run, so theme refreshes keep native hover styling. -->
+                            <Run Text="{x:Bind Player.TrackTitle, Mode=OneWay}"
+                                 FontSize="24" FontWeight="SemiBold"/>
+                        </Hyperlink>
+                    </Paragraph>
+                </RichTextBlock>
                 <RichTextBlock x:Name="MetaArtistText"
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
@@ -195,6 +208,7 @@
         </Grid>
 
         <!-- Brush providers -->
+        <TextBlock x:Name="PrimaryBrushProvider" Foreground="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="SecondaryBrushProvider" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="TertiaryBrushProvider" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="Collapsed"/>
     </Grid>
