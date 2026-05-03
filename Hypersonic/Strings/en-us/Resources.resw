@@ -72,8 +72,11 @@
   <data name="Settings_Personalization.Text" xml:space="preserve">
     <value>Personalization</value>
   </data>
-  <data name="Settings_Theme.Text" xml:space="preserve">
+  <data name="Settings_Theme.Header" xml:space="preserve">
     <value>Theme</value>
+  </data>
+  <data name="Settings_Theme.Description" xml:space="preserve">
+    <value>Choose a light, dark, or system-matched appearance.</value>
   </data>
   <data name="Settings_Theme_Light.Content" xml:space="preserve">
     <value>Light</value>
@@ -84,8 +87,11 @@
   <data name="Settings_Theme_Default.Content" xml:space="preserve">
     <value>Default</value>
   </data>
-  <data name="Settings_Backdrop.Text" xml:space="preserve">
+  <data name="Settings_Backdrop.Header" xml:space="preserve">
     <value>Backdrop material</value>
+  </data>
+  <data name="Settings_Backdrop.Description" xml:space="preserve">
+    <value>Window background effect.</value>
   </data>
   <data name="Settings_Backdrop_Mica.Content" xml:space="preserve">
     <value>Mica</value>
@@ -104,6 +110,12 @@
   </data>
   <data name="Settings_AboutDescription.Text" xml:space="preserve">
     <value>TODO: Replace with your app description.</value>
+  </data>
+  <data name="Settings_VersionCard.Header" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="Settings_PrivacyCard.Header" xml:space="preserve">
+    <value>Privacy</value>
   </data>
   <data name="SettingsPage_PrivacyTermsLink.Content" xml:space="preserve">
     <value>Privacy Statement</value>
@@ -219,26 +231,38 @@
   <data name="Settings_Scrobbling.Text" xml:space="preserve">
     <value>Scrobbling</value>
   </data>
-  <data name="Settings_ScrobblingEnabled.Header" xml:space="preserve">
+  <data name="Settings_ScrobblingExpander.Header" xml:space="preserve">
     <value>Enable scrobbling</value>
   </data>
-  <data name="Settings_NowPlaying.Header" xml:space="preserve">
+  <data name="Settings_ScrobblingExpander.Description" xml:space="preserve">
+    <value>Send playback activity to your server when listening criteria are met.</value>
+  </data>
+  <data name="Settings_NowPlayingCard.Header" xml:space="preserve">
     <value>Send "Now Playing" notifications</value>
   </data>
-  <data name="Settings_PlaytimeThreshold.Text" xml:space="preserve">
+  <data name="Settings_NowPlayingCard.Description" xml:space="preserve">
+    <value>Tell your server which track is currently playing.</value>
+  </data>
+  <data name="Settings_PlaytimeThresholdCard.Header" xml:space="preserve">
     <value>Playtime threshold</value>
   </data>
-  <data name="Settings_PercentageThreshold.Text" xml:space="preserve">
+  <data name="Settings_PlaytimeThresholdCard.Description" xml:space="preserve">
+    <value>How long a track must play before it counts.</value>
+  </data>
+  <data name="Settings_PercentageThresholdCard.Header" xml:space="preserve">
     <value>Percentage threshold</value>
   </data>
-  <data name="Settings_ConditionMode.Text" xml:space="preserve">
+  <data name="Settings_ConditionModeCard.Header" xml:space="preserve">
     <value>Condition mode</value>
   </data>
+  <data name="Settings_ConditionModeCard.Description" xml:space="preserve">
+    <value>Whether the playtime and percentage rules apply jointly or independently.</value>
+  </data>
   <data name="Settings_ConditionMode_Or.Content" xml:space="preserve">
-    <value>Either threshold (OR)</value>
+    <value>Either</value>
   </data>
   <data name="Settings_ConditionMode_And.Content" xml:space="preserve">
-    <value>Both thresholds (AND)</value>
+    <value>Both</value>
   </data>
   <data name="Settings_PlaytimePreset_15Seconds" xml:space="preserve">
     <value>15 seconds</value>

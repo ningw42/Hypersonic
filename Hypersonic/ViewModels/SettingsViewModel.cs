@@ -51,9 +51,11 @@ public partial class SettingsViewModel : ObservableRecipient
     private double _appliedUiScale = DefaultUiScale;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ElementThemeIndex))]
     public partial ElementTheme ElementTheme { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BackdropTypeIndex))]
     public partial BackdropType BackdropType { get; set; }
 
     [ObservableProperty]
@@ -73,6 +75,7 @@ public partial class SettingsViewModel : ObservableRecipient
     public partial double ScrobblePercentageThreshold { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScrobbleConditionModeIndex))]
     public partial ScrobbleConditionMode ScrobbleConditionMode { get; set; }
 
     public string PercentageThresholdText => $"{(int)ScrobblePercentageThreshold}%";
@@ -131,6 +134,117 @@ public partial class SettingsViewModel : ObservableRecipient
             }
 
             UiScale = UiScalePresets[value];
+        }
+    }
+
+    /// <summary>
+    /// SelectedIndex of the Segmented control that exposes <see cref="ElementTheme"/>.
+    /// Round-trips Light/Dark/Default to 0/1/2; out-of-range values (including
+    /// Segmented's transient -1 during rebind) are no-ops so the bound control
+    /// can settle cleanly. Setter fires-and-forgets the service call because
+    /// property setters cannot await.
+    /// </summary>
+    public int ElementThemeIndex
+    {
+        get => ElementTheme switch
+        {
+            ElementTheme.Light => 0,
+            ElementTheme.Dark => 1,
+            ElementTheme.Default => 2,
+            _ => 2,
+        };
+        set
+        {
+            if (value < 0 || value > 2)
+            {
+                return;
+            }
+
+            var theme = value switch
+            {
+                0 => ElementTheme.Light,
+                1 => ElementTheme.Dark,
+                _ => ElementTheme.Default,
+            };
+
+            if (theme == ElementTheme)
+            {
+                return;
+            }
+
+            ElementTheme = theme;
+            _ = _themeSelectorService.SetThemeAsync(theme);
+        }
+    }
+
+    /// <summary>
+    /// SelectedIndex of the Segmented control that exposes <see cref="BackdropType"/>.
+    /// Round-trips Mica/MicaAlt/Acrylic/None to 0/1/2/3; out-of-range values are
+    /// no-ops.
+    /// </summary>
+    public int BackdropTypeIndex
+    {
+        get => BackdropType switch
+        {
+            BackdropType.Mica => 0,
+            BackdropType.MicaAlt => 1,
+            BackdropType.Acrylic => 2,
+            BackdropType.None => 3,
+            _ => 0,
+        };
+        set
+        {
+            if (value < 0 || value > 3)
+            {
+                return;
+            }
+
+            var backdrop = value switch
+            {
+                0 => BackdropType.Mica,
+                1 => BackdropType.MicaAlt,
+                2 => BackdropType.Acrylic,
+                _ => BackdropType.None,
+            };
+
+            if (backdrop == BackdropType)
+            {
+                return;
+            }
+
+            BackdropType = backdrop;
+            _ = _backdropSelectorService.SetBackdropAsync(backdrop);
+        }
+    }
+
+    /// <summary>
+    /// SelectedIndex of the Segmented control that exposes
+    /// <see cref="ScrobbleConditionMode"/>. Or → 0, And → 1.
+    /// </summary>
+    public int ScrobbleConditionModeIndex
+    {
+        get => ScrobbleConditionMode switch
+        {
+            ScrobbleConditionMode.Or => 0,
+            ScrobbleConditionMode.And => 1,
+            _ => 0,
+        };
+        set
+        {
+            if (value < 0 || value > 1)
+            {
+                return;
+            }
+
+            var mode = value == 0 ? ScrobbleConditionMode.Or : ScrobbleConditionMode.And;
+
+            if (mode == ScrobbleConditionMode)
+            {
+                return;
+            }
+
+            ScrobbleConditionMode = mode;
+            _ = _scrobblingService.SetConditionModeAsync(mode);
         }
     }
 
