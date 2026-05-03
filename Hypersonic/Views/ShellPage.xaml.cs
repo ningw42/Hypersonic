@@ -671,10 +671,26 @@ public sealed partial class ShellPage : Page
     {
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            if (!TitleBarSearchBox.FocusState.HasFlag(FocusState.Programmatic) &&
-                TitleBarSearchBox.FocusState == FocusState.Unfocused)
+            // Window may be tearing down by the time this Low-priority callback
+            // runs; touching any XAML proxy (including IsLoaded) on a released
+            // element throws E_UNEXPECTED, so the IsLoaded check lives inside the try.
+            try
             {
-                CloseSearchPopup();
+                if (!IsLoaded)
+                {
+                    return;
+                }
+
+                var focusState = TitleBarSearchBox.FocusState;
+                if (focusState == FocusState.Unfocused)
+                {
+                    CloseSearchPopup();
+                }
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+                when ((uint)ex.HResult == 0x8000FFFF)
+            {
+                // Element released between scheduling and callback execution.
             }
         });
     }
@@ -756,15 +772,35 @@ public sealed partial class ShellPage : Page
         _isClosingPopup = true;
         AnimatePopup(isOpening: false, onCompleted: () =>
         {
-            // Reset visual before hiding
-            var visual = ElementCompositionPreview.GetElementVisual(SearchPopupBorder);
-            visual.StopAnimation("Opacity");
-            visual.StopAnimation("Translation.Y");
-            visual.Opacity = 1f;
-            visual.Properties.InsertVector3("Translation", Vector3.Zero);
+            try
+            {
+                if (!IsLoaded)
+                {
+                    // Don't invoke afterClose during teardown — current callers
+                    // (e.g. SearchBox_KeyDown) touch TitleBarSearchBox.Text and would
+                    // hit the same released-XAML-proxy crash.
+                    _isClosingPopup = false;
+                    return;
+                }
 
-            SearchResultsPopup.IsOpen = false;
-            ViewModel.IsSearchResultsVisible = false;
+                // Reset visual before hiding
+                var visual = ElementCompositionPreview.GetElementVisual(SearchPopupBorder);
+                visual.StopAnimation("Opacity");
+                visual.StopAnimation("Translation.Y");
+                visual.Opacity = 1f;
+                visual.Properties.InsertVector3("Translation", Vector3.Zero);
+
+                SearchResultsPopup.IsOpen = false;
+                ViewModel.IsSearchResultsVisible = false;
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+                when ((uint)ex.HResult == 0x8000FFFF)
+            {
+                // Page torn down mid-animation; visuals are gone.
+                _isClosingPopup = false;
+                return;
+            }
+
             _isClosingPopup = false;
             afterClose?.Invoke();
         });
