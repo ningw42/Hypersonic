@@ -165,13 +165,17 @@ public class SettingsViewModelSegmentedTests
     private static SettingsViewModel CreateViewModel(
         FakeThemeSelectorService? theme = null,
         FakeBackdropSelectorService? backdrop = null,
-        FakeScrobblingService? scrobbling = null)
+        FakeScrobblingService? scrobbling = null,
+        FakeAppStateService? appState = null,
+        FakeTrayIconService? tray = null)
     {
         return new SettingsViewModel(
             theme ?? new FakeThemeSelectorService(),
             backdrop ?? new FakeBackdropSelectorService(),
             scrobbling ?? new FakeScrobblingService(),
-            new NoopLocalSettingsService());
+            new NoopLocalSettingsService(),
+            appState ?? new FakeAppStateService(),
+            tray ?? new FakeTrayIconService());
     }
 
     private sealed class FakeThemeSelectorService : IThemeSelectorService

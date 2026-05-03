@@ -48,6 +48,10 @@ public class ThemeSelectorService : IThemeSelectorService
         // Re-apply backdrop in case it's set to None — its solid background
         // depends on the current theme and must be refreshed.
         await App.GetService<IBackdropSelectorService>().SetRequestedBackdropAsync();
+
+        // Note: the tray icon and its context menu are intentionally left
+        // alone -- they follow the Windows system app theme, not our
+        // in-app override. See TrayIconService.CreateIcon for rationale.
     }
 
     private async Task<ElementTheme> LoadThemeFromSettingsAsync()

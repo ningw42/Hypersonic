@@ -5,6 +5,7 @@ public class AppState
     public PlaybackState Playback { get; set; } = new();
     public WindowState Window { get; set; } = new();
     public NavigationState Navigation { get; set; } = new();
+    public GeneralState General { get; set; } = new();
 }
 
 public class PlaybackState
@@ -27,4 +28,10 @@ public class WindowState
 public class NavigationState
 {
     public string? LastPage { get; set; }
+}
+
+public class GeneralState
+{
+    public bool MinimizeToTray { get; set; } = false;
+    public bool CloseToTray { get; set; } = false;
 }

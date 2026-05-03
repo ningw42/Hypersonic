@@ -45,6 +45,12 @@ public partial class App : Application
 
     public static UIElement? AppTitlebar { get; set; }
 
+    /// <summary>
+    /// Set to true when the user chooses Exit from the tray menu.
+    /// MainWindow uses this to distinguish a real exit from a close-to-tray.
+    /// </summary>
+    public static bool IsExiting { get; set; }
+
     public App()
     {
         InitializeComponent();
@@ -99,6 +105,7 @@ public partial class App : Application
             services.AddSingleton<ISubsonicClientService, SubsonicClientService>();
             services.AddSingleton<IPlaybackService, PlaybackService>();
             services.AddSingleton<ITaskbarService, TaskbarService>();
+            services.AddSingleton<ITrayIconService, TrayIconService>();
             services.AddSingleton<ICredentialService, CredentialService>();
             services.AddSingleton<IAppStateService, AppStateService>();
 

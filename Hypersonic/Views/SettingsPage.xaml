@@ -19,8 +19,28 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="ContentArea" Padding="0,0,16,24">
 
+            <!-- General -->
+            <TextBlock x:Uid="Settings_General" Style="{ThemeResource SubtitleTextBlockStyle}" />
+
+            <controls:SettingsCard x:Uid="Settings_MinimizeToTray"
+                                   Margin="{StaticResource XSmallTopMargin}">
+                <controls:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE921;" />
+                </controls:SettingsCard.HeaderIcon>
+                <ToggleSwitch IsOn="{x:Bind ViewModel.MinimizeToTray, Mode=TwoWay}" />
+            </controls:SettingsCard>
+
+            <controls:SettingsCard x:Uid="Settings_CloseToTray">
+                <controls:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE8BB;" />
+                </controls:SettingsCard.HeaderIcon>
+                <ToggleSwitch IsOn="{x:Bind ViewModel.CloseToTray, Mode=TwoWay}" />
+            </controls:SettingsCard>
+
             <!-- Personalization -->
-            <TextBlock x:Uid="Settings_Personalization" Style="{ThemeResource SubtitleTextBlockStyle}" />
+            <TextBlock x:Uid="Settings_Personalization"
+                       Margin="{StaticResource MediumTopMargin}"
+                       Style="{ThemeResource SubtitleTextBlockStyle}" />
 
             <controls:SettingsCard
                 x:Uid="Settings_Theme"

@@ -92,6 +92,9 @@ public class PersistenceTests
         Assert.IsFalse(state.Window.IsMaximized);
 
         Assert.IsNull(state.Navigation.LastPage);
+
+        Assert.IsFalse(state.General.MinimizeToTray);
+        Assert.IsFalse(state.General.CloseToTray);
     }
 
     [TestMethod]
@@ -118,6 +121,11 @@ public class PersistenceTests
             {
                 LastPage = "Hypersonic.ViewModels.AlbumsViewModel",
             },
+            General = new GeneralState
+            {
+                MinimizeToTray = true,
+                CloseToTray = true,
+            },
         };
 
         var json = JsonSerializer.Serialize(state, Json.Options);
@@ -139,6 +147,9 @@ public class PersistenceTests
         Assert.IsFalse(deserialized.Window.IsMaximized);
 
         Assert.AreEqual("Hypersonic.ViewModels.AlbumsViewModel", deserialized.Navigation.LastPage);
+
+        Assert.IsTrue(deserialized.General.MinimizeToTray);
+        Assert.IsTrue(deserialized.General.CloseToTray);
     }
 
     [TestMethod]

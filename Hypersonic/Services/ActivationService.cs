@@ -107,6 +107,12 @@ public class ActivationService : IActivationService
         // Execute tasks after activation.
         await StartupAsync();
 
+        // Initialize tray icon last - needs MainWindow.Content present and the
+        // applied theme to render the WinUI-styled context menu correctly.
+        var tray = App.GetService<ITrayIconService>();
+        tray.Initialize();
+        tray.RefreshVisibility();
+
         _log.Info("Activation completed");
     }
 

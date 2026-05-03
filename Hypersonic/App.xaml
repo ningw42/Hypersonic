@@ -11,6 +11,25 @@
                 <ResourceDictionary Source="/Styles/TextBlock.xaml" />
                 <ResourceDictionary Source="/Themes/Generic.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!--
+                Implicit style for MenuFlyoutPresenter. Exists primarily to suppress
+                the spurious vertical scrollbar that appears on the FIRST open of the
+                tray icon's right-click menu when H.NotifyIcon's SecondWindow mode is
+                used (see TrayIconService.cs for full root-cause notes).
+
+                Must live in App.Resources (not on the MenuFlyout instance), because
+                the SecondWindow code moves user items into a NEW MenuFlyout it
+                constructs internally, discarding any per-instance MenuFlyoutPresenterStyle.
+                Implicit app-level styles still cascade into that internal flyout.
+            -->
+            <Style TargetType="MenuFlyoutPresenter">
+                <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+                <Setter Property="ScrollViewer.VerticalScrollMode" Value="Disabled" />
+                <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+                <Setter Property="ScrollViewer.HorizontalScrollMode" Value="Disabled" />
+                <Setter Property="MaxHeight" Value="10000" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

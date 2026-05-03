@@ -41,8 +41,11 @@ public partial class SettingsViewModel : ObservableRecipient
     private readonly IBackdropSelectorService _backdropSelectorService;
     private readonly IScrobblingService _scrobblingService;
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly IAppStateService _appStateService;
+    private readonly ITrayIconService _trayIconService;
     private readonly object _fontSettingsSaveLock = new();
     private bool _isInitializingScrobbling;
+    private bool _isInitializingGeneral;
     private bool _isInitializingFontSettings = true;
     private Task? _fontInitTask;
     private Task _fontSettingsSaveQueue = Task.CompletedTask;
@@ -66,6 +69,12 @@ public partial class SettingsViewModel : ObservableRecipient
 
     [ObservableProperty]
     public partial bool IsNowPlayingEnabled { get; set; }
+
+    [ObservableProperty]
+    public partial bool MinimizeToTray { get; set; }
+
+    [ObservableProperty]
+    public partial bool CloseToTray { get; set; }
 
     [ObservableProperty]
     public partial int SelectedPlaytimeThreshold { get; set; }
@@ -284,12 +293,16 @@ public partial class SettingsViewModel : ObservableRecipient
         IThemeSelectorService themeSelectorService,
         IBackdropSelectorService backdropSelectorService,
         IScrobblingService scrobblingService,
-        ILocalSettingsService localSettingsService)
+        ILocalSettingsService localSettingsService,
+        IAppStateService appStateService,
+        ITrayIconService trayIconService)
     {
         _themeSelectorService = themeSelectorService;
         _backdropSelectorService = backdropSelectorService;
         _scrobblingService = scrobblingService;
         _localSettingsService = localSettingsService;
+        _appStateService = appStateService;
+        _trayIconService = trayIconService;
         ElementTheme = _themeSelectorService.Theme;
         BackdropType = _backdropSelectorService.Backdrop;
         VersionDescription = GetVersionDescription();
@@ -301,6 +314,11 @@ public partial class SettingsViewModel : ObservableRecipient
         ScrobblePercentageThreshold = _scrobblingService.PercentageThreshold;
         ScrobbleConditionMode = _scrobblingService.ConditionMode;
         _isInitializingScrobbling = false;
+
+        _isInitializingGeneral = true;
+        MinimizeToTray = _appStateService.State.General.MinimizeToTray;
+        CloseToTray = _appStateService.State.General.CloseToTray;
+        _isInitializingGeneral = false;
 
         // Default the UI scale to 100% before async load so the bound Segmented
         // control settles on the correct segment if the load is slow.
@@ -509,6 +527,22 @@ public partial class SettingsViewModel : ObservableRecipient
     {
         if (!_isInitializingScrobbling)
             _ = _scrobblingService.SetEnabledAsync(value);
+    }
+
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        if (_isInitializingGeneral) return;
+        _appStateService.State.General.MinimizeToTray = value;
+        _ = _appStateService.SaveGeneralAsync();
+        _trayIconService.RefreshVisibility();
+    }
+
+    partial void OnCloseToTrayChanged(bool value)
+    {
+        if (_isInitializingGeneral) return;
+        _appStateService.State.General.CloseToTray = value;
+        _ = _appStateService.SaveGeneralAsync();
+        _trayIconService.RefreshVisibility();
     }
 
     partial void OnIsNowPlayingEnabledChanged(bool value)

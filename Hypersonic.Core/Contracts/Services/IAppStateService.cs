@@ -10,5 +10,6 @@ public interface IAppStateService
     Task SavePlaybackAsync();
     Task SaveWindowAsync();
     Task SaveNavigationAsync();
+    Task SaveGeneralAsync();
     void SaveSync();
 }

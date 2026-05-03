@@ -72,6 +72,27 @@
   <data name="Settings_Personalization.Text" xml:space="preserve">
     <value>Personalization</value>
   </data>
+  <data name="Settings_General.Text" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="Settings_MinimizeToTray.Header" xml:space="preserve">
+    <value>Minimize to system tray</value>
+  </data>
+  <data name="Settings_MinimizeToTray.Description" xml:space="preserve">
+    <value>When minimized, hide the window to the system tray instead.</value>
+  </data>
+  <data name="Settings_CloseToTray.Header" xml:space="preserve">
+    <value>Close to system tray</value>
+  </data>
+  <data name="Settings_CloseToTray.Description" xml:space="preserve">
+    <value>When the close button is clicked, hide the window to the system tray instead of exiting.</value>
+  </data>
+  <data name="TrayIcon_Show" xml:space="preserve">
+    <value>Show Hypersonic</value>
+  </data>
+  <data name="TrayIcon_Exit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
   <data name="Settings_Theme.Header" xml:space="preserve">
     <value>Theme</value>
   </data>

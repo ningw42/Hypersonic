@@ -66,6 +66,8 @@ public class AppStateService : IAppStateService
 
     public Task SaveNavigationAsync() => WriteStateAsync();
 
+    public Task SaveGeneralAsync() => WriteStateAsync();
+
     /// <summary>
     /// Synchronous write for use during window close, where async + Task.Run
     /// would deadlock or race against process exit. Acquires the write lock
