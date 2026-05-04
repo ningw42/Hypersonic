@@ -10,6 +10,8 @@ public interface ISubsonicClientService
 {
     ISubsonicClient? Client { get; }
 
+    string? ActiveUserIdentity { get; }
+
     void CreateClient(ServerCredential credential);
 
     Task<ConnectionTestResult> TestConnectionAsync(ServerCredential credential);

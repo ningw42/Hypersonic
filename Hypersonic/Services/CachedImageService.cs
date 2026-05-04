@@ -41,8 +41,8 @@ public sealed class CachedImageService : IImageService, IDisposable
         _cacheFolderPath = ImageCachePath.Resolve(_options);
         _resolvers =
         [
-            new SubsonicImageResolver(subsonicClientService),
-            new RemoteImageResolver(),
+            new SubsonicImageResolver(subsonicClientService, logService),
+            new RemoteImageResolver(logService),
         ];
     }
 
@@ -67,9 +67,18 @@ public sealed class CachedImageService : IImageService, IDisposable
 
         try
         {
-            var resolver = _resolvers.FirstOrDefault(r => r.TryCreateCacheKey(image, options, out _));
-            if (resolver == null ||
-                !resolver.TryCreateCacheKey(image, options, out var key))
+            IImageResolver? resolver = null;
+            ImageCacheKey key = default!;
+            foreach (var candidate in _resolvers)
+            {
+                if (candidate.TryCreateCacheKey(image, options, out key))
+                {
+                    resolver = candidate;
+                    break;
+                }
+            }
+
+            if (resolver == null)
             {
                 return null;
             }
@@ -270,6 +279,8 @@ public sealed class CachedImageService : IImageService, IDisposable
         ImageCacheKey key,
         string keyHash)
     {
+        _log.Debug("Image fetch starting", new { KeyHash = keyHash, key.Provider, key.Kind, key.Size });
+
         var task = FetchAndStoreAsync(resolver, image, options, key, keyHash, GetDisposeToken());
         _ = task.ContinueWith(
             completed => _inFlightFetches.TryRemove(new KeyValuePair<string, Task<Uri?>>(keyHash, completed)),
@@ -363,6 +374,7 @@ public sealed class CachedImageService : IImageService, IDisposable
                     Provider = key.Provider,
                     Kind = key.Kind,
                     ServerHash = key.ServerHash,
+                    ServerScopeHash = key.ServerScopeHash,
                     Size = key.Size,
                     CreatedAtUtc = oldEntry?.CreatedAtUtc ?? now,
                     LastAccessUtc = now,
@@ -372,7 +384,18 @@ public sealed class CachedImageService : IImageService, IDisposable
 
             await EvictIfNeededAsync(keyHash, cancellationToken).ConfigureAwait(false);
 
-            _log.Debug("Image cached", new { KeyHash = keyHash, key.Provider, key.Kind, bytes.LongLength });
+            _log.Debug(
+                "Image cached",
+                new
+                {
+                    KeyHash = keyHash,
+                    key.Provider,
+                    key.Kind,
+                    ServerHash = ShortHash(key.ServerHash),
+                    ServerScopeHash = ShortHash(key.ServerScopeHash),
+                    key.Size,
+                    bytes.LongLength,
+                });
             return new Uri(finalPath);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || IsDisposed)
@@ -407,6 +430,7 @@ public sealed class CachedImageService : IImageService, IDisposable
         var entry = await _store.GetEntryAsync(keyHash, cancellationToken).ConfigureAwait(false);
         if (entry == null)
         {
+            _log.Debug("Cache miss", new { KeyHash = keyHash, Reason = "no-entry", AllowStale = allowStale });
             return null;
         }
 
@@ -414,16 +438,21 @@ public sealed class CachedImageService : IImageService, IDisposable
         if (!File.Exists(path))
         {
             await _store.RemoveEntryAsync(keyHash, flushImmediately: true, cancellationToken).ConfigureAwait(false);
+            _log.Debug("Cache miss", new { KeyHash = keyHash, Reason = "file-missing", AllowStale = allowStale });
             return null;
         }
 
         var now = _timeProvider.GetUtcNow();
         if (!allowStale && entry.ExpiresAtUtc <= now)
         {
+            _log.Debug("Cache miss", new { KeyHash = keyHash, Reason = "expired", AllowStale = allowStale });
             return null;
         }
 
         await _store.TouchEntryAsync(keyHash, now, cancellationToken).ConfigureAwait(false);
+        _log.Debug(
+            allowStale ? "Cache hit (stale fallback)" : "Cache hit",
+            new { KeyHash = keyHash, entry.Provider, entry.Kind, entry.Size, entry.Length });
         return new Uri(path);
     }
 
@@ -440,6 +469,8 @@ public sealed class CachedImageService : IImageService, IDisposable
             return;
         }
 
+        var startingBytes = totalBytes;
+        var evictedCount = 0;
         var changed = false;
         foreach (var item in await _store.GetEvictionCandidatesAsync(protectedKeyHash, cancellationToken).ConfigureAwait(false))
         {
@@ -452,12 +483,22 @@ public sealed class CachedImageService : IImageService, IDisposable
             TryDeleteFile(Path.Combine(_cacheFolderPath, item.Entry.FileName), logFailures: false);
             await _store.RemoveEntryAsync(item.KeyHash, cancellationToken: cancellationToken).ConfigureAwait(false);
             totalBytes -= item.Entry.Length;
+            evictedCount++;
             changed = true;
         }
 
         if (changed)
         {
             await _store.FlushAsync(cancellationToken).ConfigureAwait(false);
+            _log.Debug(
+                "Image cache eviction",
+                new
+                {
+                    EvictedCount = evictedCount,
+                    BytesFreed = startingBytes - totalBytes,
+                    TotalBytes = totalBytes,
+                    MaximumBytes = maximumBytes,
+                });
         }
     }
 
@@ -571,6 +612,8 @@ public sealed class CachedImageService : IImageService, IDisposable
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    private static string ShortHash(string hash) => hash.Length >= 8 ? hash[..8] : hash;
 
     private static string DetectExtension(ReadOnlySpan<byte> bytes)
     {

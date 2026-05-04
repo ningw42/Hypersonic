@@ -77,6 +77,7 @@ public class PlaybackTrackPropagationTests
     private sealed class FakeSubsonicClientService : ISubsonicClientService
     {
         public Client.ISubsonicClient? Client => null;
+        public string? ActiveUserIdentity => null;
         public void CreateClient(ServerCredential credential) { }
         public Task<ConnectionTestResult> TestConnectionAsync(ServerCredential credential) =>
             throw new NotImplementedException();

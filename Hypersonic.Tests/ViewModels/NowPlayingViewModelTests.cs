@@ -35,6 +35,7 @@ public class NowPlayingViewModelTests
     private sealed class FakeSubsonicClientService : ISubsonicClientService
     {
         public Hypersonic.Client.ISubsonicClient? Client => null;
+        public string? ActiveUserIdentity => null;
         public void CreateClient(ServerCredential credential) { }
         public Task<ConnectionTestResult> TestConnectionAsync(ServerCredential credential)
             => throw new NotImplementedException();

@@ -16,6 +16,10 @@ public class SubsonicClientService : ISubsonicClientService
 
     public ISubsonicClient? Client { get; private set; }
 
+    public string? ActiveUserIdentity => _activeUserIdentity;
+
+    private string? _activeUserIdentity;
+
     public SubsonicClientService(ILoggingService logService)
     {
         _log = logService.GetLogger(nameof(SubsonicClientService));
@@ -23,13 +27,16 @@ public class SubsonicClientService : ISubsonicClientService
 
     public void CreateClient(ServerCredential credential)
     {
-        Client = new SubsonicClient(
+        var client = new SubsonicClient(
             new HttpClient(),
             credential.ServerUrl,
             credential.Username,
             credential.Password,
             ClientVersion,
             ClientId);
+
+        Client = client;
+        _activeUserIdentity = credential.Username;
 
         _log.Info("Client created", new { credential.ServerUrl, credential.Username });
     }

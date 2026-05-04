@@ -24,6 +24,7 @@ public class ImageCacheServiceTests
     private string _cacheRoot = null!;
     private FakeTimeProvider _time = null!;
     private FakeSubsonicClient _client = null!;
+    private FakeSubsonicClientService _clientService = null!;
     private JsonImageCacheStore _store = null!;
 
     [TestInitialize]
@@ -33,6 +34,7 @@ public class ImageCacheServiceTests
         Directory.CreateDirectory(_cacheRoot);
         _time = new FakeTimeProvider(new DateTimeOffset(2026, 5, 3, 0, 0, 0, TimeSpan.Zero));
         _client = new FakeSubsonicClient();
+        _clientService = new FakeSubsonicClientService { Client = _client };
     }
 
     [TestCleanup]
@@ -77,6 +79,80 @@ public class ImageCacheServiceTests
         Assert.IsFalse(manifest.Contains("secret-cover-id", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(manifest.Contains("u=", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(manifest.Contains("p=", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public async Task DifferentUserIdentities_ProduceDistinctCacheEntriesForSameCoverId()
+    {
+        _client.Images["shared-cover"] = PngA;
+        var service = CreateService();
+
+        _clientService.ActiveUserIdentity = "alice";
+        var aliceUri = await service.GetImageAsync(CoverArt("shared-cover"), ImageRequestOptions.ForSize("300"));
+
+        _clientService.ActiveUserIdentity = "bob";
+        var bobUri = await service.GetImageAsync(CoverArt("shared-cover"), ImageRequestOptions.ForSize("300"));
+
+        await _store.FlushAsync();
+        var stats = await service.GetStatsAsync();
+        var manifest = await File.ReadAllTextAsync(Path.Combine(_cacheRoot, "manifest.json"));
+
+        Assert.IsNotNull(aliceUri);
+        Assert.IsNotNull(bobUri);
+        Assert.AreNotEqual(aliceUri, bobUri);
+        Assert.IsTrue(File.Exists(aliceUri!.LocalPath));
+        Assert.IsTrue(File.Exists(bobUri!.LocalPath));
+        Assert.AreEqual(2, stats.EntryCount);
+        Assert.AreEqual(2, _client.FetchCounts["shared-cover|300"]);
+        Assert.IsFalse(manifest.Contains("alice", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(manifest.Contains("bob", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [TestMethod]
+    public async Task MissingUserIdentity_SkipsFetchAndReturnsNull()
+    {
+        _client.Images["cover-a"] = PngA;
+        _clientService.ActiveUserIdentity = null;
+        var service = CreateService();
+
+        var result = await service.GetImageAsync(CoverArt("cover-a"), ImageRequestOptions.ForSize("300"));
+
+        Assert.IsNull(result);
+        Assert.IsFalse(_client.FetchCounts.ContainsKey("cover-a|300"));
+    }
+
+    [TestMethod]
+    public async Task LegacyV1Manifest_IsReplacedWithEmptyV2OnLoad()
+    {
+        var legacyManifest = """
+            {
+              "Version": 1,
+              "Entries": {
+                "legacy-key": {
+                  "FileName": "legacy-key.png",
+                  "Length": 8,
+                  "Provider": "subsonic",
+                  "Kind": "cover-art",
+                  "ServerHash": "deadbeef",
+                  "Size": "300",
+                  "CreatedAtUtc": "2026-05-01T00:00:00+00:00",
+                  "LastAccessUtc": "2026-05-01T00:00:00+00:00",
+                  "ExpiresAtUtc": "2026-06-01T00:00:00+00:00"
+                }
+              }
+            }
+            """;
+        var manifestPath = Path.Combine(_cacheRoot, "manifest.json");
+        await File.WriteAllTextAsync(manifestPath, legacyManifest);
+
+        var store = CreateStore();
+        var entry = await store.GetEntryAsync("legacy-key");
+
+        Assert.IsNull(entry);
+        var persistedJson = await File.ReadAllTextAsync(manifestPath);
+        using var persisted = JsonDocument.Parse(persistedJson);
+        Assert.AreEqual(2, persisted.RootElement.GetProperty("Version").GetInt32());
+        Assert.AreEqual(0, persisted.RootElement.GetProperty("Entries").EnumerateObject().Count());
     }
 
     [TestMethod]
@@ -315,7 +391,7 @@ public class ImageCacheServiceTests
         _store = CreateStore(options);
 
         return new CachedImageService(
-            new FakeSubsonicClientService { Client = _client },
+            _clientService,
             _store,
             Options.Create(options),
             _time,
@@ -328,7 +404,7 @@ public class ImageCacheServiceTests
         options.RootPath = _cacheRoot;
 
         return new CachedImageService(
-            new FakeSubsonicClientService { Client = _client },
+            _clientService,
             store,
             Options.Create(options),
             _time,
@@ -381,6 +457,7 @@ public class ImageCacheServiceTests
     private sealed class FakeSubsonicClientService : ISubsonicClientService
     {
         public ISubsonicClient? Client { get; set; }
+        public string? ActiveUserIdentity { get; set; } = "alice";
         public void CreateClient(ServerCredential credential) { }
         public Task<ConnectionTestResult> TestConnectionAsync(ServerCredential credential) => throw new NotImplementedException();
     }

@@ -16,6 +16,8 @@ public sealed class ImageCacheEntry
 
     public string ServerHash { get; set; } = string.Empty;
 
+    public string ServerScopeHash { get; set; } = string.Empty;
+
     public string Size { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAtUtc { get; set; }
@@ -33,6 +35,7 @@ public sealed class ImageCacheEntry
             Provider = Provider,
             Kind = Kind,
             ServerHash = ServerHash,
+            ServerScopeHash = ServerScopeHash,
             Size = Size,
             CreatedAtUtc = CreatedAtUtc,
             LastAccessUtc = LastAccessUtc,

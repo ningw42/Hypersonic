@@ -12,6 +12,7 @@ namespace Hypersonic.Services;
 public sealed class JsonImageCacheStore : IImageCacheStore, IDisposable
 {
     private const string ManifestFileName = "manifest.json";
+    private const int CurrentManifestVersion = 2;
     private static readonly TimeSpan FlushDelay = TimeSpan.FromMilliseconds(250);
 
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -281,6 +282,15 @@ public sealed class JsonImageCacheStore : IImageCacheStore, IDisposable
             _manifest = new ImageCacheManifest();
         }
 
+        if (_manifest.Version != CurrentManifestVersion)
+        {
+            _log.Info(
+                "Image cache manifest version upgraded; existing entries discarded",
+                new { OldVersion = _manifest.Version, NewVersion = CurrentManifestVersion });
+            _manifest = new ImageCacheManifest();
+            await SaveManifestLockedAsync(_manifest, cancellationToken).ConfigureAwait(false);
+        }
+
         return _manifest;
     }
 
@@ -391,7 +401,7 @@ public sealed class JsonImageCacheStore : IImageCacheStore, IDisposable
 
     private sealed class ImageCacheManifest
     {
-        public int Version { get; set; } = 1;
+        public int Version { get; set; } = CurrentManifestVersion;
 
         public Dictionary<string, ImageCacheEntry> Entries { get; set; } = [];
     }
