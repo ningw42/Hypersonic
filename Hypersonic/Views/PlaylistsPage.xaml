@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:behaviors="using:Hypersonic.Behaviors"
+    xmlns:helpers="using:Hypersonic.Helpers"
     mc:Ignorable="d"
     NavigationCacheMode="Required"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
@@ -103,7 +104,8 @@
                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
-                                    <Image Source="{Binding CoverArtUrl}"
+                                    <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                           helpers:CachedImage.Size="300"
                                            Stretch="UniformToFill"
                                            Width="48" Height="48"/>
                                 </Grid>

@@ -1,6 +1,7 @@
 using Hypersonic.Client;
 using Hypersonic.Client.Models.Entities;
 using Hypersonic.Client.Models.Responses;
+using Hypersonic.Core.Models;
 using Hypersonic.Helpers;
 
 namespace Hypersonic.Tests.Helpers;
@@ -112,8 +113,10 @@ public class SongMapperTests
         Assert.AreEqual(120, result.BPM);
         Assert.IsTrue(result.IsStarred);
         Assert.IsNotNull(result.StreamUri);
-        Assert.IsNotNull(result.CoverArtUri);
-        Assert.IsNotNull(result.CoverArtUrl);
+        Assert.IsNotNull(result.CoverImage);
+        Assert.AreEqual(ImageReference.SubsonicProvider, result.CoverImage.Provider);
+        Assert.AreEqual(ImageReference.CoverArtKind, result.CoverImage.Kind);
+        Assert.AreEqual("cover1", result.CoverImage.Identity);
     }
 
     [TestMethod]
@@ -172,15 +175,14 @@ public class SongMapperTests
     }
 
     [TestMethod]
-    public void MapFromChild_NoCoverArt_SetsNullUris()
+    public void MapFromChild_NoCoverArt_SetsNullImageFields()
     {
         var client = new FakeSubsonicClient();
         var child = new Child { Id = "s1", CoverArt = null };
 
         var result = SongMapper.MapFromChild(child, client);
 
-        Assert.IsNull(result.CoverArtUri);
-        Assert.IsNull(result.CoverArtUrl);
+        Assert.IsNull(result.CoverImage);
     }
 
     [TestMethod]

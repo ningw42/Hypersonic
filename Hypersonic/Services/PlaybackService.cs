@@ -18,7 +18,9 @@ public class PlaybackService : IPlaybackService, IDisposable
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly DispatcherQueueTimer _positionTimer;
     private readonly PlaybackQueue _playbackQueue = new();
+    private readonly IImageService _imageService;
     private readonly ILogger _log;
+    private readonly CancellationTokenSource _disposeCts = new();
     private QueueSource? _source;
     // MediaPlayer events can arrive after the app has already switched sources.
     // Each playback source transition increments this generation; handlers capture
@@ -29,6 +31,7 @@ public class PlaybackService : IPlaybackService, IDisposable
     private bool _pendingPlayOnOpen;
     private MediaPlaybackItem? _currentPlaybackItem;
     private MediaSource? _currentMediaSource;
+    private int _disposed;
 
     public PlaybackTrack? NowPlaying => _playbackQueue.CurrentTrack;
     public IReadOnlyList<PlaybackTrack> Queue => _playbackQueue.Tracks;
@@ -107,8 +110,9 @@ public class PlaybackService : IPlaybackService, IDisposable
     public event EventHandler? PositionChanged;
     public event EventHandler? QueueChanged;
 
-    public PlaybackService(ILoggingService logService, IAppStateService appStateService)
+    public PlaybackService(ILoggingService logService, IAppStateService appStateService, IImageService imageService)
     {
+        _imageService = imageService;
         _log = logService.GetLogger(nameof(PlaybackService));
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _positionTimer = _dispatcherQueue.CreateTimer();
@@ -384,13 +388,13 @@ public class PlaybackService : IPlaybackService, IDisposable
         displayProperties.MusicProperties.Title = track.Title ?? string.Empty;
         displayProperties.MusicProperties.Artist = track.FlatArtistText;
         displayProperties.MusicProperties.AlbumTitle = track.Album ?? string.Empty;
-        if (track.CoverArtUri != null)
-        {
-            displayProperties.Thumbnail = RandomAccessStreamReference.CreateFromUri(track.CoverArtUri);
-        }
         _currentPlaybackItem.ApplyDisplayProperties(displayProperties);
 
         var gen = Interlocked.Increment(ref _playbackSourceGeneration);
+        if (track.CoverImage != null)
+        {
+            _ = ApplyCachedThumbnailAsync(_currentPlaybackItem, track.CoverImage, gen);
+        }
         _log.Info("Playing track", new { TrackId = track.Id, track.Title, Generation = gen });
 
         _pendingPlayOnOpen = true;
@@ -399,6 +403,55 @@ public class PlaybackService : IPlaybackService, IDisposable
         TrackChanged?.Invoke(this, new TrackChangedEventArgs(direction));
 
         UpdateSmtcState();
+    }
+
+    private async Task ApplyCachedThumbnailAsync(MediaPlaybackItem playbackItem, ImageReference coverImage, int generation)
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        var cancellationToken = GetDisposeToken();
+        try
+        {
+            var uri = await _imageService.GetImageAsync(
+                coverImage,
+                ImageRequestOptions.ForSize("600"),
+                cancellationToken).ConfigureAwait(false);
+
+            if (uri == null ||
+                cancellationToken.IsCancellationRequested ||
+                IsDisposed)
+            {
+                return;
+            }
+
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                if (IsDisposed ||
+                    cancellationToken.IsCancellationRequested ||
+                    generation != _playbackSourceGeneration ||
+                    !ReferenceEquals(_currentPlaybackItem, playbackItem))
+                {
+                    return;
+                }
+
+                var displayProperties = playbackItem.GetDisplayProperties();
+                displayProperties.Thumbnail = RandomAccessStreamReference.CreateFromUri(uri);
+                playbackItem.ApplyDisplayProperties(displayProperties);
+            });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || IsDisposed)
+        {
+        }
+        catch (ObjectDisposedException) when (IsDisposed)
+        {
+        }
+        catch (Exception ex)
+        {
+            _log.Warning("Failed to apply cached playback thumbnail", new { TrackGeneration = generation }, ex);
+        }
     }
 
     private void ClearCurrentPlaybackMedia()
@@ -712,6 +765,19 @@ public class PlaybackService : IPlaybackService, IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _disposeCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
         _positionTimer.Stop();
         _mediaPlayer.MediaOpened -= OnMediaOpened;
         _mediaPlayer.MediaEnded -= OnMediaEnded;
@@ -722,5 +788,20 @@ public class PlaybackService : IPlaybackService, IDisposable
         _mediaPlayer.Source = null;
         DisposeCurrentSource();
         _mediaPlayer.Dispose();
+        _disposeCts.Dispose();
+    }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
+    private CancellationToken GetDisposeToken()
+    {
+        try
+        {
+            return _disposeCts.Token;
+        }
+        catch (ObjectDisposedException) when (IsDisposed)
+        {
+            return new CancellationToken(canceled: true);
+        }
     }
 }

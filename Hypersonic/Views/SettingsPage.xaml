@@ -262,6 +262,31 @@
                 </controls:SettingsExpander.Items>
             </controls:SettingsExpander>
 
+            <!-- Storage -->
+            <TextBlock x:Uid="Settings_Storage"
+                       Style="{ThemeResource SubtitleTextBlockStyle}"
+                       Margin="{StaticResource MediumTopMargin}" />
+
+            <controls:SettingsCard
+                x:Uid="Settings_ImageCache"
+                Description="{x:Bind ViewModel.ImageCacheUsageText, Mode=OneWay}"
+                Margin="{StaticResource XSmallTopMargin}">
+                <controls:SettingsCard.HeaderIcon>
+                    <FontIcon Glyph="&#xE8B7;" />
+                </controls:SettingsCard.HeaderIcon>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ProgressRing
+                        Width="20"
+                        Height="20"
+                        IsActive="{x:Bind ViewModel.IsImageCacheBusy, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.IsImageCacheBusy, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <Button
+                        x:Uid="Settings_ImageCache_Clear"
+                        Command="{x:Bind ViewModel.ClearImageCacheCommand}"
+                        IsEnabled="{x:Bind ViewModel.CanClearImageCache, Mode=OneWay}" />
+                </StackPanel>
+            </controls:SettingsCard>
+
             <!-- About -->
             <TextBlock x:Uid="Settings_About"
                        Style="{ThemeResource SubtitleTextBlockStyle}"

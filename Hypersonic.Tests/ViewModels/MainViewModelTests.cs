@@ -287,8 +287,7 @@ public class MainViewModelTests
         await vm.LoadSectionsAsync();
 
         Assert.AreEqual(1, vm.RandomPicks.Count);
-        Assert.IsTrue(vm.RandomPicks[0].CoverArtUrl!.Contains("cover-id-different"));
-        Assert.IsFalse(vm.RandomPicks[0].CoverArtUrl!.Contains("album-id"));
+        Assert.AreEqual("cover-id-different", vm.RandomPicks[0].CoverImage!.Identity);
     }
 
     [TestMethod]

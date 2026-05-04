@@ -26,7 +26,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
     public partial string PlaylistName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? CoverArtUrl { get; set; }
+    public partial ImageReference? CoverImage { get; set; }
 
     [ObservableProperty]
     public partial string Owner { get; set; } = string.Empty;
@@ -100,9 +100,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
             Owner = playlist.Owner ?? string.Empty;
             Comment = playlist.Comment;
             SongCount = playlist.SongCount;
-            CoverArtUrl = !string.IsNullOrEmpty(playlist.CoverArt)
-                ? client.GetCoverArtUri(playlist.CoverArt, "600").ToString()
-                : null;
+            CoverImage = ImageReference.SubsonicCoverArt(playlist.CoverArt);
             TotalDuration = FormatDuration(playlist.Duration);
 
             var entries = playlist.Entry ?? [];
@@ -222,7 +220,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
                 Duration = s.Duration,
                 TrackNumber = s.TrackNumber,
                 DiscNumber = s.DiscNumber,
-                CoverArtUri = s.CoverArtUri ?? (CoverArtUrl != null ? new Uri(CoverArtUrl) : null),
+                CoverImage = s.CoverImage ?? CoverImage,
                 StreamUri = s.StreamUri,
                 Suffix = s.Suffix,
                 BitRate = s.BitRate,

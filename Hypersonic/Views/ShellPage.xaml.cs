@@ -34,6 +34,7 @@ public sealed partial class ShellPage : Page
     }
 
     private CoverArtAnimator? _coverArtAnimator;
+    private readonly IImageService _imageService;
 
     /// <summary>
     /// True when the player-bar cover and a parallel translation on the
@@ -56,6 +57,7 @@ public sealed partial class ShellPage : Page
     {
         ViewModel = viewModel;
         Player = App.GetService<PlayerViewModel>();
+        _imageService = App.GetService<IImageService>();
         InitializeComponent();
 
         ViewModel.NavigationService.Frame = NavigationFrame;
@@ -73,18 +75,16 @@ public sealed partial class ShellPage : Page
                 _coverArtAnimator?.OnIsPlayingChanged();
                 PlayPauseIcon.Glyph = Player.IsPlaying ? "\uE769" : "\uE768";
             }
-            else if (e.PropertyName == nameof(Player.CoverArtUrl))
+            else if (e.PropertyName == nameof(Player.CoverImage))
             {
                 var direction = Player.LastChangeDirection;
                 if (_coverArtAnimator is not null)
                 {
-                    _coverArtAnimator.OnCoverArtUrlChanged(direction);
+                    _coverArtAnimator.OnCoverImageChanged(direction);
                 }
                 else
                 {
-                    PlayerCoverArt.Source = !string.IsNullOrEmpty(Player.CoverArtUrl)
-                        ? new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Player.CoverArtUrl))
-                        : null;
+                    UpdatePlayerCoverArtFallback();
                 }
             }
             else if (e.PropertyName == nameof(Player.HasTrack))
@@ -122,10 +122,7 @@ public sealed partial class ShellPage : Page
 
         RenderNowPlaying();
         PlayPauseIcon.Glyph = Player.IsPlaying ? "\uE769" : "\uE768";
-        if (!string.IsNullOrEmpty(Player.CoverArtUrl))
-        {
-            PlayerCoverArt.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(Player.CoverArtUrl));
-        }
+        UpdatePlayerCoverArtFallback();
     }
 
     private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
@@ -277,16 +274,27 @@ public sealed partial class ShellPage : Page
             outgoingWrapper: PlayerCoverArtOutgoingWrapper,
             outgoing: PlayerCoverArtOutgoing,
             player: Player,
+            imageService: _imageService,
+            coverArtSize: "300",
             playingScale: 1.0f,
             pausedScale: 0.88f,
             cameraOutScale: 0.88f, // unused for Crossfade
             slideDistance: () => 0.0,
             transition: CoverArtTransition.Crossfade);
         _coverArtAnimator.Initialize();
+        _coverArtAnimator.OnCoverImageChanged(TrackChangeDirection.None);
 
         ElementCompositionPreview.SetIsTranslationEnabled(PlayerTrackInfoPanel, true);
 
         NavigationFrame.Navigated += NavigationFrame_Navigated;
+    }
+
+    private async void UpdatePlayerCoverArtFallback()
+    {
+        PlayerCoverArt.Source = await CachedImage.LoadBitmapAsync(
+            _imageService,
+            Player.CoverImage,
+            ImageRequestOptions.ForSize("300"));
     }
 
     private void NavigationFrame_Navigated(object sender, NavigationEventArgs e)

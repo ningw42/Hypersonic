@@ -426,7 +426,8 @@ public class SettingsViewModelFontTests
             new FakeScrobblingService(),
             settings,
             new FakeAppStateService(),
-            new FakeTrayIconService());
+            new FakeTrayIconService(),
+            new FakeImageCacheService());
     }
 
     private sealed class FakeLocalSettingsService : ILocalSettingsService

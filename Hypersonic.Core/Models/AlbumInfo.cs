@@ -9,8 +9,7 @@ public class AlbumInfo
     public string Artist { get; set; } = string.Empty;
     public string? ArtistId { get; set; }
     public int Year { get; set; }
-    public string? CoverArt { get; set; }
-    public string? CoverArtUrl { get; set; }
+    public ImageReference? CoverImage { get; set; }
     public int? SongCount { get; set; }
     public TimeSpan? Duration { get; set; }
 

@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:controls="using:Hypersonic.Controls"
+    xmlns:helpers="using:Hypersonic.Helpers"
     mc:Ignorable="d"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never"
     xmlns:behaviors="using:Hypersonic.Behaviors">
@@ -70,7 +71,8 @@
                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                   HorizontalAlignment="Center"
                                                                   VerticalAlignment="Center"/>
-                                                        <Image Source="{Binding CoverArtUrl}"
+                                                        <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                               helpers:CachedImage.Size="300"
                                                                Stretch="UniformToFill"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"/>
@@ -161,7 +163,8 @@
                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                   HorizontalAlignment="Center"
                                                                   VerticalAlignment="Center"/>
-                                                        <Image Source="{Binding CoverArtUrl}"
+                                                        <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                               helpers:CachedImage.Size="300"
                                                                Stretch="UniformToFill"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"/>
@@ -252,7 +255,8 @@
                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                   HorizontalAlignment="Center"
                                                                   VerticalAlignment="Center"/>
-                                                        <Image Source="{Binding CoverArtUrl}"
+                                                        <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                               helpers:CachedImage.Size="300"
                                                                Stretch="UniformToFill"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"/>
@@ -343,7 +347,8 @@
                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                   HorizontalAlignment="Center"
                                                                   VerticalAlignment="Center"/>
-                                                        <Image Source="{Binding CoverArtUrl}"
+                                                        <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                               helpers:CachedImage.Size="300"
                                                                Stretch="UniformToFill"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"/>
@@ -434,7 +439,8 @@
                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                   HorizontalAlignment="Center"
                                                                   VerticalAlignment="Center"/>
-                                                        <Image Source="{Binding CoverArtUrl}"
+                                                        <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                               helpers:CachedImage.Size="300"
                                                                Stretch="UniformToFill"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"/>

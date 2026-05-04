@@ -9,6 +9,7 @@
     xmlns:converters="using:Hypersonic.Converters"
     xmlns:behaviors="using:Hypersonic.Behaviors"
     xmlns:controls="using:Hypersonic.Controls"
+    xmlns:helpers="using:Hypersonic.Helpers"
     mc:Ignorable="d"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
@@ -179,7 +180,9 @@
                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <Image Source="{Binding Track.CoverArtUri}" Stretch="UniformToFill"
+                                    <Image helpers:CachedImage.Reference="{x:Bind Track.CoverImage, Mode=OneWay}"
+                                           helpers:CachedImage.Size="100"
+                                           Stretch="UniformToFill"
                                            Width="48" Height="48"/>
                                 </Grid>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="0">

@@ -118,10 +118,7 @@ public partial class ArtistsViewModel : ObservableRecipient, INavigationAware
                         SortName = artist.SortName,
                         AlbumCount = artist.AlbumCount,
                         UserRating = artist.UserRating,
-                        CoverArt = artist.CoverArt,
-                        CoverArtUrl = !string.IsNullOrEmpty(artist.CoverArt)
-                            ? client.GetCoverArtUri(artist.CoverArt, "300").ToString()
-                            : null,
+                        CoverImage = ImageReference.SubsonicCoverArt(artist.CoverArt),
                     });
                 }
             }

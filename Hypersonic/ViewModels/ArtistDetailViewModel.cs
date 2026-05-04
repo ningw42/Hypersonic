@@ -30,7 +30,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
     public partial string ArtistName { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial string? ArtistImageUrl { get; set; }
+    public partial ImageReference? ArtistImage { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AlbumCountText))]
@@ -298,11 +298,9 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 
             TotalSongCount = _allAlbums.Sum(a => a.SongCount ?? 0);
 
-            ArtistImageUrl = !string.IsNullOrEmpty(artist.ArtistImageUrl)
-                ? artist.ArtistImageUrl
-                : !string.IsNullOrEmpty(artist.CoverArt)
-                    ? client.GetCoverArtUri(artist.CoverArt, "600").ToString()
-                    : null;
+            ArtistImage =
+                ImageReference.Remote(artist.ArtistImageUrl) ??
+                ImageReference.SubsonicCoverArt(artist.CoverArt);
 
             // Process artist info (biography, similar artists, image fallback)
             try
@@ -317,9 +315,9 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                         HasBiography = !string.IsNullOrWhiteSpace(Biography);
                     }
 
-                    if (string.IsNullOrEmpty(ArtistImageUrl))
+                    if (ArtistImage == null)
                     {
-                        ArtistImageUrl = info.LargeImageUrl ?? info.MediumImageUrl;
+                        ArtistImage = ImageReference.Remote(info.LargeImageUrl ?? info.MediumImageUrl);
                     }
 
                     if (info.SimilarArtist != null && info.SimilarArtist.Length > 0)
@@ -331,10 +329,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                                 Id = similar.Id,
                                 Name = similar.Name ?? string.Empty,
                                 AlbumCount = similar.AlbumCount,
-                                CoverArt = similar.CoverArt,
-                                CoverArtUrl = !string.IsNullOrEmpty(similar.CoverArt)
-                                    ? client.GetCoverArtUri(similar.CoverArt, "300").ToString()
-                                    : null,
+                                CoverImage = ImageReference.SubsonicCoverArt(similar.CoverArt),
                             });
                         }
 
@@ -605,7 +600,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 Duration = s.Duration,
                 TrackNumber = s.TrackNumber,
                 DiscNumber = s.DiscNumber,
-                CoverArtUri = s.CoverArtUri,
+                CoverImage = s.CoverImage,
                 StreamUri = s.StreamUri,
                 Suffix = s.Suffix,
                 BitRate = s.BitRate,

@@ -1,10 +1,11 @@
-﻿using Hypersonic.Activation;
+using Hypersonic.Activation;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Core.Services;
 using Hypersonic.Core.Services.Logging;
 using Hypersonic.Helpers;
+using Hypersonic.Models;
 using Hypersonic.Services;
 using Hypersonic.ViewModels;
 using Hypersonic.Views;
@@ -103,6 +104,8 @@ public partial class App : Application
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IFileService, FileService>();
             services.AddSingleton<ISubsonicClientService, SubsonicClientService>();
+            services.AddSingleton<IImageCacheStore, JsonImageCacheStore>();
+            services.AddSingleton<IImageService, CachedImageService>();
             services.AddSingleton<IPlaybackService, PlaybackService>();
             services.AddSingleton<ITaskbarService, TaskbarService>();
             services.AddSingleton<ITrayIconService, TrayIconService>();
@@ -142,6 +145,7 @@ public partial class App : Application
 
             // Configuration
             services.Configure<LocalSettingsOptions>(context.Configuration.GetSection(nameof(LocalSettingsOptions)));
+            services.Configure<ImageCacheOptions>(context.Configuration.GetSection(nameof(ImageCacheOptions)));
         }).
         Build();
 
@@ -159,5 +163,23 @@ public partial class App : Application
         base.OnLaunched(args);
 
         await App.GetService<IActivationService>().ActivateAsync(args);
+        _ = ReconcileImageCacheAsync();
+    }
+
+    private static async Task ReconcileImageCacheAsync()
+    {
+        try
+        {
+            await App.GetService<IImageService>().ReconcileAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            App.GetService<ILoggingService>()
+                .GetLogger(nameof(App))
+                .Warning("Image cache reconciliation failed", exception: ex);
+        }
     }
 }

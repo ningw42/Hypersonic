@@ -1,4 +1,5 @@
 using Hypersonic.Core.Helpers;
+using Hypersonic.Core.Models;
 using Hypersonic.Models;
 
 namespace Hypersonic.Helpers;
@@ -25,10 +26,7 @@ public static class SongMapper
             Album = albumVersion != null ? AlbumMapper.StripVersionSuffix(song.Album, albumVersion) : song.Album ?? string.Empty,
             Genre = song.Genre,
             Year = song.Year,
-            CoverArt = song.CoverArt,
-            CoverArtUrl = !string.IsNullOrEmpty(song.CoverArt)
-                ? client.GetCoverArtUri(song.CoverArt, "300").ToString()
-                : null,
+            CoverImage = ImageReference.SubsonicCoverArt(song.CoverArt),
             BitRate = song.BitRate,
             BitDepth = song.BitDepth,
             SamplingRate = song.SamplingRate,
@@ -39,9 +37,6 @@ public static class SongMapper
             ArtistId = song.ArtistId,
             DisplayArtist = song.DisplayArtist,
             StreamUri = client.GetStreamUri(song.Id),
-            CoverArtUri = !string.IsNullOrEmpty(song.CoverArt)
-                ? client.GetCoverArtUri(song.CoverArt, "300")
-                : null,
             PlayCount = song.PlayCount,
             BPM = song.BPM,
             IsStarred = !string.IsNullOrEmpty(song.Starred),

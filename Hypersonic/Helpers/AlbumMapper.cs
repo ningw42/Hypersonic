@@ -1,6 +1,7 @@
 using Hypersonic.Client;
 using Hypersonic.Client.Models.Entities;
 using Hypersonic.Core.Helpers;
+using Hypersonic.Core.Models;
 
 using CoreAlbumInfo = Hypersonic.Core.Models.AlbumInfo;
 
@@ -28,10 +29,7 @@ public static class AlbumMapper
             Artists = artists,
             HasStructuredArtists = hasStructured,
             Year = album.Year,
-            CoverArt = album.CoverArt,
-            CoverArtUrl = !string.IsNullOrEmpty(album.CoverArt)
-                ? client.GetCoverArtUri(album.CoverArt, "300").ToString()
-                : null,
+            CoverImage = ImageReference.SubsonicCoverArt(album.CoverArt),
             SongCount = album.SongCount,
             Duration = TimeSpan.FromSeconds(album.Duration),
         };

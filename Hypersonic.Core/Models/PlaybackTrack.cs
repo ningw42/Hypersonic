@@ -13,7 +13,7 @@ public class PlaybackTrack
     public string Album { get; set; } = string.Empty;
     public string? AlbumId { get; set; }
     public int Duration { get; set; }
-    public Uri? CoverArtUri { get; set; }
+    public ImageReference? CoverImage { get; set; }
     public Uri? StreamUri { get; set; }
     public int TrackNumber { get; set; }
     public int DiscNumber { get; set; }

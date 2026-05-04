@@ -175,7 +175,8 @@ public class SettingsViewModelSegmentedTests
             scrobbling ?? new FakeScrobblingService(),
             new NoopLocalSettingsService(),
             appState ?? new FakeAppStateService(),
-            tray ?? new FakeTrayIconService());
+            tray ?? new FakeTrayIconService(),
+            new FakeImageCacheService());
     }
 
     private sealed class FakeThemeSelectorService : IThemeSelectorService

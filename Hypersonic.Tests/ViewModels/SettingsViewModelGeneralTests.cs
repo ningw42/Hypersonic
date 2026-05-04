@@ -1,3 +1,5 @@
+using CommunityToolkit.Mvvm.Input;
+
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
@@ -45,11 +47,32 @@ public class SettingsViewModelGeneralTests
         Assert.AreEqual(1, tray.RefreshVisibilityCount);
     }
 
+    [TestMethod]
+    public async Task ClearImageCacheCommand_ClearsCacheAndRefreshesUsageText()
+    {
+        var imageCache = new FakeImageCacheService
+        {
+            Stats = new ImageCacheStats(1536, 2, "cache"),
+        };
+        var vm = CreateViewModel(imageCache: imageCache);
+
+        await Task.Yield();
+        Assert.AreEqual("2 images · 1.5 KB", vm.ImageCacheUsageText);
+
+        ((IAsyncRelayCommand)vm.ClearImageCacheCommand).Execute(null);
+        await ((IAsyncRelayCommand)vm.ClearImageCacheCommand).ExecutionTask!;
+
+        Assert.AreEqual(1, imageCache.ClearCallCount);
+        Assert.AreEqual("0 images · 0 B", vm.ImageCacheUsageText);
+        Assert.IsFalse(vm.IsImageCacheBusy);
+    }
+
     // --- Test infrastructure ---
 
     private static SettingsViewModel CreateViewModel(
         FakeAppStateService? appState = null,
-        FakeTrayIconService? tray = null)
+        FakeTrayIconService? tray = null,
+        FakeImageCacheService? imageCache = null)
     {
         return new SettingsViewModel(
             new GeneralFakeThemeSelectorService(),
@@ -57,7 +80,8 @@ public class SettingsViewModelGeneralTests
             new GeneralFakeScrobblingService(),
             new GeneralNoopLocalSettingsService(),
             appState ?? new FakeAppStateService(),
-            tray ?? new FakeTrayIconService());
+            tray ?? new FakeTrayIconService(),
+            imageCache ?? new FakeImageCacheService());
     }
 
     private sealed class GeneralFakeThemeSelectorService : IThemeSelectorService

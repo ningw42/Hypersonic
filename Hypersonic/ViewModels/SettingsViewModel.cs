@@ -43,6 +43,7 @@ public partial class SettingsViewModel : ObservableRecipient
     private readonly ILocalSettingsService _localSettingsService;
     private readonly IAppStateService _appStateService;
     private readonly ITrayIconService _trayIconService;
+    private readonly IImageService _imageService;
     private readonly object _fontSettingsSaveLock = new();
     private bool _isInitializingScrobbling;
     private bool _isInitializingGeneral;
@@ -115,6 +116,15 @@ public partial class SettingsViewModel : ObservableRecipient
 
     [ObservableProperty]
     public partial bool IsFontSettingsInitialized { get; set; }
+
+    [ObservableProperty]
+    public partial string ImageCacheUsageText { get; set; } = "Calculating...";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanClearImageCache))]
+    public partial bool IsImageCacheBusy { get; set; }
+
+    public bool CanClearImageCache => !IsImageCacheBusy;
 
     /// <summary>
     /// SelectedIndex of the Segmented control that exposes <see cref="UiScale"/>.
@@ -288,6 +298,7 @@ public partial class SettingsViewModel : ObservableRecipient
     public ICommand ResetUiFontsCommand { get; }
     public ICommand ResetLyricsFontsCommand { get; }
     public ICommand ResetUiScaleCommand { get; }
+    public ICommand ClearImageCacheCommand { get; }
 
     public SettingsViewModel(
         IThemeSelectorService themeSelectorService,
@@ -295,7 +306,8 @@ public partial class SettingsViewModel : ObservableRecipient
         IScrobblingService scrobblingService,
         ILocalSettingsService localSettingsService,
         IAppStateService appStateService,
-        ITrayIconService trayIconService)
+        ITrayIconService trayIconService,
+        IImageService imageService)
     {
         _themeSelectorService = themeSelectorService;
         _backdropSelectorService = backdropSelectorService;
@@ -303,6 +315,7 @@ public partial class SettingsViewModel : ObservableRecipient
         _localSettingsService = localSettingsService;
         _appStateService = appStateService;
         _trayIconService = trayIconService;
+        _imageService = imageService;
         ElementTheme = _themeSelectorService.Theme;
         BackdropType = _backdropSelectorService.Backdrop;
         VersionDescription = GetVersionDescription();
@@ -338,6 +351,8 @@ public partial class SettingsViewModel : ObservableRecipient
         ResetUiScaleCommand = new RelayCommand(
             () => UiScale = DefaultUiScale,
             () => CanResetUiScale);
+
+        ClearImageCacheCommand = new AsyncRelayCommand(ClearImageCacheAsync);
 
         SwitchThemeCommand = new RelayCommand<ElementTheme>(
             async (param) =>
@@ -375,6 +390,59 @@ public partial class SettingsViewModel : ObservableRecipient
         // _isInitializingFontSettings guard prevents the seeding writes from
         // round-tripping back through the persistence path.
         _ = InitializeFontSettingsAsync();
+        _ = RefreshImageCacheStatsAsync();
+    }
+
+    private async Task RefreshImageCacheStatsAsync()
+    {
+        try
+        {
+            var stats = await _imageService.GetStatsAsync();
+            ImageCacheUsageText = $"{FormatImageCount(stats.EntryCount)} \u00b7 {FormatByteSize(stats.TotalBytes)}";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+            ImageCacheUsageText = "Unavailable";
+        }
+    }
+
+    private async Task ClearImageCacheAsync()
+    {
+        IsImageCacheBusy = true;
+        try
+        {
+            await _imageService.ClearAsync();
+            await RefreshImageCacheStatsAsync();
+        }
+        finally
+        {
+            IsImageCacheBusy = false;
+        }
+    }
+
+    private static string FormatImageCount(int count)
+    {
+        return count == 1 ? "1 image" : $"{count} images";
+    }
+
+    internal static string FormatByteSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        var value = (double)Math.Max(0, bytes);
+        var unitIndex = 0;
+
+        while (value >= 1024 && unitIndex < units.Length - 1)
+        {
+            value /= 1024;
+            unitIndex++;
+        }
+
+        return unitIndex == 0
+            ? $"{value:0} {units[unitIndex]}"
+            : $"{value:0.##} {units[unitIndex]}";
     }
 
     /// <summary>

@@ -8,6 +8,7 @@
     xmlns:behaviors="using:Hypersonic.Behaviors"
     xmlns:controls="using:Hypersonic.Controls"
     xmlns:models="using:Hypersonic.Models"
+    xmlns:helpers="using:Hypersonic.Helpers"
     mc:Ignorable="d"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
@@ -33,7 +34,8 @@
                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"/>
-                        <Image Source="{Binding ViewModel.ArtistImageUrl, ElementName=PageRoot}"
+                        <Image helpers:CachedImage.Reference="{Binding ViewModel.ArtistImage, ElementName=PageRoot}"
+                               helpers:CachedImage.Size="600"
                                Stretch="UniformToFill"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
@@ -165,7 +167,8 @@
                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"/>
-                                                <Image Source="{Binding CoverArtUrl}"
+                                                <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                       helpers:CachedImage.Size="300"
                                                        Stretch="UniformToFill"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
@@ -442,7 +445,8 @@
                                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                               HorizontalAlignment="Center"
                                                               VerticalAlignment="Center"/>
-                                                    <Image Source="{Binding CoverArtUrl}"
+                                                    <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                           helpers:CachedImage.Size="300"
                                                            Stretch="UniformToFill"
                                                            HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"/>

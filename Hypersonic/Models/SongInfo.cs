@@ -20,8 +20,7 @@ public partial class SongInfo : ObservableObject
     public string Album { get; set; } = string.Empty;
     public string? Genre { get; set; }
     public int Year { get; set; }
-    public string? CoverArt { get; set; }
-    public string? CoverArtUrl { get; set; }
+    public ImageReference? CoverImage { get; set; }
     public int BitRate { get; set; }
     public int BitDepth { get; set; }
     public int SamplingRate { get; set; }
@@ -32,7 +31,6 @@ public partial class SongInfo : ObservableObject
     public string? ArtistId { get; set; }
     public string? DisplayArtist { get; set; }
     public Uri? StreamUri { get; set; }
-    public Uri? CoverArtUri { get; set; }
 
     // Additional metadata columns
     public long PlayCount { get; set; }

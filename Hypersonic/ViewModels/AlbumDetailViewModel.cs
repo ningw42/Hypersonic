@@ -39,7 +39,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
     public partial string? AlbumArtistId { get; set; }
 
     [ObservableProperty]
-    public partial string? AlbumArtistImageUrl { get; set; }
+    public partial ImageReference? AlbumArtistImage { get; set; }
 
     [ObservableProperty]
     public partial List<SongArtistInfo> AlbumArtists { get; set; } = [];
@@ -50,7 +50,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
     public bool AlbumHasStructuredArtists { get; private set; }
 
     [ObservableProperty]
-    public partial string? CoverArtUrl { get; set; }
+    public partial ImageReference? CoverImage { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ReleaseDateGenre))]
@@ -150,9 +150,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                 album.ArtistId);
             AlbumHasStructuredArtists = albumHasStructured;
             AlbumArtists = albumArtists;
-            CoverArtUrl = !string.IsNullOrEmpty(album.CoverArt)
-                ? client.GetCoverArtUri(album.CoverArt, "600").ToString()
-                : null;
+            CoverImage = ImageReference.SubsonicCoverArt(album.CoverArt);
 
             // Load artist image in background (best-effort)
             if (!string.IsNullOrEmpty(album.ArtistId))
@@ -324,11 +322,9 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
             var artist = response.Artist;
             if (artist != null)
             {
-                AlbumArtistImageUrl = !string.IsNullOrEmpty(artist.ArtistImageUrl)
-                    ? artist.ArtistImageUrl
-                    : !string.IsNullOrEmpty(artist.CoverArt)
-                        ? client.GetCoverArtUri(artist.CoverArt, "100").ToString()
-                        : null;
+                AlbumArtistImage =
+                    ImageReference.Remote(artist.ArtistImageUrl) ??
+                    ImageReference.SubsonicCoverArt(artist.CoverArt);
             }
         }
         catch (Exception)
@@ -362,7 +358,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                 Duration = s.Duration,
                 TrackNumber = s.TrackNumber,
                 DiscNumber = s.DiscNumber,
-                CoverArtUri = s.CoverArtUri ?? (CoverArtUrl != null ? new Uri(CoverArtUrl) : null),
+                CoverImage = s.CoverImage ?? CoverImage,
                 StreamUri = s.StreamUri,
                 Suffix = s.Suffix,
                 BitRate = s.BitRate,

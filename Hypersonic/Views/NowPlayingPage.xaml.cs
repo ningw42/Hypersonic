@@ -13,7 +13,6 @@ using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
-using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 
 namespace Hypersonic.Views;
@@ -24,6 +23,7 @@ public sealed partial class NowPlayingPage : Page
     public PlayerViewModel Player { get; }
 
     private readonly IPlaybackService _playbackService;
+    private readonly IImageService _imageService;
     private readonly DispatcherQueue _pageDispatcher;
     private readonly QueueAutoScrollCoordinator _scrollCoordinator;
     private readonly QueueTabSubscriptionGate _queueTabGate;
@@ -46,6 +46,7 @@ public sealed partial class NowPlayingPage : Page
         ViewModel = App.GetService<NowPlayingViewModel>();
         Player = App.GetService<PlayerViewModel>();
         _playbackService = App.GetService<IPlaybackService>();
+        _imageService = App.GetService<IImageService>();
 
         // Construct the queue-tab plumbing BEFORE InitializeComponent() so the
         // SelectorBar's XAML-wired SelectionChanged handler (which can fire on
@@ -108,6 +109,8 @@ public sealed partial class NowPlayingPage : Page
             outgoingWrapper: LargeCoverArtOutgoingWrapper,
             outgoing: LargeCoverArtOutgoing,
             player: Player,
+            imageService: _imageService,
+            coverArtSize: "600",
             playingScale: LargeCoverPlayingScale,
             pausedScale: LargeCoverPausedScale,
             cameraOutScale: 0.72f,
@@ -118,6 +121,7 @@ public sealed partial class NowPlayingPage : Page
             slideDistance: () => LargeCoverArtClip.ActualWidth * 0.85,
             transition: CoverArtTransition.CameraSlide);
         _coverArtAnimator.Initialize();
+        _coverArtAnimator.OnCoverImageChanged(TrackChangeDirection.None);
     }
 
     private void LargeCoverArtClip_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -172,7 +176,7 @@ public sealed partial class NowPlayingPage : Page
                 _coverArtAnimator?.OnIsPlayingChanged();
             });
         }
-        else if (e.PropertyName == nameof(Player.CoverArtUrl))
+        else if (e.PropertyName == nameof(Player.CoverImage))
         {
             // Capture direction synchronously here. The PropertyChanged event
             // fires inside PlayerViewModel.OnTrackChanged, which resets
@@ -184,7 +188,7 @@ public sealed partial class NowPlayingPage : Page
                 if (!_pageActive) return;
                 if (_coverArtAnimator is not null)
                 {
-                    _coverArtAnimator.OnCoverArtUrlChanged(direction);
+                    _coverArtAnimator.OnCoverImageChanged(direction);
                 }
                 else
                 {
@@ -390,7 +394,7 @@ public sealed partial class NowPlayingPage : Page
         MetaTrackTitleLink.Foreground = PrimaryBrush;
         RenderArtist();
         RenderAlbum();
-        // Cover art swap is driven by Player.PropertyChanged (CoverArtUrl), so
+        // Cover art swap is driven by Player.PropertyChanged (CoverImage), so
         // it's not invoked here — that channel uses the animator and avoids a
         // double source-set when both events fire for the same change.
         if (_coverArtAnimator is null)
@@ -399,11 +403,12 @@ public sealed partial class NowPlayingPage : Page
         }
     }
 
-    private void UpdateCoverArtFallback()
+    private async void UpdateCoverArtFallback()
     {
-        LargeCoverArt.Source = !string.IsNullOrEmpty(Player.CoverArtUrl)
-            ? new BitmapImage(new Uri(Player.CoverArtUrl))
-            : null;
+        LargeCoverArt.Source = await CachedImage.LoadBitmapAsync(
+            _imageService,
+            Player.CoverImage,
+            ImageRequestOptions.ForSize("600"));
     }
 
     private void RenderArtist()

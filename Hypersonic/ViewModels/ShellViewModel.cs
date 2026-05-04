@@ -110,9 +110,7 @@ public partial class ShellViewModel : ObservableRecipient
                         Id = a.Id,
                         PrimaryText = a.Name ?? string.Empty,
                         SecondaryText = a.AlbumCount == 1 ? "1 album" : $"{a.AlbumCount} albums",
-                        ImageUrl = !string.IsNullOrEmpty(a.CoverArt)
-                            ? client.GetCoverArtUri(a.CoverArt, "100").ToString()
-                            : null,
+                        Image = ImageReference.SubsonicCoverArt(a.CoverArt),
                     });
                 }
             }
@@ -135,9 +133,7 @@ public partial class ShellViewModel : ObservableRecipient
                         Id = album.Id,
                         PrimaryText = shortName,
                         SecondaryText = secondaryText,
-                        ImageUrl = !string.IsNullOrEmpty(album.CoverArt)
-                            ? client.GetCoverArtUri(album.CoverArt, "100").ToString()
-                            : null,
+                        Image = ImageReference.SubsonicCoverArt(album.CoverArt),
                     });
                 }
             }
@@ -158,9 +154,7 @@ public partial class ShellViewModel : ObservableRecipient
                         Id = song.Id,
                         PrimaryText = song.Title ?? string.Empty,
                         SecondaryText = $"{song.Artist} \u00b7 {song.Album}",
-                        ImageUrl = !string.IsNullOrEmpty(song.CoverArt)
-                            ? client.GetCoverArtUri(song.CoverArt, "100").ToString()
-                            : null,
+                        Image = ImageReference.SubsonicCoverArt(song.CoverArt),
                         Artist = song.Artist,
                         ArtistId = song.ArtistId,
                         DisplayArtist = song.DisplayArtist,
@@ -170,9 +164,6 @@ public partial class ShellViewModel : ObservableRecipient
                         AlbumId = song.AlbumId,
                         Duration = song.Duration,
                         StreamUri = client.GetStreamUri(song.Id),
-                        CoverArtUri = !string.IsNullOrEmpty(song.CoverArt)
-                            ? client.GetCoverArtUri(song.CoverArt, "300")
-                            : null,
                         Suffix = song.Suffix,
                         BitRate = song.BitRate,
                         BitDepth = song.BitDepth,
@@ -250,8 +241,8 @@ public partial class ShellViewModel : ObservableRecipient
                     Album = item.Album ?? string.Empty,
                     AlbumId = item.AlbumId,
                     Duration = item.Duration,
+                    CoverImage = item.Image,
                     StreamUri = item.StreamUri,
-                    CoverArtUri = item.CoverArtUri,
                     Suffix = item.Suffix,
                     BitRate = item.BitRate,
                     BitDepth = item.BitDepth,

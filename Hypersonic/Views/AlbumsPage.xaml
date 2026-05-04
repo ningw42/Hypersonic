@@ -6,6 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:behaviors="using:Hypersonic.Behaviors"
     xmlns:controls="using:Hypersonic.Controls"
+    xmlns:helpers="using:Hypersonic.Helpers"
     mc:Ignorable="d"
     NavigationCacheMode="Required"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
@@ -116,7 +117,8 @@
                                                       HorizontalAlignment="Center"
                                                       VerticalAlignment="Center"/>
                                             <!-- Actual cover art -->
-                                            <Image Source="{Binding CoverArtUrl}"
+                                            <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                                   helpers:CachedImage.Size="300"
                                                    Stretch="UniformToFill"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"/>

@@ -13,7 +13,7 @@ public class SearchSuggestionItem
     public string Id { get; set; } = string.Empty;
     public string PrimaryText { get; set; } = string.Empty;
     public string SecondaryText { get; set; } = string.Empty;
-    public string? ImageUrl { get; set; }
+    public ImageReference? Image { get; set; }
 
     // Song-only fields for playback
     public string? Artist { get; set; }
@@ -25,7 +25,6 @@ public class SearchSuggestionItem
     public string? AlbumId { get; set; }
     public int Duration { get; set; }
     public Uri? StreamUri { get; set; }
-    public Uri? CoverArtUri { get; set; }
     public string? Suffix { get; set; }
     public int BitRate { get; set; }
     public int BitDepth { get; set; }

@@ -438,7 +438,7 @@ public partial class TracksViewModel : ObservableRecipient, INavigationAware
                 Duration = s.Duration,
                 TrackNumber = s.TrackNumber,
                 DiscNumber = s.DiscNumber,
-                CoverArtUri = s.CoverArtUri,
+                CoverImage = s.CoverImage,
                 StreamUri = s.StreamUri,
                 Suffix = s.Suffix,
                 BitRate = s.BitRate,

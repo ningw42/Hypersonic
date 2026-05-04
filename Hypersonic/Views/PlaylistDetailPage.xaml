@@ -8,6 +8,7 @@
     xmlns:models="using:Hypersonic.Models"
     xmlns:controls="using:Hypersonic.Controls"
     xmlns:behaviors="using:Hypersonic.Behaviors"
+    xmlns:helpers="using:Hypersonic.Helpers"
     mc:Ignorable="d"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
 
@@ -34,7 +35,8 @@
                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"/>
-                        <Image Source="{Binding ViewModel.CoverArtUrl, ElementName=PageRoot}"
+                        <Image helpers:CachedImage.Reference="{Binding ViewModel.CoverImage, ElementName=PageRoot}"
+                               helpers:CachedImage.Size="600"
                                Stretch="UniformToFill"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>

@@ -27,7 +27,7 @@
 | 4.5 Time-Synced Lyrics | M | 🔲 Not started |
 | **Phase 5 — Data Layer (Stretch)** | | |
 | 5.1 SQLite Metadata Cache | XL | 🔲 Not started |
-| 5.2 Image Cache | L | 🔲 Not started |
+| 5.2 Image Cache | L | ✅ Complete |
 | 5.3 Audio Cache | XL | 🔲 Not started |
 
 ---

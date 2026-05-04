@@ -217,6 +217,73 @@ public sealed partial class MainWindow : WindowEx
             // PlayerViewModel may not be available.
         }
 
+        try
+        {
+            if (App.GetService<IPlaybackService>() is IDisposable disposablePlaybackService)
+            {
+                disposablePlaybackService.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                App.GetService<ILoggingService>()
+                    .GetLogger(nameof(MainWindow))
+                    .Warning("Playback service dispose failed during shutdown", exception: ex);
+            }
+            catch
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Playback service dispose failed during shutdown: {ex}");
+            }
+        }
+
+        try
+        {
+            if (App.GetService<IImageService>() is IDisposable disposableImageService)
+            {
+                disposableImageService.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                App.GetService<ILoggingService>()
+                    .GetLogger(nameof(MainWindow))
+                    .Warning("Image service dispose failed during shutdown", exception: ex);
+            }
+            catch
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Image service dispose failed during shutdown: {ex}");
+            }
+        }
+
+        try
+        {
+            if (App.GetService<IImageCacheStore>() is IDisposable disposableStore)
+            {
+                disposableStore.Dispose();
+            }
+            else
+            {
+                App.GetService<IImageCacheStore>().FlushAsync().GetAwaiter().GetResult();
+            }
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                App.GetService<ILoggingService>()
+                    .GetLogger(nameof(MainWindow))
+                    .Warning("Image cache manifest flush failed during shutdown", exception: ex);
+            }
+            catch
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Image cache manifest flush failed during shutdown: {ex}");
+            }
+        }
+
         if (App.GetService<ILoggingService>() is LoggingService loggingService)
         {
             loggingService.Dispose();

@@ -1,5 +1,6 @@
 using System.Numerics;
 
+using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.ViewModels;
 
@@ -40,7 +41,7 @@ internal enum CoverArtTransition
 /// - Calling <see cref="Initialize"/> once after Loaded.
 /// - Forwarding <c>PlayerViewModel</c> property changes:
 ///   <see cref="OnIsPlayingChanged"/> for IsPlaying,
-///   <see cref="OnCoverArtUrlChanged"/> for CoverArtUrl.
+///   <see cref="OnCoverImageChanged"/> for CoverImage.
 /// - Calling <see cref="Dispose"/> on Unloaded.
 /// </summary>
 internal sealed class CoverArtAnimator
@@ -50,6 +51,8 @@ internal sealed class CoverArtAnimator
     private readonly Grid _outgoingWrapper;
     private readonly Image _outgoing;
     private readonly PlayerViewModel _player;
+    private readonly IImageService _imageService;
+    private readonly string _coverArtSize;
     private readonly float _playingScale;
     private readonly float _pausedScale;
     private readonly float _cameraOutScale;
@@ -64,6 +67,7 @@ internal sealed class CoverArtAnimator
     private CompositionScopedBatch? _phase2Batch;
     private CompositionScopedBatch? _phase3Batch;
     private BitmapImage? _pendingIncomingSource;
+    private int _sourceRequestVersion;
     /// <summary>
     /// True between <see cref="RunCameraSlide"/> and the start of phase 2,
     /// when <see cref="_pendingIncomingSource"/> is the source that should
@@ -82,6 +86,8 @@ internal sealed class CoverArtAnimator
         Grid outgoingWrapper,
         Image outgoing,
         PlayerViewModel player,
+        IImageService imageService,
+        string coverArtSize,
         float playingScale,
         float pausedScale,
         float cameraOutScale,
@@ -93,6 +99,8 @@ internal sealed class CoverArtAnimator
         _outgoingWrapper = outgoingWrapper;
         _outgoing = outgoing;
         _player = player;
+        _imageService = imageService;
+        _coverArtSize = coverArtSize;
         _playingScale = playingScale;
         _pausedScale = pausedScale;
         _cameraOutScale = cameraOutScale;
@@ -132,10 +140,30 @@ internal sealed class CoverArtAnimator
         AnimateScale(_primaryVisual, target);
     }
 
-    public void OnCoverArtUrlChanged(TrackChangeDirection direction)
+    public async void OnCoverImageChanged(TrackChangeDirection direction)
     {
-        var newSource = BuildSource(_player.CoverArtUrl);
+        var requestVersion = Interlocked.Increment(ref _sourceRequestVersion);
+        BitmapImage? newSource;
 
+        try
+        {
+            newSource = await BuildSourceAsync(_player.CoverImage);
+        }
+        catch
+        {
+            newSource = null;
+        }
+
+        if (requestVersion != _sourceRequestVersion)
+        {
+            return;
+        }
+
+        ApplyCoverArtSource(newSource, direction);
+    }
+
+    private void ApplyCoverArtSource(BitmapImage? newSource, TrackChangeDirection direction)
+    {
         if (!_initialized || _primaryVisual is null || _outgoingVisual is null || _compositor is null)
         {
             _primary.Source = newSource;
@@ -412,7 +440,7 @@ internal sealed class CoverArtAnimator
         {
             // Apply even if null — the destination track may genuinely have
             // no artwork, and leaving the previous track's source in _primary
-            // would diverge from Player.CoverArtUrl.
+            // would diverge from Player.CoverImage.
             _primary.Source = _pendingIncomingSource;
             _pendingIncomingSource = null;
             _hasPendingIncoming = false;
@@ -446,7 +474,7 @@ internal sealed class CoverArtAnimator
         visual.StartAnimation("Scale", animation);
     }
 
-    private bool HasTrack() => !string.IsNullOrEmpty(_player.CoverArtUrl);
+    private bool HasTrack() => _player.CoverImage != null;
 
     private static void UpdateCenterPoint(FrameworkElement element, Visual? visual)
     {
@@ -459,8 +487,11 @@ internal sealed class CoverArtAnimator
         }
     }
 
-    private static BitmapImage? BuildSource(string? url)
+    private async Task<BitmapImage?> BuildSourceAsync(ImageReference? coverImage)
     {
-        return string.IsNullOrEmpty(url) ? null : new BitmapImage(new Uri(url));
+        return await CachedImage.LoadBitmapAsync(
+            _imageService,
+            coverImage,
+            ImageRequestOptions.ForSize(_coverArtSize));
     }
 }

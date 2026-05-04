@@ -119,7 +119,9 @@
                                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                         </Border>
-                                                        <Image Source="{Binding ImageUrl}" Stretch="UniformToFill" Width="32" Height="32"/>
+                                                        <Image helpers:CachedImage.Reference="{x:Bind Image, Mode=OneWay}"
+                                                               helpers:CachedImage.Size="100"
+                                                               Stretch="UniformToFill" Width="32" Height="32"/>
                                                     </Grid>
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <controls:MarqueeTextBlock Text="{x:Bind PrimaryText}" FontSize="13"/>
@@ -163,7 +165,9 @@
                                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                         </Border>
-                                                        <Image Source="{Binding ImageUrl}" Stretch="UniformToFill" Width="32" Height="32"/>
+                                                        <Image helpers:CachedImage.Reference="{x:Bind Image, Mode=OneWay}"
+                                                               helpers:CachedImage.Size="100"
+                                                               Stretch="UniformToFill" Width="32" Height="32"/>
                                                     </Grid>
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <controls:MarqueeTextBlock Text="{x:Bind PrimaryText}" FontSize="13"/>
@@ -207,7 +211,9 @@
                                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                         </Border>
-                                                        <Image Source="{Binding ImageUrl}" Stretch="UniformToFill" Width="32" Height="32"/>
+                                                        <Image helpers:CachedImage.Reference="{x:Bind Image, Mode=OneWay}"
+                                                               helpers:CachedImage.Size="100"
+                                                               Stretch="UniformToFill" Width="32" Height="32"/>
                                                     </Grid>
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <controls:MarqueeTextBlock Text="{x:Bind PrimaryText}" FontSize="13"/>
@@ -386,7 +392,9 @@
                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
-                                            <Image Source="{Binding Track.CoverArtUri}" Stretch="UniformToFill"
+                                            <Image helpers:CachedImage.Reference="{x:Bind Track.CoverImage, Mode=OneWay}"
+                                                   helpers:CachedImage.Size="100"
+                                                   Stretch="UniformToFill"
                                                    Width="32" Height="32"/>
                                         </Grid>
 

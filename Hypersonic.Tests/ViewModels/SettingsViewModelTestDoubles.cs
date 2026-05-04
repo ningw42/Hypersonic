@@ -37,3 +37,34 @@ internal sealed class FakeTrayIconService : ITrayIconService
     public void ShowMainWindow() { }
     public void Dispose() { }
 }
+
+internal sealed class FakeImageCacheService : IImageService
+{
+    public ImageCacheStats Stats { get; set; } = new(0, 0, string.Empty);
+    public int ClearCallCount { get; private set; }
+
+    public Task<Uri?> GetImageAsync(
+        ImageReference? image,
+        ImageRequestOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<Uri?>(null);
+    }
+
+    public Task<ImageCacheStats> GetStatsAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Stats);
+    }
+
+    public Task ReconcileAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task ClearAsync(CancellationToken cancellationToken = default)
+    {
+        ClearCallCount++;
+        Stats = new ImageCacheStats(0, 0, Stats.CacheFolderPath);
+        return Task.CompletedTask;
+    }
+}

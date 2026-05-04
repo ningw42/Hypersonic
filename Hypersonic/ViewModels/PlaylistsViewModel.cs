@@ -110,10 +110,7 @@ public partial class PlaylistsViewModel : ObservableRecipient, INavigationAware
                     Name = playlist.Name,
                     SongCount = playlist.SongCount,
                     Duration = playlist.Duration,
-                    CoverArt = playlist.CoverArt,
-                    CoverArtUrl = !string.IsNullOrEmpty(playlist.CoverArt)
-                        ? client.GetCoverArtUri(playlist.CoverArt, "300").ToString()
-                        : null,
+                    CoverImage = ImageReference.SubsonicCoverArt(playlist.CoverArt),
                 });
             }
 

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
@@ -134,6 +134,15 @@
   </data>
   <data name="Settings_VersionCard.Header" xml:space="preserve">
     <value>Version</value>
+  </data>
+  <data name="Settings_Storage.Text" xml:space="preserve">
+    <value>Storage</value>
+  </data>
+  <data name="Settings_ImageCache.Header" xml:space="preserve">
+    <value>Image cache</value>
+  </data>
+  <data name="Settings_ImageCache_Clear.Content" xml:space="preserve">
+    <value>Clear</value>
   </data>
   <data name="Settings_PrivacyCard.Header" xml:space="preserve">
     <value>Privacy</value>

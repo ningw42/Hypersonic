@@ -59,12 +59,12 @@ public partial class PlayerViewModel : ObservableRecipient
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasCoverArt))]
-    public partial string? CoverArtUrl { get; set; }
+    public partial ImageReference? CoverImage { get; set; }
 
     /// <summary>
-    /// True only when there's a non-empty <see cref="CoverArtUrl"/>. Distinct
+    /// True only when there's a non-empty <see cref="CoverImage"/>. Distinct
     /// from <see cref="HasTrack"/>: a track may exist without artwork (server
-    /// returned no <c>CoverArt</c> field). UI uses this to keep the music-glyph
+    /// returned no image field). UI uses this to keep the music-glyph
     /// placeholder showing for art-less tracks instead of going blank.
     ///
     /// Note: this does NOT cover load failures (404, decode error) on a URL
@@ -72,7 +72,7 @@ public partial class PlayerViewModel : ObservableRecipient
     /// render empty in that case. Add ImageFailed handling if that becomes a
     /// real-world issue.
     /// </summary>
-    public bool HasCoverArt => !string.IsNullOrEmpty(CoverArtUrl);
+    public bool HasCoverArt => CoverImage != null;
 
     [ObservableProperty]
     public partial bool IsPlaying { get; set; }
@@ -176,7 +176,7 @@ public partial class PlayerViewModel : ObservableRecipient
             DisplayArtist = track.DisplayArtist;
             Artists = track.Artists;
             FlatArtistText = track.FlatArtistText;
-            CoverArtUrl = track.CoverArtUri?.ToString();
+            CoverImage = track.CoverImage;
             Duration = track.Duration;
             DurationText = FormatTime(track.Duration);
             IsPlaying = _playbackService.IsPlaying;
@@ -418,7 +418,7 @@ public partial class PlayerViewModel : ObservableRecipient
         DisplayArtist = track?.DisplayArtist;
         Artists = track?.Artists ?? [];
         FlatArtistText = track?.FlatArtistText ?? string.Empty;
-        CoverArtUrl = track?.CoverArtUri?.ToString();
+        CoverImage = track?.CoverImage;
         Duration = track?.Duration ?? 0;
         DurationText = FormatTime(track?.Duration ?? 0);
         _isExternalUpdate = true;

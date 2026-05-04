@@ -153,7 +153,8 @@
                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"/>
-                        <Image Source="{Binding ViewModel.CoverArtUrl, ElementName=PageRoot}"
+                        <Image helpers:CachedImage.Reference="{Binding ViewModel.CoverImage, ElementName=PageRoot}"
+                               helpers:CachedImage.Size="600"
                                Stretch="UniformToFill"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
@@ -224,7 +225,8 @@
                                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                                       HorizontalAlignment="Center"
                                                                       VerticalAlignment="Center"/>
-                                                            <Image Source="{Binding ViewModel.AlbumArtistImageUrl, ElementName=PageRoot}"
+                                                            <Image helpers:CachedImage.Reference="{Binding ViewModel.AlbumArtistImage, ElementName=PageRoot}"
+                                                                   helpers:CachedImage.Size="100"
                                                                    Stretch="UniformToFill"
                                                                    HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"/>

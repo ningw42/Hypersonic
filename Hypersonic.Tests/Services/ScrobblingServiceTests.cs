@@ -57,11 +57,11 @@ public class ScrobblingServiceTests
 
     private sealed class RecordingSubsonicClient : ISubsonicClient
     {
-        public List<(string Id, ulong? Time, bool Submission)> ScrobbleCalls { get; } = [];
+        public System.Collections.Concurrent.ConcurrentQueue<(string Id, ulong? Time, bool Submission)> ScrobbleCalls { get; } = [];
 
         public Task<SubsonicResponse> ScrobbleAsync(string id, ulong? time = null, bool submission = true)
         {
-            ScrobbleCalls.Add((id, time, submission));
+            ScrobbleCalls.Enqueue((id, time, submission));
             return Task.FromResult(new SubsonicResponse());
         }
 
