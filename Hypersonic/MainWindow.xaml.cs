@@ -68,6 +68,11 @@ public sealed partial class MainWindow : WindowEx
 
     private void MainWindow_SizeChanged(object sender, WindowSizeChangedEventArgs args)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         EnsureAppStateService();
         CaptureWindowState();
         DebounceSaveWindow();
@@ -75,6 +80,11 @@ public sealed partial class MainWindow : WindowEx
 
     private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
     {
+        if (_isClosing)
+        {
+            return;
+        }
+
         if (args.DidPositionChange || args.DidPresenterChange)
         {
             EnsureAppStateService();
@@ -217,6 +227,27 @@ public sealed partial class MainWindow : WindowEx
             // PlayerViewModel may not be available.
         }
 
+        // Dispose taskbar service before playback: it unhooks the comctl32
+        // window subclass (whose managed WndProc delegate must not be called
+        // after teardown) and unsubscribes from playback events.
+        try
+        {
+            App.GetService<ITaskbarService>().Dispose();
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                App.GetService<ILoggingService>()
+                    .GetLogger(nameof(MainWindow))
+                    .Warning("Taskbar service dispose failed during shutdown", exception: ex);
+            }
+            catch
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Taskbar service dispose failed during shutdown: {ex}");
+            }
+        }
+
         try
         {
             if (App.GetService<IPlaybackService>() is IDisposable disposablePlaybackService)
@@ -284,12 +315,28 @@ public sealed partial class MainWindow : WindowEx
             }
         }
 
+        try
+        {
+            App.GetService<ITrayIconService>().Dispose();
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                App.GetService<ILoggingService>()
+                    .GetLogger(nameof(MainWindow))
+                    .Warning("Tray icon service dispose failed during shutdown", exception: ex);
+            }
+            catch
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainWindow] Tray icon service dispose failed during shutdown: {ex}");
+            }
+        }
+
         if (App.GetService<ILoggingService>() is LoggingService loggingService)
         {
             loggingService.Dispose();
         }
-
-        try { App.GetService<ITrayIconService>().Dispose(); } catch { /* may not be available */ }
     }
 
     // this handles updating the caption button colors correctly when indows system theme is changed
