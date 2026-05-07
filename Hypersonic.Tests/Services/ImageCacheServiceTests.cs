@@ -1,6 +1,5 @@
 using System.Net.Http;
 using System.Reflection;
-using System.Text.Json;
 
 using Hypersonic.Client;
 using Hypersonic.Client.Models.Responses;
@@ -25,7 +24,7 @@ public class ImageCacheServiceTests
     private FakeTimeProvider _time = null!;
     private FakeSubsonicClient _client = null!;
     private FakeSubsonicClientService _clientService = null!;
-    private JsonImageCacheStore _store = null!;
+    private SqliteImageCacheStore _store = null!;
 
     [TestInitialize]
     public void Setup()
@@ -40,9 +39,27 @@ public class ImageCacheServiceTests
     [TestCleanup]
     public void Cleanup()
     {
+        try
+        {
+            _store?.Dispose();
+        }
+        catch
+        {
+            // Best-effort.
+        }
+
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
         if (Directory.Exists(_cacheRoot))
         {
-            Directory.Delete(_cacheRoot, recursive: true);
+            try
+            {
+                Directory.Delete(_cacheRoot, recursive: true);
+            }
+            catch (IOException)
+            {
+                // SQLite may briefly hold sidecar handles; cleanup is best-effort.
+            }
         }
     }
 
@@ -73,12 +90,12 @@ public class ImageCacheServiceTests
         await service.GetImageAsync(CoverArt("secret-cover-id"), ImageRequestOptions.ForSize("600"));
         await _store.FlushAsync();
 
-        var manifest = await File.ReadAllTextAsync(Path.Combine(_cacheRoot, "manifest.json"));
-        Assert.IsFalse(manifest.Contains("password", StringComparison.OrdinalIgnoreCase));
-        Assert.IsFalse(manifest.Contains("alice", StringComparison.OrdinalIgnoreCase));
-        Assert.IsFalse(manifest.Contains("secret-cover-id", StringComparison.OrdinalIgnoreCase));
-        Assert.IsFalse(manifest.Contains("u=", StringComparison.OrdinalIgnoreCase));
-        Assert.IsFalse(manifest.Contains("p=", StringComparison.OrdinalIgnoreCase));
+        var serialized = await SerializeStoreEntriesAsync(_store);
+        Assert.IsFalse(serialized.Contains("password", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serialized.Contains("alice", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serialized.Contains("secret-cover-id", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serialized.Contains("u=", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serialized.Contains("p=", StringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]
@@ -95,7 +112,7 @@ public class ImageCacheServiceTests
 
         await _store.FlushAsync();
         var stats = await service.GetStatsAsync();
-        var manifest = await File.ReadAllTextAsync(Path.Combine(_cacheRoot, "manifest.json"));
+        var serialized = await SerializeStoreEntriesAsync(_store);
 
         Assert.IsNotNull(aliceUri);
         Assert.IsNotNull(bobUri);
@@ -104,8 +121,8 @@ public class ImageCacheServiceTests
         Assert.IsTrue(File.Exists(bobUri!.LocalPath));
         Assert.AreEqual(2, stats.EntryCount);
         Assert.AreEqual(2, _client.FetchCounts["shared-cover|300"]);
-        Assert.IsFalse(manifest.Contains("alice", StringComparison.OrdinalIgnoreCase));
-        Assert.IsFalse(manifest.Contains("bob", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serialized.Contains("alice", StringComparison.OrdinalIgnoreCase));
+        Assert.IsFalse(serialized.Contains("bob", StringComparison.OrdinalIgnoreCase));
     }
 
     [TestMethod]
@@ -122,37 +139,25 @@ public class ImageCacheServiceTests
     }
 
     [TestMethod]
-    public async Task LegacyV1Manifest_IsReplacedWithEmptyV2OnLoad()
+    public async Task LegacyJsonManifest_IsDiscardedAndImageFilesRemoved()
     {
-        var legacyManifest = """
-            {
-              "Version": 1,
-              "Entries": {
-                "legacy-key": {
-                  "FileName": "legacy-key.png",
-                  "Length": 8,
-                  "Provider": "subsonic",
-                  "Kind": "cover-art",
-                  "ServerHash": "deadbeef",
-                  "Size": "300",
-                  "CreatedAtUtc": "2026-05-01T00:00:00+00:00",
-                  "LastAccessUtc": "2026-05-01T00:00:00+00:00",
-                  "ExpiresAtUtc": "2026-06-01T00:00:00+00:00"
-                }
-              }
-            }
-            """;
         var manifestPath = Path.Combine(_cacheRoot, "manifest.json");
-        await File.WriteAllTextAsync(manifestPath, legacyManifest);
+        await File.WriteAllTextAsync(manifestPath, "{ \"Version\": 2, \"Entries\": {} }");
+
+        var orphanCachedImage = Path.Combine(_cacheRoot, new string('a', 64) + ".png");
+        await File.WriteAllBytesAsync(orphanCachedImage, PngA);
+
+        var unrelatedFile = Path.Combine(_cacheRoot, "user-notes.txt");
+        await File.WriteAllTextAsync(unrelatedFile, "do not delete");
 
         var store = CreateStore();
         var entry = await store.GetEntryAsync("legacy-key");
 
         Assert.IsNull(entry);
-        var persistedJson = await File.ReadAllTextAsync(manifestPath);
-        using var persisted = JsonDocument.Parse(persistedJson);
-        Assert.AreEqual(2, persisted.RootElement.GetProperty("Version").GetInt32());
-        Assert.AreEqual(0, persisted.RootElement.GetProperty("Entries").EnumerateObject().Count());
+        Assert.IsFalse(File.Exists(manifestPath), "Legacy manifest.json should be deleted.");
+        Assert.IsFalse(File.Exists(orphanCachedImage), "Cached image file should be deleted during JSON discard.");
+        Assert.IsTrue(File.Exists(unrelatedFile), "Files that don't match the cached-image predicate must be left alone.");
+        Assert.IsTrue(File.Exists(Path.Combine(_cacheRoot, "cache.db")), "SQLite database file should be created.");
     }
 
     [TestMethod]
@@ -293,15 +298,34 @@ public class ImageCacheServiceTests
     }
 
     [TestMethod]
-    public async Task ReconcileAsync_RemovesFilesWithoutManifestEntries()
+    public async Task ReconcileAsync_RemovesCachedImageFilesWithoutManifestEntries_AndPreservesOthers()
     {
-        var orphanPath = Path.Combine(_cacheRoot, "orphan.png");
-        await File.WriteAllBytesAsync(orphanPath, PngA);
+        var matchingOrphan = Path.Combine(_cacheRoot, new string('b', 64) + ".png");
+        var unrelatedOrphan = Path.Combine(_cacheRoot, "orphan.png");
+        await File.WriteAllBytesAsync(matchingOrphan, PngA);
+        await File.WriteAllBytesAsync(unrelatedOrphan, PngA);
+
         var service = CreateService();
 
         await service.ReconcileAsync();
 
-        Assert.IsFalse(File.Exists(orphanPath));
+        Assert.IsFalse(File.Exists(matchingOrphan), "Cached-image-shaped orphan should be deleted.");
+        Assert.IsTrue(File.Exists(unrelatedOrphan), "File not matching cached-image predicate should be left alone.");
+        Assert.IsTrue(File.Exists(Path.Combine(_cacheRoot, "cache.db")), "SQLite database must survive ReconcileAsync.");
+    }
+
+    [TestMethod]
+    public async Task ClearAsync_PreservesSqliteDatabaseFile()
+    {
+        _client.Images["cover-a"] = PngA;
+        var service = CreateService();
+        await service.GetImageAsync(CoverArt("cover-a"), ImageRequestOptions.ForSize("300"));
+
+        await service.ClearAsync();
+
+        Assert.IsTrue(File.Exists(Path.Combine(_cacheRoot, "cache.db")), "ClearAsync must not delete the SQLite database file.");
+        var stats = await service.GetStatsAsync();
+        Assert.AreEqual(0, stats.EntryCount);
     }
 
     [TestMethod]
@@ -366,9 +390,9 @@ public class ImageCacheServiceTests
     }
 
     [TestMethod]
-    public async Task CorruptManifest_RecoversWithEmptyStore()
+    public async Task CorruptDatabase_RecoversWithEmptyStore()
     {
-        await File.WriteAllTextAsync(Path.Combine(_cacheRoot, "manifest.json"), "{ not valid json");
+        await File.WriteAllBytesAsync(Path.Combine(_cacheRoot, "cache.db"), [0x42, 0x42, 0x42, 0x42, 0x42]);
         var service = CreateService();
 
         var stats = await service.GetStatsAsync();
@@ -377,11 +401,29 @@ public class ImageCacheServiceTests
         Assert.AreEqual(0, stats.TotalBytes);
     }
 
-    private JsonImageCacheStore CreateStore(ImageCacheOptions? options = null)
+    [TestMethod]
+    public async Task ReconcileAsync_AbortsWithoutDeletingFiles_WhenStoreEnumerationFails()
+    {
+        // A real cached image file lives in the folder, but the store can't enumerate (DB read error).
+        // Reconcile must NOT treat that as "table is empty" and delete the file.
+        var cachedImage = Path.Combine(_cacheRoot, new string('a', 64) + ".png");
+        await File.WriteAllBytesAsync(cachedImage, PngA);
+
+        var throwingStore = new ThrowingGetEntriesStore();
+        var service = CreateService(throwingStore);
+
+        await service.ReconcileAsync();
+
+        Assert.IsTrue(
+            File.Exists(cachedImage),
+            "ReconcileAsync must abort and leave files alone when the store's entry enumeration fails.");
+    }
+
+    private SqliteImageCacheStore CreateStore(ImageCacheOptions? options = null)
     {
         options ??= new ImageCacheOptions { RootPath = _cacheRoot };
         options.RootPath = _cacheRoot;
-        return new JsonImageCacheStore(Options.Create(options), new NullLoggingService());
+        return new SqliteImageCacheStore(Options.Create(options), new NullLoggingService());
     }
 
     private CachedImageService CreateService(ImageCacheOptions? options = null)
@@ -414,6 +456,24 @@ public class ImageCacheServiceTests
     private static ImageReference CoverArt(string id)
     {
         return ImageReference.SubsonicCoverArt(id)!;
+    }
+
+    private static async Task<string> SerializeStoreEntriesAsync(IImageCacheStore store)
+    {
+        var entries = await store.GetEntriesAsync();
+        var sb = new System.Text.StringBuilder();
+        foreach (var item in entries)
+        {
+            var entry = item.Entry;
+            sb.Append(item.KeyHash).Append('|')
+              .Append(entry.FileName).Append('|')
+              .Append(entry.Provider).Append('|')
+              .Append(entry.Kind).Append('|')
+              .Append(entry.ServerHash).Append('|')
+              .Append(entry.ServerScopeHash).Append('|')
+              .Append(entry.Size).Append('\n');
+        }
+        return sb.ToString();
     }
 
     private async Task WaitForFetchAttemptAsync(string key)
@@ -576,6 +636,30 @@ public class ImageCacheServiceTests
         public Task ClearAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
         public Task FlushAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
+    }
+
+    private sealed class ThrowingGetEntriesStore : IImageCacheStore
+    {
+        public Task<ImageCacheEntry?> GetEntryAsync(string keyHash, CancellationToken cancellationToken = default) => Task.FromResult<ImageCacheEntry?>(null);
+
+        public Task TouchEntryAsync(string keyHash, DateTimeOffset lastAccessUtc, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task UpsertEntryAsync(string keyHash, ImageCacheEntry entry, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task RemoveEntryAsync(string keyHash, bool flushImmediately = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<ImageCacheStoreStats> GetStatsAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ImageCacheStoreStats(0, 0));
+
+        public Task<IReadOnlyList<ImageCacheStoreEntry>> GetEntriesAsync(CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Image cache database is unavailable; cannot enumerate entries.");
+
+        public Task<IReadOnlyList<ImageCacheStoreEntry>> GetEvictionCandidatesAsync(
+            string? protectedKeyHash = null,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ImageCacheStoreEntry>>([]);
+
+        public Task ClearAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class NullLogger : ILogger

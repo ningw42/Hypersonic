@@ -13,7 +13,6 @@ namespace Hypersonic.Services;
 
 public sealed class CachedImageService : IImageService, IDisposable
 {
-    private const string ManifestFileName = "manifest.json";
     private static readonly TimeSpan ShutdownGateWaitTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IImageCacheStore _store;
@@ -140,7 +139,19 @@ public sealed class CachedImageService : IImageService, IDisposable
             Directory.CreateDirectory(_cacheFolderPath);
 
             var changed = false;
-            var entries = await _store.GetEntriesAsync(token).ConfigureAwait(false);
+            IReadOnlyList<ImageCacheStoreEntry> entries;
+            try
+            {
+                entries = await _store.GetEntriesAsync(token).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && ex is not ObjectDisposedException)
+            {
+                // If we can't enumerate the manifest reliably, treating it as empty would delete every
+                // cached image file. Abort the reconcile and try again next cycle.
+                _log.Warning("Image cache reconcile aborted: store entry enumeration failed", exception: ex);
+                return;
+            }
+
             var knownFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in entries)
@@ -158,9 +169,12 @@ public sealed class CachedImageService : IImageService, IDisposable
                 token.ThrowIfCancellationRequested();
 
                 var fileName = Path.GetFileName(file);
-                if (string.Equals(fileName, ManifestFileName, StringComparison.OrdinalIgnoreCase) ||
-                    fileName.StartsWith($"{ManifestFileName}.", StringComparison.OrdinalIgnoreCase) ||
-                    knownFiles.Contains(fileName))
+                if (!SqliteImageCacheStore.IsCachedImageFileName(fileName))
+                {
+                    continue;
+                }
+
+                if (knownFiles.Contains(fileName))
                 {
                     continue;
                 }
@@ -213,6 +227,12 @@ public sealed class CachedImageService : IImageService, IDisposable
             foreach (var file in Directory.EnumerateFiles(_cacheFolderPath))
             {
                 token.ThrowIfCancellationRequested();
+
+                if (!SqliteImageCacheStore.IsCachedImageFileName(Path.GetFileName(file)))
+                {
+                    continue;
+                }
+
                 TryDeleteFile(file, logFailures: true);
             }
 
