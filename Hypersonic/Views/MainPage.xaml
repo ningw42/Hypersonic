@@ -16,12 +16,75 @@
                       Visibility="{x:Bind ViewModel.HasAnyContent, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
             <StackPanel Padding="0,0,16,24">
 
+                <!-- Random Picks -->
+                <StackPanel Visibility="{x:Bind ViewModel.HasRandomPicks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock x:Uid="Home_RandomPicks"
+                               Text="Random Picks"
+                               Style="{StaticResource SubtitleTextBlockStyle}"
+                               Margin="0,0,0,12"/>
+                    <controls:CoverflowControl x:Name="RandomPicksCoverflow"
+                                               ItemsSource="{x:Bind ViewModel.RandomPicks, Mode=OneWay}"
+                                               SelectedIndex="9"
+                                               ItemWidth="240"
+                                               ItemSpacing="-180"
+                                               HoverRotationXDegrees="5"
+                                               HoverRotationYDegrees="6"
+                                               PressedScale="0.96"
+                                               PressInDurationMilliseconds="70"
+                                               PressOutDurationMilliseconds="120"
+                                               Height="280"
+                                               ItemInvoked="RandomPicksCoverflow_ItemInvoked">
+                        <!-- Negative spacing intentionally overlaps side covers under the centered cover. -->
+                        <controls:CoverflowControl.ItemTemplate>
+                            <DataTemplate>
+                                <controls:SquarePanel>
+                                    <Grid CornerRadius="10">
+                                        <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
+                                        <Image helpers:CachedImage.Reference="{Binding CoverImage}"
+                                               helpers:CachedImage.Size="300"
+                                               Stretch="UniformToFill"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                    </Grid>
+                                </controls:SquarePanel>
+                            </DataTemplate>
+                        </controls:CoverflowControl.ItemTemplate>
+                    </controls:CoverflowControl>
+                    <StackPanel x:Name="CoverflowMetadataPanel"
+                                DataContext="{Binding SelectedItem, ElementName=RandomPicksCoverflow}"
+                                HorizontalAlignment="Center"
+                                MaxWidth="520"
+                                Margin="0,-2,0,0">
+                        <RichTextBlock x:Name="CoverflowAlbumTitleText"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxLines="1"
+                                       IsTextSelectionEnabled="False"
+                                       DataContextChanged="CoverflowAlbumTitle_DataContextChanged"/>
+                        <RichTextBlock x:Name="CoverflowAlbumArtistText"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxLines="1"
+                                       IsTextSelectionEnabled="False"
+                                       Margin="0,2,0,0"
+                                       DataContextChanged="AlbumArtistLinks_DataContextChanged"/>
+                        <TextBlock Text="{Binding SelectedItem.Year, ElementName=RandomPicksCoverflow}"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                   FontSize="12"
+                                   TextAlignment="Center"
+                                   Margin="0,1,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
                 <!-- Recently Played -->
                 <StackPanel Visibility="{x:Bind ViewModel.HasRecentlyPlayed, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock x:Uid="Home_RecentlyPlayed"
                                Text="Recently Played"
                                Style="{StaticResource SubtitleTextBlockStyle}"
-                               Margin="0,0,0,12"/>
+                               Margin="0,24,0,12"/>
                     <controls:CarouselPanel>
                         <ItemsRepeater x:Name="RecentlyPlayedRepeater"
                                        ItemsSource="{x:Bind ViewModel.RecentlyPlayed, Mode=OneWay}">
@@ -384,98 +447,6 @@
                     </controls:CarouselPanel>
                 </StackPanel>
 
-                <!-- Random Picks -->
-                <StackPanel Visibility="{x:Bind ViewModel.HasRandomPicks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock x:Uid="Home_RandomPicks"
-                               Text="Random Picks"
-                               Style="{StaticResource SubtitleTextBlockStyle}"
-                               Margin="0,24,0,12"/>
-                    <controls:CarouselPanel>
-                        <ItemsRepeater x:Name="RandomPicksRepeater"
-                                       ItemsSource="{x:Bind ViewModel.RandomPicks, Mode=OneWay}">
-                            <ItemsRepeater.Layout>
-                                <StackLayout Orientation="Horizontal" Spacing="8"/>
-                            </ItemsRepeater.Layout>
-                            <ItemsRepeater.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Click="AlbumCard_Click"
-                                            Width="180"
-                                            Padding="4"
-                                            BorderThickness="0"
-                                            CornerRadius="12"
-                                            HorizontalContentAlignment="Stretch"
-                                            VerticalContentAlignment="Stretch"
-                                            Style="{StaticResource SubtleButtonStyle}">
-                                        <Button.Resources>
-                                            <ResourceDictionary>
-                                                <ResourceDictionary.ThemeDictionaries>
-                                                    <ResourceDictionary x:Key="Light">
-                                                        <SolidColorBrush x:Key="SubtleButtonBackgroundPointerOver" Color="#1A000000"/>
-                                                        <SolidColorBrush x:Key="SubtleButtonBackgroundPressed" Color="#25000000"/>
-                                                    </ResourceDictionary>
-                                                    <ResourceDictionary x:Key="Dark">
-                                                        <SolidColorBrush x:Key="SubtleButtonBackgroundPointerOver" Color="#1AFFFFFF"/>
-                                                        <SolidColorBrush x:Key="SubtleButtonBackgroundPressed" Color="#25FFFFFF"/>
-                                                    </ResourceDictionary>
-                                                </ResourceDictionary.ThemeDictionaries>
-                                            </ResourceDictionary>
-                                        </Button.Resources>
-                                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="8">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <controls:SquarePanel Grid.Row="0">
-                                                    <Grid CornerRadius="8,8,0,0">
-                                                        <Rectangle Fill="{ThemeResource CardBackgroundFillColorSecondaryBrush}"/>
-                                                        <FontIcon Glyph="&#xE8D6;"
-                                                                  FontSize="48"
-                                                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                                  HorizontalAlignment="Center"
-                                                                  VerticalAlignment="Center"/>
-                                                        <Image helpers:CachedImage.Reference="{Binding CoverImage}"
-                                                               helpers:CachedImage.Size="300"
-                                                               Stretch="UniformToFill"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"/>
-                                                    </Grid>
-                                                </controls:SquarePanel>
-                                                <TextBlock Grid.Row="1"
-                                                           Text="{Binding Name}"
-                                                           FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           MaxLines="1"
-                                                           ToolTipService.ToolTip="{Binding DisplayName}"
-                                                           Margin="12,8,12,2"/>
-                                                <RichTextBlock Grid.Row="2"
-                                                               Margin="12,0,12,2"
-                                                               HorizontalAlignment="Left"
-                                                               VerticalAlignment="Top"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               MaxLines="1"
-                                                               IsTextSelectionEnabled="False"
-                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                               DataContextChanged="AlbumArtistLinks_DataContextChanged"/>
-                                                <TextBlock Grid.Row="3"
-                                                           Text="{Binding Year}"
-                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                           FontSize="12"
-                                                           Margin="12,0,12,12"/>
-                                            </Grid>
-                                        </Border>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsRepeater.ItemTemplate>
-                        </ItemsRepeater>
-                    </controls:CarouselPanel>
-                </StackPanel>
-
             </StackPanel>
         </ScrollViewer>
 
@@ -509,7 +480,8 @@
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                    Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-        <!-- Brush providers for code-behind artist rendering -->
+        <!-- Brush providers for code-behind hyperlink rendering -->
+        <TextBlock x:Name="PrimaryBrushProvider" Foreground="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="SecondaryBrushProvider" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="TertiaryBrushProvider" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="Collapsed"/>
     </Grid>

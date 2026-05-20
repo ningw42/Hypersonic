@@ -337,6 +337,90 @@
         </Setter>
     </Style>
 
+    <!-- CoverflowItemContainer: hosts the item visuals and dims without making the card transparent -->
+    <Style TargetType="controls:CoverflowItemContainer">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="controls:CoverflowItemContainer">
+                    <Grid Width="{TemplateBinding Width}"
+                          Height="{TemplateBinding Height}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          ContentTransitions="{TemplateBinding ContentTransitions}"
+                                          Width="{TemplateBinding Width}"
+                                          Height="{TemplateBinding Height}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        <Border Background="Black"
+                              Width="{TemplateBinding Width}"
+                              Height="{TemplateBinding Width}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Top"
+                              CornerRadius="{TemplateBinding DimmingCornerRadius}"
+                              IsHitTestVisible="False"
+                              Opacity="{TemplateBinding DimmingOpacity}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- CoverflowControl: 3D perspective carousel with tilted, receding neighbors -->
+    <Style TargetType="controls:CoverflowControl">
+        <Setter Property="IsTabStop" Value="True"/>
+        <Setter Property="UseSystemFocusVisuals" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="controls:CoverflowControl">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="PART_LeftArrowBtn"
+                                Grid.Column="0"
+                                Style="{StaticResource CarouselArrowButtonStyle}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"
+                                Visibility="Collapsed"
+                                AutomationProperties.Name="Center previous">
+                            <FontIcon Glyph="&#xE76B;" FontSize="16"/>
+                        </Button>
+
+                        <ScrollViewer x:Name="PART_Scroller"
+                                      Grid.Column="1"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Disabled"
+                                      HorizontalScrollMode="Enabled"
+                                      VerticalScrollMode="Disabled"
+                                      HorizontalSnapPointsType="None"
+                                      ZoomMode="Disabled">
+                            <Border x:Name="PART_ScrolledContent">
+                                <ItemsRepeater x:Name="PART_Repeater">
+                                    <ItemsRepeater.Layout>
+                                        <StackLayout Orientation="Horizontal" Spacing="0"/>
+                                    </ItemsRepeater.Layout>
+                                </ItemsRepeater>
+                            </Border>
+                        </ScrollViewer>
+
+                        <Button x:Name="PART_RightArrowBtn"
+                                Grid.Column="2"
+                                Style="{StaticResource CarouselArrowButtonStyle}"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0"
+                                Visibility="Collapsed"
+                                AutomationProperties.Name="Center next">
+                            <FontIcon Glyph="&#xE76C;" FontSize="16"/>
+                        </Button>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- EqualizerBars: three animated vertical bars indicating now-playing -->
     <Style TargetType="controls:EqualizerBars">
         <Setter Property="IsTabStop" Value="False"/>

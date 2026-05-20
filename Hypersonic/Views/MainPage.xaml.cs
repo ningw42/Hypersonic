@@ -1,4 +1,5 @@
 using Hypersonic.Contracts.Services;
+using Hypersonic.Controls;
 using Hypersonic.Core.Helpers;
 using Hypersonic.Core.Models;
 using Hypersonic.ViewModels;
@@ -28,6 +29,7 @@ public sealed partial class MainPage : Page
         };
     }
 
+    private Brush PrimaryBrush => PrimaryBrushProvider.Foreground;
     private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
     private Brush TertiaryBrush => TertiaryBrushProvider.Foreground;
 
@@ -42,7 +44,7 @@ public sealed partial class MainPage : Page
         ReRenderRepeater(RecentlyReleasedRepeater, ViewModel.RecentlyReleased.Count);
         ReRenderRepeater(RecentlyAddedRepeater, ViewModel.RecentlyAdded.Count);
         ReRenderRepeater(MostPlayedRepeater, ViewModel.MostPlayed.Count);
-        ReRenderRepeater(RandomPicksRepeater, ViewModel.RandomPicks.Count);
+        ReRenderCoverflowMetadata();
     }
 
     private static void ReRenderRepeater(ItemsRepeater repeater, int count)
@@ -63,14 +65,96 @@ public sealed partial class MainPage : Page
     {
         if (sender is Button button && button.DataContext is AlbumInfo album)
         {
-            var navigationService = App.GetService<INavigationService>();
-            navigationService.NavigateTo(typeof(AlbumDetailViewModel).FullName!, album.Id);
+            NavigateToAlbum(album);
         }
+    }
+
+    private void RandomPicksCoverflow_ItemInvoked(object? sender, CoverflowItemInvokedEventArgs e)
+    {
+        if (e.Item is AlbumInfo album)
+        {
+            NavigateToAlbum(album);
+        }
+    }
+
+    private static void NavigateToAlbum(AlbumInfo album)
+    {
+        NavigateToAlbumId(album.Id);
+    }
+
+    private static void NavigateToAlbumId(string albumId)
+    {
+        var navigationService = App.GetService<INavigationService>();
+        navigationService.NavigateTo(typeof(AlbumDetailViewModel).FullName!, albumId);
+    }
+
+    private void CoverflowAlbumTitle_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        if (sender is RichTextBlock rtb)
+        {
+            RenderCoverflowAlbumTitle(rtb, rtb.DataContext as AlbumInfo);
+        }
+    }
+
+    private void ReRenderCoverflowMetadata()
+    {
+        var album = CoverflowMetadataPanel.DataContext as AlbumInfo;
+        RenderCoverflowAlbumTitle(CoverflowAlbumTitleText, album);
+        RenderAlbumArtistLinks(CoverflowAlbumArtistText, album);
+    }
+
+    private void RenderCoverflowAlbumTitle(RichTextBlock rtb, AlbumInfo? album)
+    {
+        rtb.Blocks.Clear();
+        ToolTipService.SetToolTip(rtb, null);
+
+        if (album is null)
+        {
+            return;
+        }
+
+        var title = album.DisplayName;
+        ToolTipService.SetToolTip(rtb, title);
+
+        var paragraph = new Paragraph();
+        if (!string.IsNullOrEmpty(album.Id))
+        {
+            var link = new Hyperlink
+            {
+                UnderlineStyle = UnderlineStyle.None,
+                Foreground = PrimaryBrush,
+            };
+            link.Inlines.Add(new Run { Text = title });
+            var albumId = album.Id;
+            link.Click += (s, e) => NavigateToAlbumId(albumId);
+            paragraph.Inlines.Add(link);
+        }
+        else
+        {
+            paragraph.Inlines.Add(new Run
+            {
+                Text = title,
+                Foreground = PrimaryBrush,
+            });
+        }
+
+        rtb.Blocks.Add(paragraph);
     }
 
     private void AlbumArtistLinks_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
     {
-        if (sender is not RichTextBlock rtb || rtb.DataContext is not AlbumInfo album)
+        if (sender is RichTextBlock rtb)
+        {
+            RenderAlbumArtistLinks(rtb, rtb.DataContext as AlbumInfo);
+        }
+    }
+
+    private void RenderAlbumArtistLinks(RichTextBlock rtb, AlbumInfo? album)
+    {
+        rtb.Blocks.Clear();
+        ToolTipService.SetToolTip(rtb, null);
+
+        if (album is null)
         {
             return;
         }
