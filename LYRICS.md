@@ -31,7 +31,9 @@ The lyrics surface is a **Win2D `CanvasAnimatedControl` embedded inside the exis
 
 Four phases, each independently shippable to `master`. Order is mandatory: the data model defines the contracts both ends depend on; providers/service land before the renderer so the renderer can be exercised against real fetched data; integration is last.
 
-### Phase 0 — Data model (`Hypersonic.Core`)
+### Phase 0 — Data model (`Hypersonic.Core`) — ✅ shipped
+
+> See implementation: [`docs/implementation/service/2026-05-22-lyrics-data-model.md`](docs/implementation/service/2026-05-22-lyrics-data-model.md). Container renamed `Lyrics` → `LyricsDocument` to avoid colliding with `Hypersonic.Client.Models.Entities.Lyrics`.
 
 Define platform-independent lyric types in `Hypersonic.Core/Models/Lyrics/`. Both the renderer's input and the providers' output bind to these.
 
