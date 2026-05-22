@@ -111,6 +111,7 @@ public partial class App : Application
             services.AddSingleton<ITrayIconService, TrayIconService>();
             services.AddSingleton<ICredentialService, CredentialService>();
             services.AddSingleton<IAppStateService, AppStateService>();
+            services.AddSingleton<IRandomPicksCacheService, RandomPicksCacheService>();
 
             services.AddSingleton<TimeProvider>(TimeProvider.System);
             services.AddSingleton<IScrobblingService, ScrobblingService>();

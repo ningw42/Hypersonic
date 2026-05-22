@@ -6,7 +6,10 @@ using Hypersonic.Client.Models.Responses;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
+using Hypersonic.Services;
 using Hypersonic.ViewModels;
+
+using AlbumInfo = Hypersonic.Core.Models.AlbumInfo;
 
 namespace Hypersonic.Tests.ViewModels;
 
@@ -45,10 +48,15 @@ public class MainViewModelTests
     {
         public Dictionary<string, AlbumID3[]?> AlbumListResponses { get; set; } = [];
         public HashSet<string> ShouldThrowTypes { get; set; } = [];
+        public int RandomCallCount { get; private set; }
 
         public Task<GetAlbumList2Response> GetAlbumList2Async(string type, int? size = null, int? offset = null, int? fromYear = null, int? toYear = null, string? genre = null, string? musicFolderId = null)
         {
             var key = type == "byYear" ? $"byYear:{fromYear}-{toYear}" : type;
+            if (key == "random")
+            {
+                RandomCallCount++;
+            }
             if (ShouldThrowTypes.Contains(key))
             {
                 throw new HttpRequestException($"Failed to fetch {key}");
@@ -113,13 +121,77 @@ public class MainViewModelTests
         public Uri GetAvatarUri(string username) => throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Fake cache that records calls and lets tests force refresh / failure behavior without
+    /// going through the real RandomPicksCacheService. Useful for verifying VM-cache interactions.
+    /// </summary>
+    private sealed class FakeRandomPicksCache : IRandomPicksCacheService
+    {
+        public IReadOnlyList<AlbumInfo> CurrentPicks { get; private set; } = [];
+        public bool IsLoading { get; private set; }
+        public bool HasLoaded { get; private set; }
+        public int GetOrFetchCalls { get; private set; }
+        public int RefreshCalls { get; private set; }
+        public Func<IReadOnlyList<AlbumInfo>>? FetchResult { get; set; }
+
+        public event EventHandler? PicksChanged;
+        public event EventHandler? LoadingChanged;
+
+        public Task<IReadOnlyList<AlbumInfo>> GetOrFetchAsync()
+        {
+            GetOrFetchCalls++;
+            if (HasLoaded)
+            {
+                return Task.FromResult(CurrentPicks);
+            }
+            return DoFetchAsync();
+        }
+
+        public Task RefreshAsync()
+        {
+            RefreshCalls++;
+            return DoFetchAsync();
+        }
+
+        private Task<IReadOnlyList<AlbumInfo>> DoFetchAsync()
+        {
+            IsLoading = true;
+            LoadingChanged?.Invoke(this, EventArgs.Empty);
+            try
+            {
+                CurrentPicks = FetchResult?.Invoke() ?? [];
+                HasLoaded = true;
+                PicksChanged?.Invoke(this, EventArgs.Empty);
+                return Task.FromResult(CurrentPicks);
+            }
+            finally
+            {
+                IsLoading = false;
+                LoadingChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>Inject an external change (simulating a refresh completing).</summary>
+        public void PushPicks(IReadOnlyList<AlbumInfo> picks)
+        {
+            CurrentPicks = picks;
+            HasLoaded = true;
+            PicksChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     private static AlbumID3 MakeAlbum(string id, string name = "Album", string artist = "Artist", int year = 2025) =>
         new() { Id = id, Name = name, Artist = artist, ArtistId = "ar1", Year = year, CoverArt = $"cov-{id}", SongCount = 10, Duration = 3600 };
 
-    private static MainViewModel CreateVm(FakeSubsonicClient client)
+    private static AlbumInfo MakeMappedAlbum(string id) =>
+        new() { Id = id, Name = id, Artist = "A", ArtistId = "ar1", Year = 2025 };
+
+    private static MainViewModel CreateVm(FakeSubsonicClient client, IRandomPicksCacheService? cache = null)
     {
         var clientService = new FakeSubsonicClientService { Client = client };
-        return new MainViewModel(clientService, new NullLoggingService());
+        cache ??= new RandomPicksCacheService(clientService, new NullLoggingService());
+        // Synchronous enqueue keeps event handlers on the calling thread for deterministic tests.
+        return new MainViewModel(clientService, cache, new NullLoggingService(), enqueue: action => action());
     }
 
     private static FakeSubsonicClient CreateClientWithAllSections()
@@ -143,7 +215,7 @@ public class MainViewModelTests
         var client = CreateClientWithAllSections();
         var vm = CreateVm(client);
 
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsTrue(vm.HasRecentlyPlayed);
         Assert.IsTrue(vm.HasRecentlyReleased);
@@ -171,7 +243,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsFalse(vm.HasRecentlyPlayed);
         Assert.IsTrue(vm.HasRecentlyReleased);
@@ -198,7 +270,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsFalse(vm.HasAnyContent);
         Assert.IsFalse(vm.HasError);
@@ -214,7 +286,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsFalse(vm.HasAnyContent);
         Assert.IsTrue(vm.HasError);
@@ -235,7 +307,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsFalse(vm.HasRecentlyPlayed);
         Assert.IsTrue(vm.HasRecentlyReleased);
@@ -247,7 +319,36 @@ public class MainViewModelTests
     }
 
     [TestMethod]
-    public async Task Retry_ReloadsData()
+    public async Task LoadSectionsAsync_DoesNotCallRandomEndpointDirectly()
+    {
+        var client = CreateClientWithAllSections();
+        var vm = CreateVm(client);
+
+        await vm.LoadSectionsAsync();
+
+        Assert.AreEqual(0, client.RandomCallCount, "LoadSectionsAsync must no longer touch the random endpoint; that is the cache's job.");
+    }
+
+    [TestMethod]
+    public async Task OnlyFourNonRandomFailures_StillShowsError()
+    {
+        // The four non-random sections all fail; random is empty (cache returns []).
+        // The denominator must be 4, not 5 — otherwise the empty state would show instead of error.
+        var client = new FakeSubsonicClient
+        {
+            ShouldThrowTypes = { "recent", $"byYear:{DateTime.Now.Year}-0", "newest", "frequent" },
+            AlbumListResponses = { ["random"] = null },
+        };
+
+        var vm = CreateVm(client);
+        await vm.LoadAllAsync();
+
+        Assert.IsFalse(vm.HasAnyContent);
+        Assert.IsTrue(vm.HasError, "Four non-random failures must trigger HasError (denominator is 4, not 5).");
+    }
+
+    [TestMethod]
+    public async Task Retry_ReloadsData_IncludingRandom()
     {
         var client = new FakeSubsonicClient
         {
@@ -255,7 +356,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsTrue(vm.HasError);
 
@@ -266,7 +367,129 @@ public class MainViewModelTests
         await vm.RetryCommand.ExecuteAsync(null);
 
         Assert.IsFalse(vm.HasError);
+        Assert.IsTrue(vm.HasRandomPicks, "Retry must cover random — if random is the only success, the page must still show it.");
+    }
+
+    [TestMethod]
+    public async Task Retry_WhenRandomIsOnlyAvailableSection_ShowsContent()
+    {
+        // All four non-random sections fail and stay failing; only random recovers.
+        // Without retry covering random, the page would stay stuck on the error screen.
+        var client = new FakeSubsonicClient
+        {
+            ShouldThrowTypes = { "recent", $"byYear:{DateTime.Now.Year}-0", "newest", "frequent", "random" },
+        };
+
+        var vm = CreateVm(client);
+        await vm.LoadAllAsync();
+        Assert.IsTrue(vm.HasError);
+
+        client.ShouldThrowTypes.Remove("random");
+        client.AlbumListResponses["random"] = [MakeAlbum("rand1")];
+
+        await vm.RetryCommand.ExecuteAsync(null);
+
         Assert.IsTrue(vm.HasRandomPicks);
+        Assert.IsTrue(vm.HasAnyContent);
+        Assert.IsFalse(vm.HasError);
+    }
+
+    [TestMethod]
+    public async Task RefreshRandomPicksCommand_DelegatesToCache()
+    {
+        var client = CreateClientWithAllSections();
+        var cache = new FakeRandomPicksCache
+        {
+            FetchResult = () => [MakeMappedAlbum("from-cache")],
+        };
+        var vm = CreateVm(client, cache);
+
+        await vm.LoadAllAsync();
+        var refreshesBefore = cache.RefreshCalls;
+
+        await vm.RefreshRandomPicksCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(refreshesBefore + 1, cache.RefreshCalls);
+    }
+
+    [TestMethod]
+    public async Task PicksChangedEvent_UpdatesRandomPicks_AndAggregateState()
+    {
+        // Start with no non-random content and no random; trigger a push from the cache,
+        // which should populate RandomPicks and flip HasAnyContent on.
+        var client = new FakeSubsonicClient
+        {
+            AlbumListResponses = { ["random"] = null, ["recent"] = null, [$"byYear:{DateTime.Now.Year}-0"] = null, ["newest"] = null, ["frequent"] = null },
+        };
+        var cache = new FakeRandomPicksCache();
+        var vm = CreateVm(client, cache);
+
+        // Subscribe via OnNavigatedTo so the VM is listening to the cache.
+        // We can't call OnNavigatedTo directly (async void), so manually subscribe via reflection-like:
+        // use the same code path by calling LoadAllAsync after manually invoking subscribe via the test seam.
+        // The simplest seam: push the picks *after* subscription is set up by OnNavigatedTo equivalents.
+        // Since Subscribe is private, we exercise it through OnNavigatedTo and Task.Yield.
+        vm.OnNavigatedTo(null!);
+        await Task.Yield();
+
+        cache.PushPicks([MakeMappedAlbum("new1"), MakeMappedAlbum("new2")]);
+
+        Assert.AreEqual(2, vm.RandomPicks.Count);
+        Assert.IsTrue(vm.HasRandomPicks);
+        Assert.IsTrue(vm.HasAnyContent, "Random becoming the only successful section must flip HasAnyContent on.");
+
+        vm.OnNavigatedFrom();
+    }
+
+    [TestMethod]
+    public async Task OnNavigatedFrom_Unsubscribes_FromCacheEvents()
+    {
+        var client = CreateClientWithAllSections();
+        var cache = new FakeRandomPicksCache
+        {
+            FetchResult = () => [MakeMappedAlbum("first")],
+        };
+        var vm = CreateVm(client, cache);
+
+        vm.OnNavigatedTo(null!);
+        await Task.Yield();
+        vm.OnNavigatedFrom();
+
+        // After unsubscribe, a cache push must not mutate the VM.
+        var before = vm.RandomPicks.Count;
+        cache.PushPicks([MakeMappedAlbum("late1"), MakeMappedAlbum("late2"), MakeMappedAlbum("late3")]);
+
+        Assert.AreEqual(before, vm.RandomPicks.Count, "Unsubscribed VM must not respond to cache events.");
+    }
+
+    [TestMethod]
+    public async Task RandomPicks_StableAcrossMultipleNavigations()
+    {
+        // The design's headline guarantee: navigating away and back keeps the same picks.
+        var rand = new[] { MakeAlbum("seedA"), MakeAlbum("seedB") };
+        var client = new FakeSubsonicClient
+        {
+            AlbumListResponses =
+            {
+                ["recent"] = [MakeAlbum("rp")],
+                [$"byYear:{DateTime.Now.Year}-0"] = [MakeAlbum("rr")],
+                ["newest"] = [MakeAlbum("ra")],
+                ["frequent"] = [MakeAlbum("mp")],
+                ["random"] = rand,
+            },
+        };
+        var vm = CreateVm(client);
+
+        await vm.LoadAllAsync();
+        var firstRandomCalls = client.RandomCallCount;
+        var firstIds = vm.RandomPicks.Select(a => a.Id).ToArray();
+
+        // Simulate a second navigation by re-loading.
+        await vm.LoadAllAsync();
+        var secondIds = vm.RandomPicks.Select(a => a.Id).ToArray();
+
+        CollectionAssert.AreEqual(firstIds, secondIds, "Random picks must be stable across navigations.");
+        Assert.AreEqual(firstRandomCalls, client.RandomCallCount, "Second navigation must reuse cache, not re-fetch random.");
     }
 
     [TestMethod]
@@ -285,7 +508,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.AreEqual(1, vm.RandomPicks.Count);
         Assert.AreEqual("cover-id-different", vm.RandomPicks[0].CoverImage!.Identity);
@@ -307,7 +530,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.AreEqual("Display Artist Name", vm.RandomPicks[0].Artist);
     }
@@ -328,7 +551,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.AreEqual("Fallback Artist", vm.RandomPicks[0].Artist);
     }
@@ -349,7 +572,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsFalse(vm.HasRecentlyPlayed);
         Assert.IsFalse(vm.HasRecentlyReleased);
@@ -375,7 +598,7 @@ public class MainViewModelTests
         };
 
         var vm = CreateVm(client);
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.AreEqual(3, vm.RecentlyReleased.Count);
         Assert.AreEqual(2026, vm.RecentlyReleased[0].Year);
@@ -398,7 +621,7 @@ public class MainViewModelTests
         var client = CreateClientWithAllSections();
         var vm = CreateVm(client);
 
-        await vm.LoadSectionsAsync();
+        await vm.LoadAllAsync();
 
         Assert.IsFalse(vm.ShowEmptyState, "ShowEmptyState must be false when content is loaded");
         Assert.IsTrue(vm.HasAnyContent);

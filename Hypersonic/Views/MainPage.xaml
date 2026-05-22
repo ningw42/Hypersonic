@@ -10,18 +10,52 @@
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never"
     xmlns:behaviors="using:Hypersonic.Behaviors">
 
-    <Grid x:Name="ContentArea">
+    <Grid x:Name="ContentArea" PointerMoved="ContentArea_PointerMoved">
         <!-- Main content -->
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       Visibility="{x:Bind ViewModel.HasAnyContent, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
             <StackPanel Padding="0,0,16,24">
 
                 <!-- Random Picks -->
-                <StackPanel Visibility="{x:Bind ViewModel.HasRandomPicks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock x:Uid="Home_RandomPicks"
-                               Text="Random Picks"
-                               Style="{StaticResource SubtitleTextBlockStyle}"
-                               Margin="0,0,0,12"/>
+                <StackPanel x:Name="RandomPicksSection"
+                            Background="Transparent"
+                            PointerEntered="RandomPicksSection_PointerEntered"
+                            PointerExited="RandomPicksSection_PointerExited"
+                            Visibility="{x:Bind ViewModel.HasRandomPicks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,0,0,12">
+                        <TextBlock x:Uid="Home_RandomPicks"
+                                   Text="Random Picks"
+                                   Style="{StaticResource SubtitleTextBlockStyle}"
+                                   VerticalAlignment="Center"/>
+                        <Button x:Name="ShuffleRandomPicksButton"
+                                Command="{x:Bind ViewModel.RefreshRandomPicksCommand}"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                Margin="8,0,0,0"
+                                CornerRadius="16"
+                                BorderThickness="1"
+                                VerticalAlignment="Center"
+                                Opacity="0"
+                                IsHitTestVisible="False"
+                                GotFocus="ShuffleRandomPicksButton_GotFocus"
+                                LostFocus="ShuffleRandomPicksButton_LostFocus"
+                                ToolTipService.ToolTip="Shuffle">
+                            <Button.OpacityTransition>
+                                <ScalarTransition Duration="0:0:0.15"/>
+                            </Button.OpacityTransition>
+                            <Grid>
+                                <FontIcon Glyph="&#xE72C;"
+                                          FontSize="14"
+                                          Visibility="{x:Bind ViewModel.IsRefreshingRandomPicks, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                                <ProgressRing Width="14"
+                                              Height="14"
+                                              IsActive="{x:Bind ViewModel.IsRefreshingRandomPicks, Mode=OneWay}"
+                                              Visibility="{x:Bind ViewModel.IsRefreshingRandomPicks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
                     <controls:CoverflowControl x:Name="RandomPicksCoverflow"
                                                ItemsSource="{x:Bind ViewModel.RandomPicks, Mode=OneWay}"
                                                SelectedIndex="9"

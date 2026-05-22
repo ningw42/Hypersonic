@@ -77,6 +77,71 @@ public sealed partial class MainPage : Page
         }
     }
 
+    private bool _shufflePointerInside;
+    private bool _shuffleHasFocus;
+
+    private void RandomPicksSection_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _shufflePointerInside = true;
+        UpdateShuffleButtonVisibility();
+    }
+
+    private void RandomPicksSection_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        // PointerExited bubbles from child elements (incl. RichTextBlock with hyperlinks),
+        // and the bubbled event can fire even when the pointer is still inside the section.
+        // Re-test against the section's bounds.
+        if (!IsPointerInsideRandomPicksSection(e.GetCurrentPoint(RandomPicksSection).Position))
+        {
+            _shufflePointerInside = false;
+            UpdateShuffleButtonVisibility();
+        }
+    }
+
+    private void ContentArea_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        // Backstop: PointerExited on the section can be swallowed by children with hit-test
+        // quirks (e.g. selectable RichTextBlock, hyperlinks). On every page-level pointer move,
+        // re-evaluate whether the pointer is still inside the Random Picks section. The early
+        // exit keeps per-move overhead negligible.
+        if (!_shufflePointerInside) return;
+
+        var pos = e.GetCurrentPoint(RandomPicksSection).Position;
+        if (!IsPointerInsideRandomPicksSection(pos))
+        {
+            _shufflePointerInside = false;
+            UpdateShuffleButtonVisibility();
+        }
+    }
+
+    private void ShuffleRandomPicksButton_GotFocus(object sender, RoutedEventArgs e)
+    {
+        // Reveal on keyboard focus so the button is not an invisible Tab target.
+        _shuffleHasFocus = true;
+        UpdateShuffleButtonVisibility();
+    }
+
+    private void ShuffleRandomPicksButton_LostFocus(object sender, RoutedEventArgs e)
+    {
+        _shuffleHasFocus = false;
+        UpdateShuffleButtonVisibility();
+    }
+
+    private bool IsPointerInsideRandomPicksSection(Windows.Foundation.Point pos)
+    {
+        return pos.X >= 0
+            && pos.Y >= 0
+            && pos.X <= RandomPicksSection.ActualWidth
+            && pos.Y <= RandomPicksSection.ActualHeight;
+    }
+
+    private void UpdateShuffleButtonVisibility()
+    {
+        var visible = _shufflePointerInside || _shuffleHasFocus;
+        ShuffleRandomPicksButton.Opacity = visible ? 1.0 : 0.0;
+        ShuffleRandomPicksButton.IsHitTestVisible = visible;
+    }
+
     private static void NavigateToAlbum(AlbumInfo album)
     {
         NavigateToAlbumId(album.Id);
