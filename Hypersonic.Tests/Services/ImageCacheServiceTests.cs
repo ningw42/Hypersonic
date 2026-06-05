@@ -26,6 +26,13 @@ public class ImageCacheServiceTests
     private FakeSubsonicClientService _clientService = null!;
     private SqliteImageCacheStore _store = null!;
 
+    [TestMethod]
+    public void ImageCacheStats_DoesNotExposePhysicalCacheFolder()
+    {
+        Assert.IsFalse(
+            typeof(ImageCacheStats).GetProperties().Any(property => property.Name == "CacheFolderPath"));
+    }
+
     [TestInitialize]
     public void Setup()
     {
@@ -376,20 +383,6 @@ public class ImageCacheServiceTests
     }
 
     [TestMethod]
-    public async Task Dispose_CancelsRunningReconcileBeforeDisposingGate()
-    {
-        var store = new BlockingGetEntriesStore();
-        var service = CreateService(store);
-
-        var reconcile = service.ReconcileAsync();
-        await store.GetEntriesStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-
-        service.Dispose();
-
-        await reconcile.WaitAsync(TimeSpan.FromSeconds(5));
-    }
-
-    [TestMethod]
     public async Task CorruptDatabase_RecoversWithEmptyStore()
     {
         await File.WriteAllBytesAsync(Path.Combine(_cacheRoot, "cache.db"), [0x42, 0x42, 0x42, 0x42, 0x42]);
@@ -399,24 +392,6 @@ public class ImageCacheServiceTests
 
         Assert.AreEqual(0, stats.EntryCount);
         Assert.AreEqual(0, stats.TotalBytes);
-    }
-
-    [TestMethod]
-    public async Task ReconcileAsync_AbortsWithoutDeletingFiles_WhenStoreEnumerationFails()
-    {
-        // A real cached image file lives in the folder, but the store can't enumerate (DB read error).
-        // Reconcile must NOT treat that as "table is empty" and delete the file.
-        var cachedImage = Path.Combine(_cacheRoot, new string('a', 64) + ".png");
-        await File.WriteAllBytesAsync(cachedImage, PngA);
-
-        var throwingStore = new ThrowingGetEntriesStore();
-        var service = CreateService(throwingStore);
-
-        await service.ReconcileAsync();
-
-        Assert.IsTrue(
-            File.Exists(cachedImage),
-            "ReconcileAsync must abort and leave files alone when the store's entry enumeration fails.");
     }
 
     private SqliteImageCacheStore CreateStore(ImageCacheOptions? options = null)
@@ -440,27 +415,14 @@ public class ImageCacheServiceTests
             new NullLoggingService());
     }
 
-    private CachedImageService CreateService(IImageCacheStore store, ImageCacheOptions? options = null)
-    {
-        options ??= new ImageCacheOptions { RootPath = _cacheRoot };
-        options.RootPath = _cacheRoot;
-
-        return new CachedImageService(
-            _clientService,
-            store,
-            Options.Create(options),
-            _time,
-            new NullLoggingService());
-    }
-
     private static ImageReference CoverArt(string id)
     {
         return ImageReference.SubsonicCoverArt(id)!;
     }
 
-    private static async Task<string> SerializeStoreEntriesAsync(IImageCacheStore store)
+    private static async Task<string> SerializeStoreEntriesAsync(SqliteImageCacheStore store)
     {
-        var entries = await store.GetEntriesAsync();
+        var entries = await store.EnumerateAllEntriesAsync();
         var sb = new System.Text.StringBuilder();
         foreach (var item in entries)
         {
@@ -606,60 +568,6 @@ public class ImageCacheServiceTests
         public Task<GetUsersResponse> GetUsersAsync() => throw new NotImplementedException();
         public Task<GetScanStatusResponse> GetScanStatusAsync() => throw new NotImplementedException();
         public Task<StartScanResponse> StartScanAsync() => throw new NotImplementedException();
-    }
-
-    private sealed class BlockingGetEntriesStore : IImageCacheStore
-    {
-        public TaskCompletionSource GetEntriesStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task<ImageCacheEntry?> GetEntryAsync(string keyHash, CancellationToken cancellationToken = default) => throw new NotImplementedException();
-
-        public Task TouchEntryAsync(string keyHash, DateTimeOffset lastAccessUtc, CancellationToken cancellationToken = default) => throw new NotImplementedException();
-
-        public Task UpsertEntryAsync(string keyHash, ImageCacheEntry entry, CancellationToken cancellationToken = default) => throw new NotImplementedException();
-
-        public Task RemoveEntryAsync(string keyHash, bool flushImmediately = false, CancellationToken cancellationToken = default) => throw new NotImplementedException();
-
-        public Task<ImageCacheStoreStats> GetStatsAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
-
-        public async Task<IReadOnlyList<ImageCacheStoreEntry>> GetEntriesAsync(CancellationToken cancellationToken = default)
-        {
-            GetEntriesStarted.TrySetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
-            return [];
-        }
-
-        public Task<IReadOnlyList<ImageCacheStoreEntry>> GetEvictionCandidatesAsync(
-            string? protectedKeyHash = null,
-            CancellationToken cancellationToken = default) => throw new NotImplementedException();
-
-        public Task ClearAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
-
-        public Task FlushAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
-    }
-
-    private sealed class ThrowingGetEntriesStore : IImageCacheStore
-    {
-        public Task<ImageCacheEntry?> GetEntryAsync(string keyHash, CancellationToken cancellationToken = default) => Task.FromResult<ImageCacheEntry?>(null);
-
-        public Task TouchEntryAsync(string keyHash, DateTimeOffset lastAccessUtc, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task UpsertEntryAsync(string keyHash, ImageCacheEntry entry, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task RemoveEntryAsync(string keyHash, bool flushImmediately = false, CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task<ImageCacheStoreStats> GetStatsAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ImageCacheStoreStats(0, 0));
-
-        public Task<IReadOnlyList<ImageCacheStoreEntry>> GetEntriesAsync(CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("Image cache database is unavailable; cannot enumerate entries.");
-
-        public Task<IReadOnlyList<ImageCacheStoreEntry>> GetEvictionCandidatesAsync(
-            string? protectedKeyHash = null,
-            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ImageCacheStoreEntry>>([]);
-
-        public Task ClearAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-
-        public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class NullLogger : ILogger

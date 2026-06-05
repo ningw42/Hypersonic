@@ -40,7 +40,7 @@ internal sealed class FakeTrayIconService : ITrayIconService
 
 internal sealed class FakeImageCacheService : IImageService
 {
-    public ImageCacheStats Stats { get; set; } = new(0, 0, string.Empty);
+    public ImageCacheStats Stats { get; set; } = new(0, 0);
     public int ClearCallCount { get; private set; }
 
     public Task<Uri?> GetImageAsync(
@@ -64,7 +64,7 @@ internal sealed class FakeImageCacheService : IImageService
     public Task ClearAsync(CancellationToken cancellationToken = default)
     {
         ClearCallCount++;
-        Stats = new ImageCacheStats(0, 0, Stats.CacheFolderPath);
+        Stats = new ImageCacheStats(0, 0);
         return Task.CompletedTask;
     }
 }

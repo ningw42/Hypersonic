@@ -2,7 +2,7 @@ using Hypersonic.Core.Models;
 
 namespace Hypersonic.Contracts.Services;
 
-public sealed record ImageCacheStats(long TotalBytes, int EntryCount, string CacheFolderPath);
+public sealed record ImageCacheStats(long TotalBytes, int EntryCount);
 
 public interface IImageService
 {

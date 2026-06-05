@@ -1,10 +1,13 @@
+using Hypersonic.Services.Cache;
+
 namespace Hypersonic.Models;
 
-public class ImageCacheOptions
+public class ImageCacheOptions : CacheOptionsBase
 {
-    public string? RootPath { get; set; }
-
-    public long MaximumBytes { get; set; } = 256L * 1024L * 1024L;
+    public ImageCacheOptions()
+    {
+        MaximumBytes = 256L * 1024L * 1024L;
+    }
 
     public int TimeToLiveDays { get; set; } = 30;
 }

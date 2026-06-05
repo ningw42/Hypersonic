@@ -1,10 +1,8 @@
+using Hypersonic.Services.Cache;
+
 namespace Hypersonic.Contracts.Services;
 
-public sealed record ImageCacheStoreStats(long TotalBytes, int EntryCount);
-
-public sealed record ImageCacheStoreEntry(string KeyHash, ImageCacheEntry Entry);
-
-public sealed class ImageCacheEntry
+public sealed class ImageCacheEntry : ICacheEntry
 {
     public string FileName { get; set; } = string.Empty;
 
@@ -44,8 +42,18 @@ public sealed class ImageCacheEntry
     }
 }
 
+/// <summary>
+/// Per-entity cache store interface for cover-art / cached images. Inherits the
+/// generic surface (stats, clear, flush, entry CRUD, payload write/read, reconcile,
+/// eviction) implicitly via the implementing <see cref="Services.SqliteImageCacheStore"/>
+/// subclass of <see cref="SqliteCacheStoreBase{TEntry}"/>. This interface only
+/// names the methods consumers (CachedImageService, settings UI) bind against, in
+/// terms of <see cref="ImageCacheEntry"/>.
+/// </summary>
 public interface IImageCacheStore
 {
+    string CacheFolderPath { get; }
+
     Task<ImageCacheEntry?> GetEntryAsync(string keyHash, CancellationToken cancellationToken = default);
 
     Task TouchEntryAsync(string keyHash, DateTimeOffset lastAccessUtc, CancellationToken cancellationToken = default);
@@ -54,15 +62,21 @@ public interface IImageCacheStore
 
     Task RemoveEntryAsync(string keyHash, bool flushImmediately = false, CancellationToken cancellationToken = default);
 
-    Task<ImageCacheStoreStats> GetStatsAsync(CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<ImageCacheStoreEntry>> GetEntriesAsync(CancellationToken cancellationToken = default);
-
-    Task<IReadOnlyList<ImageCacheStoreEntry>> GetEvictionCandidatesAsync(
-        string? protectedKeyHash = null,
-        CancellationToken cancellationToken = default);
+    Task<CacheStoreStats> GetStatsAsync(CancellationToken cancellationToken = default);
 
     Task ClearAsync(CancellationToken cancellationToken = default);
 
     Task FlushAsync(CancellationToken cancellationToken = default);
+
+    Task<Uri?> WritePayloadAsync(
+        string keyHash,
+        ReadOnlyMemory<byte> bytes,
+        ImageCacheEntry entry,
+        CancellationToken cancellationToken = default);
+
+    Task<Uri?> TryGetPayloadUriAsync(string keyHash, CancellationToken cancellationToken = default);
+
+    Task ReconcileAsync(CancellationToken cancellationToken = default);
+
+    Task EvictIfNeededAsync(string? protectedKeyHash = null, CancellationToken cancellationToken = default);
 }

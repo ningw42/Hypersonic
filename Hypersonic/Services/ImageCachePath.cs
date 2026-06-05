@@ -16,9 +16,12 @@ internal static class ImageCachePath
 
         if (RuntimeHelper.IsMSIX)
         {
+            // %LOCALAPPDATA%\Packages\<package family name>\LocalCache\ImageCache
+            // %LOCALAPPDATA%\Packages\Hypersonic_257ke566bd2wr\LocalCache\ImageCache
             return Path.Combine(ApplicationData.Current.LocalCacheFolder.Path, "ImageCache");
         }
 
+        // %LOCALAPPDATA%\Hypersonic\Cache\Images
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Hypersonic",

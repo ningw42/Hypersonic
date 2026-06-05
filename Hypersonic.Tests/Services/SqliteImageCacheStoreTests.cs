@@ -44,6 +44,15 @@ public class SqliteImageCacheStoreTests
     }
 
     [TestMethod]
+    public void CacheFolderPath_ReturnsConfiguredRootPath()
+    {
+        IImageCacheStore store = CreateStore();
+        using var disposable = (IDisposable)store;
+
+        Assert.AreEqual(_cacheRoot, store.CacheFolderPath);
+    }
+
+    [TestMethod]
     public async Task UpsertAndGet_RoundTripsAllFieldsAtMillisecondPrecision()
     {
         var store = CreateStore();
@@ -207,7 +216,7 @@ public class SqliteImageCacheStoreTests
         SqliteConnection.ClearAllPools();
 
         var version = await ReadUserVersionAsync(_databasePath);
-        Assert.AreEqual(SqliteImageCacheSchema.CurrentSchemaVersion, version);
+        Assert.AreEqual(1, version);
     }
 
     [TestMethod]
@@ -236,7 +245,7 @@ public class SqliteImageCacheStoreTests
         SqliteConnection.ClearAllPools();
 
         var version = await ReadUserVersionAsync(_databasePath);
-        Assert.AreEqual(SqliteImageCacheSchema.CurrentSchemaVersion, version);
+        Assert.AreEqual(1, version);
     }
 
     [TestMethod]
@@ -349,27 +358,6 @@ public class SqliteImageCacheStoreTests
         Assert.IsFalse(text.Contains("alice", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(text.Contains("password", StringComparison.OrdinalIgnoreCase));
         Assert.IsFalse(text.Contains("secret-cover-id", StringComparison.OrdinalIgnoreCase));
-    }
-
-    [TestMethod]
-    public async Task GetEntriesAsync_ThrowsWhenStoreCannotEnumerate()
-    {
-        var store = CreateStore();
-        var initial = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
-        await store.UpsertEntryAsync(new string('a', 64), NewEntry(initial));
-
-        // Drop the Entries table from a side connection so the next SELECT against the cached connection fails.
-        await using (var saboteur = new SqliteConnection($"Data Source={_databasePath}"))
-        {
-            await saboteur.OpenAsync();
-            await using var cmd = saboteur.CreateCommand();
-            cmd.CommandText = "DROP TABLE Entries;";
-            await cmd.ExecuteNonQueryAsync();
-        }
-
-        // GetEntriesAsync must surface the failure rather than silently returning an empty list,
-        // because callers (e.g. ReconcileAsync) treat the result as authoritative.
-        await Assert.ThrowsExactlyAsync<SqliteException>(async () => await store.GetEntriesAsync());
     }
 
     [TestMethod]

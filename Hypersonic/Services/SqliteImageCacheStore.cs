@@ -4,495 +4,67 @@ using Microsoft.Extensions.Options;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Models;
+using Hypersonic.Services.Cache;
 
 namespace Hypersonic.Services;
 
-public sealed class SqliteImageCacheStore : IImageCacheStore, IDisposable
+/// <summary>
+/// Image-specific subclass of <see cref="SqliteCacheStoreBase{TEntry}"/>. The base
+/// owns all the generic SQLite plumbing (lifecycle, gate, schema driver, self-heal,
+/// dispose drain, stats/clear/flush, atomic payload write, reconcile, eviction,
+/// startup temp-file sweep). This subclass supplies only the image-specific bits:
+/// the entries-table schema SQL, column mapping, image extension predicate, and
+/// the legacy <c>manifest.json</c> discard one-off.
+///
+/// Public method signatures (and the on-disk path layout via
+/// <see cref="ImageCachePath"/>) are preserved verbatim so existing callers and
+/// existing user installations see no migration.
+/// </summary>
+public sealed class SqliteImageCacheStore : SqliteCacheStoreBase<ImageCacheEntry>, IImageCacheStore
 {
-    internal const string DatabaseFileName = "cache.db";
     internal const string LegacyManifestFileName = "manifest.json";
 
     private static readonly string[] CachedImageExtensions =
         [".jpg", ".png", ".gif", ".webp", ".bmp", ".img"];
 
-    private const int ConnectionDefaultTimeoutSeconds = 2;
-    private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(5);
-
-    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly ImageCacheOptions _options;
     private readonly ILogger _log;
-    private readonly string _cacheFolderPath;
-    private readonly string _databasePath;
-
-    private SqliteConnection? _connection;
-    private bool _initialized;
-    private bool _disposed;
 
     public SqliteImageCacheStore(IOptions<ImageCacheOptions> options, ILoggingService logService)
+        : base(options.Value, logService)
     {
-        _cacheFolderPath = ImageCachePath.Resolve(options.Value);
-        _databasePath = Path.Combine(_cacheFolderPath, DatabaseFileName);
+        _options = options.Value;
         _log = logService.GetLogger(nameof(SqliteImageCacheStore));
     }
 
-    public async Task<ImageCacheEntry?> GetEntryAsync(string keyHash, CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return null;
-            }
+    protected override string TableName => "Entries";
 
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT FileName, Length, Provider, Kind, ServerHash, ServerScopeHash, Size,
-                       CreatedAtUtc, LastAccessUtc, ExpiresAtUtc
-                FROM Entries
-                WHERE KeyHash = $keyHash
-                LIMIT 1;
-                """;
-            command.Parameters.AddWithValue("$keyHash", keyHash);
+    protected override int CurrentSchemaVersion => 1;
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                return null;
-            }
+    protected override IReadOnlyList<MigrationStep> MigrationSteps => Array.Empty<MigrationStep>();
 
-            return ReadEntry(reader);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache GetEntryAsync failed; returning miss", ex);
-            return null;
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
+    protected override string CreateCurrentSchemaSql => CreateEntriesTableSql + "\n" + CreateLastAccessIndexSql;
 
-    public async Task TouchEntryAsync(string keyHash, DateTimeOffset lastAccessUtc, CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return;
-            }
+    private const string CreateEntriesTableSql = """
+        CREATE TABLE IF NOT EXISTS Entries (
+            KeyHash         TEXT    PRIMARY KEY NOT NULL,
+            FileName        TEXT    NOT NULL,
+            Length          INTEGER NOT NULL,
+            Provider        TEXT    NOT NULL,
+            Kind            TEXT    NOT NULL,
+            ServerHash      TEXT    NOT NULL,
+            ServerScopeHash TEXT    NOT NULL,
+            Size            TEXT    NOT NULL,
+            CreatedAtUtc    INTEGER NOT NULL,
+            LastAccessUtc   INTEGER NOT NULL,
+            ExpiresAtUtc    INTEGER NOT NULL
+        ) WITHOUT ROWID;
+        """;
 
-            await using var command = connection.CreateCommand();
-            command.CommandText = "UPDATE Entries SET LastAccessUtc = $lastAccessUtc WHERE KeyHash = $keyHash;";
-            command.Parameters.AddWithValue("$lastAccessUtc", ToUnixMs(lastAccessUtc));
-            command.Parameters.AddWithValue("$keyHash", keyHash);
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache TouchEntryAsync failed; ignoring", ex);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
+    private const string CreateLastAccessIndexSql =
+        "CREATE INDEX IF NOT EXISTS IX_Entries_LastAccessUtc ON Entries(LastAccessUtc);";
 
-    public async Task UpsertEntryAsync(string keyHash, ImageCacheEntry entry, CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return;
-            }
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = """
-                INSERT INTO Entries (
-                    KeyHash, FileName, Length, Provider, Kind, ServerHash, ServerScopeHash, Size,
-                    CreatedAtUtc, LastAccessUtc, ExpiresAtUtc)
-                VALUES (
-                    $keyHash, $fileName, $length, $provider, $kind, $serverHash, $serverScopeHash, $size,
-                    $createdAtUtc, $lastAccessUtc, $expiresAtUtc)
-                ON CONFLICT(KeyHash) DO UPDATE SET
-                    FileName        = excluded.FileName,
-                    Length          = excluded.Length,
-                    Provider        = excluded.Provider,
-                    Kind            = excluded.Kind,
-                    ServerHash      = excluded.ServerHash,
-                    ServerScopeHash = excluded.ServerScopeHash,
-                    Size            = excluded.Size,
-                    CreatedAtUtc    = excluded.CreatedAtUtc,
-                    LastAccessUtc   = excluded.LastAccessUtc,
-                    ExpiresAtUtc    = excluded.ExpiresAtUtc;
-                """;
-            command.Parameters.AddWithValue("$keyHash", keyHash);
-            command.Parameters.AddWithValue("$fileName", entry.FileName);
-            command.Parameters.AddWithValue("$length", entry.Length);
-            command.Parameters.AddWithValue("$provider", entry.Provider);
-            command.Parameters.AddWithValue("$kind", entry.Kind);
-            command.Parameters.AddWithValue("$serverHash", entry.ServerHash);
-            command.Parameters.AddWithValue("$serverScopeHash", entry.ServerScopeHash);
-            command.Parameters.AddWithValue("$size", entry.Size);
-            command.Parameters.AddWithValue("$createdAtUtc", ToUnixMs(entry.CreatedAtUtc));
-            command.Parameters.AddWithValue("$lastAccessUtc", ToUnixMs(entry.LastAccessUtc));
-            command.Parameters.AddWithValue("$expiresAtUtc", ToUnixMs(entry.ExpiresAtUtc));
-
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache UpsertEntryAsync failed; image may be orphaned until next reconcile", ex);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    public async Task RemoveEntryAsync(
-        string keyHash,
-        bool flushImmediately = false,
-        CancellationToken cancellationToken = default)
-    {
-        _ = flushImmediately; // SQLite commits each mutation; no deferred flush to force.
-
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return;
-            }
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM Entries WHERE KeyHash = $keyHash;";
-            command.Parameters.AddWithValue("$keyHash", keyHash);
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache RemoveEntryAsync failed; ignoring", ex);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    public async Task<ImageCacheStoreStats> GetStatsAsync(CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return new ImageCacheStoreStats(0, 0);
-            }
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT COALESCE(SUM(Length), 0), COUNT(*) FROM Entries;";
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                return new ImageCacheStoreStats(0, 0);
-            }
-
-            var totalBytes = reader.IsDBNull(0) ? 0L : reader.GetInt64(0);
-            var count = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
-            return new ImageCacheStoreStats(totalBytes, count);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache GetStatsAsync failed; returning zero stats", ex);
-            return new ImageCacheStoreStats(0, 0);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    public async Task<IReadOnlyList<ImageCacheStoreEntry>> GetEntriesAsync(CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                throw new InvalidOperationException(
-                    "Image cache database is unavailable; cannot enumerate entries.");
-            }
-
-            return await ReadEntriesAsync(connection, orderByLastAccess: false, protectedKeyHash: null, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    public async Task<IReadOnlyList<ImageCacheStoreEntry>> GetEvictionCandidatesAsync(
-        string? protectedKeyHash = null,
-        CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return [];
-            }
-
-            return await ReadEntriesAsync(connection, orderByLastAccess: true, protectedKeyHash, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache GetEvictionCandidatesAsync failed; returning empty list", ex);
-            return [];
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    public async Task ClearAsync(CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
-            if (connection is null)
-            {
-                return;
-            }
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = "DELETE FROM Entries;";
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache ClearAsync failed", ex);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    public async Task FlushAsync(CancellationToken cancellationToken = default)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            if (_connection is not { State: System.Data.ConnectionState.Open } connection)
-            {
-                return;
-            }
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA wal_checkpoint(PASSIVE);";
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache FlushAsync (WAL checkpoint) failed", ex);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        // Mark disposed first so new EnsureInitializedLockedAsync calls bail before re-opening.
-        _disposed = true;
-
-        // Drain the gate so any in-flight read/write completes before we tear down the connection.
-        // We do NOT dispose the semaphore — queued waiters may still wake up and observe _disposed,
-        // and disposing it under them would surface ObjectDisposedException on a benign release path.
-        var gateAcquired = false;
-        try
-        {
-            gateAcquired = _gate.Wait(DisposeDrainTimeout);
-            if (!gateAcquired)
-            {
-                LogWarning(
-                    "Image cache dispose timed out draining the gate; tearing down connection anyway",
-                    new TimeoutException($"Gate did not drain within {DisposeDrainTimeout.TotalSeconds:F0}s."));
-            }
-
-            try
-            {
-                if (_connection is not null)
-                {
-                    _connection.Dispose();
-                    _connection = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogWarning("Image cache connection dispose failed", ex);
-            }
-
-            try
-            {
-                SqliteConnection.ClearAllPools();
-            }
-            catch
-            {
-                // Best-effort.
-            }
-        }
-        finally
-        {
-            if (gateAcquired)
-            {
-                _gate.Release();
-            }
-        }
-    }
-
-    private async Task<SqliteConnection?> EnsureInitializedLockedAsync(CancellationToken cancellationToken)
-    {
-        if (_disposed)
-        {
-            return null;
-        }
-
-        if (_initialized && _connection is { State: System.Data.ConnectionState.Open })
-        {
-            return _connection;
-        }
-
-        try
-        {
-            Directory.CreateDirectory(_cacheFolderPath);
-            DiscardLegacyJsonManifestIfPresent();
-            _connection = await OpenAndPrepareConnectionAsync(cancellationToken).ConfigureAwait(false);
-            _initialized = true;
-            return _connection;
-        }
-        catch (SqliteException ex)
-        {
-            LogWarning("Image cache database initialization failed; rebuilding from scratch", ex);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            LogWarning("Image cache database initialization I/O failure; rebuilding from scratch", ex);
-        }
-
-        // Self-heal: dispose, delete cache.db + sidecars, retry once.
-        await TryDisposeConnectionAsync().ConfigureAwait(false);
-        TryDeleteDatabaseFiles();
-
-        try
-        {
-            _connection = await OpenAndPrepareConnectionAsync(cancellationToken).ConfigureAwait(false);
-            _initialized = true;
-            return _connection;
-        }
-        catch (OperationCanceledException)
-        {
-            // Don't swallow cancellation; let the caller observe it like every other public method does.
-            await TryDisposeConnectionAsync().ConfigureAwait(false);
-            throw;
-        }
-        catch (Exception ex)
-        {
-            LogWarning("Image cache database rebuild failed; cache will be unavailable", ex);
-            await TryDisposeConnectionAsync().ConfigureAwait(false);
-            return null;
-        }
-    }
-
-    private async Task<SqliteConnection> OpenAndPrepareConnectionAsync(CancellationToken cancellationToken)
-    {
-        var connectionString = new SqliteConnectionStringBuilder
-        {
-            DataSource = _databasePath,
-            Mode = SqliteOpenMode.ReadWriteCreate,
-            Pooling = false,
-            DefaultTimeout = ConnectionDefaultTimeoutSeconds,
-        }.ToString();
-
-        var connection = new SqliteConnection(connectionString);
-        try
-        {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-            await ApplyConnectionPragmasAsync(connection, cancellationToken).ConfigureAwait(false);
-            await SqliteImageCacheSchema.EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
-            return connection;
-        }
-        catch
-        {
-            await connection.DisposeAsync().ConfigureAwait(false);
-            throw;
-        }
-    }
-
-    private static async Task ApplyConnectionPragmasAsync(SqliteConnection connection, CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;";
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    private void DiscardLegacyJsonManifestIfPresent()
-    {
-        var manifestPath = Path.Combine(_cacheFolderPath, LegacyManifestFileName);
-
-        if (File.Exists(_databasePath) || !File.Exists(manifestPath))
-        {
-            return;
-        }
-
-        var deleted = 0;
-        TryDeleteFile(manifestPath);
-
-        foreach (var file in Directory.EnumerateFiles(_cacheFolderPath))
-        {
-            if (IsCachedImageFileName(Path.GetFileName(file)))
-            {
-                if (TryDeleteFile(file))
-                {
-                    deleted++;
-                }
-            }
-        }
-
-        try
-        {
-            _log.Info(
-                "Legacy JSON image cache manifest discarded; cache will rebuild on demand",
-                new { ManifestPath = manifestPath, DeletedImageCount = deleted });
-        }
-        catch
-        {
-            // Logging failures are non-fatal during init.
-        }
-    }
+    protected override string ResolvePayloadFolder() => ImageCachePath.Resolve(_options);
 
     internal static bool IsCachedImageFileName(string fileName)
     {
@@ -530,41 +102,46 @@ public sealed class SqliteImageCacheStore : IImageCacheStore, IDisposable
         return false;
     }
 
-    private async Task TryDisposeConnectionAsync()
+    protected override bool IsKnownPayloadFileName(string fileName) => IsCachedImageFileName(fileName);
+
+    /// <summary>
+    /// One-off cleanup: the original cache implementation persisted a JSON manifest +
+    /// loose image files. On first launch of the SQLite-backed cache we discard both
+    /// rather than try to migrate, so the cache rebuilds itself on demand.
+    /// </summary>
+    protected override void OnBeforeOpenConnection(string cacheFolderPath, string databasePath)
     {
-        if (_connection is null)
+        var manifestPath = Path.Combine(cacheFolderPath, LegacyManifestFileName);
+
+        if (File.Exists(databasePath) || !File.Exists(manifestPath))
         {
             return;
         }
 
-        try
+        var deleted = 0;
+        TryDeleteFile(manifestPath);
+
+        foreach (var file in Directory.EnumerateFiles(cacheFolderPath))
         {
-            await _connection.DisposeAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            // Best-effort.
-        }
-        finally
-        {
-            _connection = null;
+            if (IsCachedImageFileName(Path.GetFileName(file)))
+            {
+                if (TryDeleteFile(file))
+                {
+                    deleted++;
+                }
+            }
         }
 
         try
         {
-            SqliteConnection.ClearAllPools();
+            _log.Info(
+                "Legacy JSON image cache manifest discarded; cache will rebuild on demand",
+                new { ManifestPath = manifestPath, DeletedImageCount = deleted });
         }
         catch
         {
-            // Best-effort.
+            // Logging failures are non-fatal during init.
         }
-    }
-
-    private void TryDeleteDatabaseFiles()
-    {
-        TryDeleteFile(_databasePath);
-        TryDeleteFile(_databasePath + "-wal");
-        TryDeleteFile(_databasePath + "-shm");
     }
 
     private static bool TryDeleteFile(string path)
@@ -585,52 +162,153 @@ public sealed class SqliteImageCacheStore : IImageCacheStore, IDisposable
         return false;
     }
 
-    private static async Task<IReadOnlyList<ImageCacheStoreEntry>> ReadEntriesAsync(
+    // ----- *LockedAsync DB surface (gate-held; throw on SqliteException). -----
+
+    protected override async Task<ImageCacheEntry?> GetEntryLockedAsync(
         SqliteConnection connection,
-        bool orderByLastAccess,
+        string keyHash,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT FileName, Length, Provider, Kind, ServerHash, ServerScopeHash, Size,
+                   CreatedAtUtc, LastAccessUtc, ExpiresAtUtc
+            FROM Entries
+            WHERE KeyHash = $keyHash
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$keyHash", keyHash);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        return ReadEntry(reader, offset: 0);
+    }
+
+    protected override async Task TouchEntryLockedAsync(
+        SqliteConnection connection,
+        string keyHash,
+        DateTimeOffset lastAccessUtc,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE Entries SET LastAccessUtc = $lastAccessUtc WHERE KeyHash = $keyHash;";
+        command.Parameters.AddWithValue("$lastAccessUtc", ToUnixMs(lastAccessUtc));
+        command.Parameters.AddWithValue("$keyHash", keyHash);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    protected override async Task UpsertEntryLockedAsync(
+        SqliteConnection connection,
+        string keyHash,
+        ImageCacheEntry entry,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO Entries (
+                KeyHash, FileName, Length, Provider, Kind, ServerHash, ServerScopeHash, Size,
+                CreatedAtUtc, LastAccessUtc, ExpiresAtUtc)
+            VALUES (
+                $keyHash, $fileName, $length, $provider, $kind, $serverHash, $serverScopeHash, $size,
+                $createdAtUtc, $lastAccessUtc, $expiresAtUtc)
+            ON CONFLICT(KeyHash) DO UPDATE SET
+                FileName        = excluded.FileName,
+                Length          = excluded.Length,
+                Provider        = excluded.Provider,
+                Kind            = excluded.Kind,
+                ServerHash      = excluded.ServerHash,
+                ServerScopeHash = excluded.ServerScopeHash,
+                Size            = excluded.Size,
+                CreatedAtUtc    = excluded.CreatedAtUtc,
+                LastAccessUtc   = excluded.LastAccessUtc,
+                ExpiresAtUtc    = excluded.ExpiresAtUtc;
+            """;
+        command.Parameters.AddWithValue("$keyHash", keyHash);
+        command.Parameters.AddWithValue("$fileName", entry.FileName);
+        command.Parameters.AddWithValue("$length", entry.Length);
+        command.Parameters.AddWithValue("$provider", entry.Provider);
+        command.Parameters.AddWithValue("$kind", entry.Kind);
+        command.Parameters.AddWithValue("$serverHash", entry.ServerHash);
+        command.Parameters.AddWithValue("$serverScopeHash", entry.ServerScopeHash);
+        command.Parameters.AddWithValue("$size", entry.Size);
+        command.Parameters.AddWithValue("$createdAtUtc", ToUnixMs(entry.CreatedAtUtc));
+        command.Parameters.AddWithValue("$lastAccessUtc", ToUnixMs(entry.LastAccessUtc));
+        command.Parameters.AddWithValue("$expiresAtUtc", ToUnixMs(entry.ExpiresAtUtc));
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    protected override async Task RemoveEntryLockedAsync(
+        SqliteConnection connection,
+        string keyHash,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM Entries WHERE KeyHash = $keyHash;";
+        command.Parameters.AddWithValue("$keyHash", keyHash);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    protected override async Task<IReadOnlyList<(string KeyHash, ImageCacheEntry Entry)>> GetEvictionCandidatesLockedAsync(
+        SqliteConnection connection,
         string? protectedKeyHash,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
-
         var sql = """
             SELECT KeyHash, FileName, Length, Provider, Kind, ServerHash, ServerScopeHash, Size,
                    CreatedAtUtc, LastAccessUtc, ExpiresAtUtc
             FROM Entries
+            WHERE FileName != ''
             """;
 
         if (protectedKeyHash is not null)
         {
-            sql += " WHERE KeyHash != $protected";
+            sql += " AND KeyHash != $protected";
             command.Parameters.AddWithValue("$protected", protectedKeyHash);
         }
 
-        if (orderByLastAccess)
-        {
-            sql += " ORDER BY LastAccessUtc ASC";
-        }
-
-        sql += ";";
+        sql += " ORDER BY LastAccessUtc ASC;";
         command.CommandText = sql;
 
-        var results = new List<ImageCacheStoreEntry>();
+        var results = new List<(string, ImageCacheEntry)>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var keyHash = reader.GetString(0);
-            var entry = ReadEntryWithOffset(reader, offset: 1);
-            results.Add(new ImageCacheStoreEntry(keyHash, entry));
+            results.Add((keyHash, ReadEntry(reader, offset: 1)));
         }
 
         return results;
     }
 
-    private static ImageCacheEntry ReadEntry(SqliteDataReader reader)
+    protected override async Task<IReadOnlyList<(string KeyHash, ImageCacheEntry Entry)>> EnumerateAllEntriesLockedAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
     {
-        return ReadEntryWithOffset(reader, offset: 0);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT KeyHash, FileName, Length, Provider, Kind, ServerHash, ServerScopeHash, Size,
+                   CreatedAtUtc, LastAccessUtc, ExpiresAtUtc
+            FROM Entries;
+            """;
+
+        var results = new List<(string, ImageCacheEntry)>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var keyHash = reader.GetString(0);
+            results.Add((keyHash, ReadEntry(reader, offset: 1)));
+        }
+
+        return results;
     }
 
-    private static ImageCacheEntry ReadEntryWithOffset(SqliteDataReader reader, int offset)
+    private static ImageCacheEntry ReadEntry(SqliteDataReader reader, int offset)
     {
         return new ImageCacheEntry
         {
@@ -650,16 +328,4 @@ public sealed class SqliteImageCacheStore : IImageCacheStore, IDisposable
     private static long ToUnixMs(DateTimeOffset value) => value.ToUnixTimeMilliseconds();
 
     private static DateTimeOffset FromUnixMs(long value) => DateTimeOffset.FromUnixTimeMilliseconds(value);
-
-    private void LogWarning(string message, Exception exception)
-    {
-        try
-        {
-            _log.Warning(message, exception: exception);
-        }
-        catch
-        {
-            System.Diagnostics.Debug.WriteLine($"[SqliteImageCacheStore] {message}: {exception}");
-        }
-    }
 }

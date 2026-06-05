@@ -52,7 +52,7 @@ public class SettingsViewModelGeneralTests
     {
         var imageCache = new FakeImageCacheService
         {
-            Stats = new ImageCacheStats(1536, 2, "cache"),
+            Stats = new ImageCacheStats(1536, 2),
         };
         var vm = CreateViewModel(imageCache: imageCache);
 
