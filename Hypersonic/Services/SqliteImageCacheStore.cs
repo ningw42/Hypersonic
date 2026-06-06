@@ -16,9 +16,10 @@ namespace Hypersonic.Services;
 /// the entries-table schema SQL, column mapping, image extension predicate, and
 /// the legacy <c>manifest.json</c> discard one-off.
 ///
-/// Public method signatures (and the on-disk path layout via
-/// <see cref="ImageCachePath"/>) are preserved verbatim so existing callers and
-/// existing user installations see no migration.
+/// Declares <c>PayloadSubfolderName = "Images"</c> plus a single folder-migration
+/// step renaming the legacy MSIX <c>ImageCache</c> folder to <c>Images</c>, so that
+/// after migration packaged and unpackaged installs share the same subfolder name.
+/// No image data is lost: the whole directory is moved as one unit.
 /// </summary>
 public sealed class SqliteImageCacheStore : SqliteCacheStoreBase<ImageCacheEntry>, IImageCacheStore
 {
@@ -27,13 +28,14 @@ public sealed class SqliteImageCacheStore : SqliteCacheStoreBase<ImageCacheEntry
     private static readonly string[] CachedImageExtensions =
         [".jpg", ".png", ".gif", ".webp", ".bmp", ".img"];
 
-    private readonly ImageCacheOptions _options;
     private readonly ILogger _log;
 
-    public SqliteImageCacheStore(IOptions<ImageCacheOptions> options, ILoggingService logService)
-        : base(options.Value, logService)
+    public SqliteImageCacheStore(
+        IOptions<ImageCacheOptions> options,
+        IAppFolderLocator folderLocator,
+        ILoggingService logService)
+        : base(options.Value, folderLocator, logService)
     {
-        _options = options.Value;
         _log = logService.GetLogger(nameof(SqliteImageCacheStore));
     }
 
@@ -64,7 +66,15 @@ public sealed class SqliteImageCacheStore : SqliteCacheStoreBase<ImageCacheEntry
     private const string CreateLastAccessIndexSql =
         "CREATE INDEX IF NOT EXISTS IX_Entries_LastAccessUtc ON Entries(LastAccessUtc);";
 
-    protected override string ResolvePayloadFolder() => ImageCachePath.Resolve(_options);
+    protected override string PayloadSubfolderName => "Images";
+
+    protected override IReadOnlyList<PayloadFolderMigrationStep> PayloadFolderMigrationSteps =>
+    [
+        new PayloadFolderMigrationStep(
+            TargetVersion: 1,
+            SourceSubfolder: "ImageCache",
+            TargetSubfolder: "Images"),
+    ];
 
     internal static bool IsCachedImageFileName(string fileName)
     {

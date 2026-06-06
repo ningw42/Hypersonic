@@ -1,3 +1,4 @@
+using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Services.Cache;
 
@@ -8,19 +9,41 @@ namespace Hypersonic.Tests.Services.Cache;
 
 /// <summary>
 /// Minimal in-test subclass of <see cref="SqliteCacheStoreBase{TEntry}"/> used by
-/// the generic base-class tests. Mirrors what a real entity subclass looks like
-/// (image / lyrics / audio) but keeps the schema as small as possible — just
-/// <c>KeyHash</c> primary key + the three columns mandated by <see cref="ICacheEntry"/>.
+/// the generic base-class and folder-migrator tests. Mirrors what a real entity
+/// subclass looks like (image / lyrics / audio) but keeps the schema as small as
+/// possible — just <c>KeyHash</c> primary key + the three columns mandated by
+/// <see cref="ICacheEntry"/>. The payload subfolder name, migration steps, and
+/// metadata file name are configurable so the migrator state machine can be driven
+/// from tests.
 /// </summary>
 internal sealed class TestCacheStore : SqliteCacheStoreBase<TestCacheEntry>
 {
-    public TestCacheStore(IOptions<TestCacheOptions> options, ILoggingService logService)
-        : base(options.Value, logService)
+    public TestCacheStore(
+        IOptions<TestCacheOptions> options,
+        IAppFolderLocator folderLocator,
+        ILoggingService logService)
+        : base(options.Value, folderLocator, logService)
     {
-        Options = options.Value;
     }
 
-    public TestCacheOptions Options { get; }
+    /// <summary>Configurable <c>PayloadSubfolderName</c>; defaults to <c>"Payload"</c>.</summary>
+    public string SubfolderName { get; init; } = "Payload";
+
+    /// <summary>
+    /// Test seam for the "validate once, use end-to-end" contract: when set, every read of
+    /// <c>PayloadSubfolderName</c> after the first returns this value instead of
+    /// <see cref="SubfolderName"/>. A correctly-implemented base reads the virtual once during
+    /// path resolution and reuses that captured value, so this mutation never surfaces.
+    /// </summary>
+    public string? SubfolderNameAfterFirstRead { get; init; }
+
+    /// <summary>Configurable migration steps; defaults to none (greenfield).</summary>
+    public IReadOnlyList<PayloadFolderMigrationStep> MigrationStepsValue { get; init; } = [];
+
+    /// <summary>Optional override for the marker file name; defaults to <c>SubfolderName + ".json"</c>.</summary>
+    public string? MetadataFileNameValue { get; init; }
+
+    private int _subfolderReadCount;
 
     /// <summary>
     /// Test-only switch: when true, the next <c>EnumerateAllEntriesLockedAsync</c> call
@@ -42,6 +65,21 @@ internal sealed class TestCacheStore : SqliteCacheStoreBase<TestCacheEntry>
 
     protected override IReadOnlyList<MigrationStep> MigrationSteps => Array.Empty<MigrationStep>();
 
+    protected override string PayloadSubfolderName
+    {
+        get
+        {
+            var read = Interlocked.Increment(ref _subfolderReadCount);
+            return SubfolderNameAfterFirstRead is not null && read > 1
+                ? SubfolderNameAfterFirstRead
+                : SubfolderName;
+        }
+    }
+
+    protected override IReadOnlyList<PayloadFolderMigrationStep> PayloadFolderMigrationSteps => MigrationStepsValue;
+
+    protected override string MetadataFileName => MetadataFileNameValue ?? base.MetadataFileName;
+
     protected override string CreateCurrentSchemaSql => """
         CREATE TABLE IF NOT EXISTS Entries (
             KeyHash       TEXT    PRIMARY KEY NOT NULL,
@@ -51,16 +89,6 @@ internal sealed class TestCacheStore : SqliteCacheStoreBase<TestCacheEntry>
         ) WITHOUT ROWID;
         CREATE INDEX IF NOT EXISTS IX_TestEntries_LastAccessUtc ON Entries(LastAccessUtc);
         """;
-
-    protected override string ResolvePayloadFolder()
-    {
-        if (string.IsNullOrWhiteSpace(Options.RootPath))
-        {
-            throw new InvalidOperationException("TestCacheStore requires Options.RootPath.");
-        }
-
-        return Options.RootPath;
-    }
 
     protected override bool IsKnownPayloadFileName(string fileName)
     {

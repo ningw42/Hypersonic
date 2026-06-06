@@ -3,6 +3,7 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Models;
 using Hypersonic.Services;
+using Hypersonic.Tests.Services.Cache;
 
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
@@ -12,13 +13,15 @@ namespace Hypersonic.Tests.Services;
 [TestClass]
 public class SqliteImageCacheStoreTests
 {
+    private string _cacheParent = null!;
     private string _cacheRoot = null!;
     private string _databasePath = null!;
 
     [TestInitialize]
     public void Setup()
     {
-        _cacheRoot = Path.Combine(Path.GetTempPath(), "hypersonic-sqlite-cache-" + Guid.NewGuid().ToString("N"));
+        _cacheParent = Path.Combine(Path.GetTempPath(), "hypersonic-sqlite-cache-" + Guid.NewGuid().ToString("N"));
+        _cacheRoot = Path.Combine(_cacheParent, "Images");
         Directory.CreateDirectory(_cacheRoot);
         _databasePath = Path.Combine(_cacheRoot, SqliteImageCacheStore.DatabaseFileName);
     }
@@ -28,14 +31,14 @@ public class SqliteImageCacheStoreTests
     {
         SqliteConnection.ClearAllPools();
 
-        if (!Directory.Exists(_cacheRoot))
+        if (!Directory.Exists(_cacheParent))
         {
             return;
         }
 
         try
         {
-            Directory.Delete(_cacheRoot, recursive: true);
+            Directory.Delete(_cacheParent, recursive: true);
         }
         catch (IOException)
         {
@@ -44,12 +47,12 @@ public class SqliteImageCacheStoreTests
     }
 
     [TestMethod]
-    public void CacheFolderPath_ReturnsConfiguredRootPath()
+    public void CacheFolderPath_ComposesCacheParentWithImagesSubfolder()
     {
         IImageCacheStore store = CreateStore();
         using var disposable = (IDisposable)store;
 
-        Assert.AreEqual(_cacheRoot, store.CacheFolderPath);
+        Assert.AreEqual(Path.Combine(_cacheParent, "Images"), store.CacheFolderPath);
     }
 
     [TestMethod]
@@ -375,10 +378,39 @@ public class SqliteImageCacheStoreTests
             async () => await store.GetEntryAsync(new string('a', 64), cts.Token));
     }
 
+    [TestMethod]
+    public async Task LegacyImageCacheFolder_IsMigratedToImagesOnFirstLaunch()
+    {
+        // Simulate a pre-migration MSIX user: data lives in the legacy "ImageCache" folder and
+        // the new "Images" folder does not exist yet. Exercises the store's real declared step.
+        Directory.Delete(_cacheRoot, recursive: true); // remove the pre-created Images folder
+
+        var legacy = Path.Combine(_cacheParent, "ImageCache");
+        Directory.CreateDirectory(legacy);
+        var legacyImage = Path.Combine(legacy, new string('a', 64) + ".png");
+        await File.WriteAllBytesAsync(legacyImage, [1, 2, 3]);
+
+        var store = CreateStore();
+        await store.GetStatsAsync(); // triggers folder migration + init
+
+        Assert.IsFalse(Directory.Exists(legacy), "Legacy ImageCache folder must be moved.");
+        Assert.IsTrue(
+            File.Exists(Path.Combine(_cacheRoot, new string('a', 64) + ".png")),
+            "Image payload must land in the Images folder.");
+        Assert.IsTrue(File.Exists(_databasePath), "Init must open the DB at the migrated Images folder.");
+        Assert.IsTrue(File.Exists(Path.Combine(_cacheParent, "Images.json")), "A migration marker must be written.");
+
+        store.Dispose();
+        SqliteConnection.ClearAllPools();
+    }
+
     private SqliteImageCacheStore CreateStore()
     {
-        var options = new ImageCacheOptions { RootPath = _cacheRoot };
-        return new SqliteImageCacheStore(Options.Create(options), new NullLoggingService());
+        var options = new ImageCacheOptions();
+        return new SqliteImageCacheStore(
+            Options.Create(options),
+            new FixedAppFolderLocator(_cacheParent),
+            new NullLoggingService());
     }
 
     private static ImageCacheEntry NewEntry(DateTimeOffset at, long length = 1024)

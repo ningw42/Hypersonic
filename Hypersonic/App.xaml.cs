@@ -104,6 +104,7 @@ public partial class App : Application
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IFileService, FileService>();
             services.AddSingleton<ISubsonicClientService, SubsonicClientService>();
+            services.AddSingleton<IAppFolderLocator, AppFolderLocator>();
             services.AddSingleton<IImageCacheStore, SqliteImageCacheStore>();
             services.AddSingleton<IImageService, CachedImageService>();
             services.AddSingleton<IPlaybackService, PlaybackService>();

@@ -10,12 +10,14 @@ namespace Hypersonic.Tests.Services.Cache;
 [TestClass]
 public class SqliteCacheStoreBaseTests
 {
+    private string _cacheParent = null!;
     private string _cacheRoot = null!;
 
     [TestInitialize]
     public void Setup()
     {
-        _cacheRoot = Path.Combine(Path.GetTempPath(), "hypersonic-cache-base-" + Guid.NewGuid().ToString("N"));
+        _cacheParent = Path.Combine(Path.GetTempPath(), "hypersonic-cache-base-" + Guid.NewGuid().ToString("N"));
+        _cacheRoot = Path.Combine(_cacheParent, "Payload");
         Directory.CreateDirectory(_cacheRoot);
     }
 
@@ -24,14 +26,14 @@ public class SqliteCacheStoreBaseTests
     {
         SqliteConnection.ClearAllPools();
 
-        if (!Directory.Exists(_cacheRoot))
+        if (!Directory.Exists(_cacheParent))
         {
             return;
         }
 
         try
         {
-            Directory.Delete(_cacheRoot, recursive: true);
+            Directory.Delete(_cacheParent, recursive: true);
         }
         catch (IOException)
         {
@@ -974,6 +976,100 @@ public class SqliteCacheStoreBaseTests
         Assert.IsTrue(File.Exists(Path.Combine(_cacheRoot, second + ".bin")));
     }
 
+    [TestMethod]
+    public async Task FolderMigratorFailure_ReturnsNullWithoutCreatingTargetOrOpeningDb_ThenRetriesNextCall()
+    {
+        // A migrating store whose target path is blocked by a file: the migrator's Directory.Move
+        // throws, so init must return null without creating the target folder or opening the DB.
+        Directory.Delete(_cacheRoot, recursive: true); // remove the pre-created Payload folder
+
+        var legacy = Path.Combine(_cacheParent, "Legacy");
+        Directory.CreateDirectory(legacy);
+        await File.WriteAllBytesAsync(Path.Combine(legacy, "data.bin"), [1, 2, 3]);
+        await File.WriteAllBytesAsync(_cacheRoot, [0]); // _cacheRoot == <parent>/Payload, now a file
+
+        using var store = CreateMigratingStore("Payload", new PayloadFolderMigrationStep(1, "Legacy", "Payload"));
+
+        var stats = await store.GetStatsAsync();
+        Assert.AreEqual(0, stats.EntryCount, "A failed migration leaves the cache unavailable (safe default).");
+        Assert.IsFalse(Directory.Exists(_cacheRoot), "Target folder must not be created on a migration failure.");
+        Assert.IsTrue(File.Exists(Path.Combine(legacy, "data.bin")), "Source must remain intact.");
+
+        // _initialized stayed false; clearing the obstacle lets the next call re-run the migrator.
+        File.Delete(_cacheRoot);
+        var stats2 = await store.GetStatsAsync();
+
+        Assert.AreEqual(0, stats2.EntryCount);
+        Assert.IsTrue(File.Exists(Path.Combine(_cacheRoot, "data.bin")), "Recovery move lands the payload.");
+        Assert.IsFalse(Directory.Exists(legacy), "Recovery move clears the source.");
+    }
+
+    [TestMethod]
+    public async Task FolderMigrator_DoesNotRunAfterSuccessfulInit()
+    {
+        Directory.Delete(_cacheRoot, recursive: true);
+
+        var legacy = Path.Combine(_cacheParent, "Legacy");
+        Directory.CreateDirectory(legacy);
+        await File.WriteAllBytesAsync(Path.Combine(legacy, "data.bin"), [1]);
+
+        using var store = CreateMigratingStore("Payload", new PayloadFolderMigrationStep(1, "Legacy", "Payload"));
+
+        await store.GetStatsAsync(); // migrates Legacy -> Payload and opens the DB
+        Assert.IsFalse(Directory.Exists(legacy));
+        Assert.IsTrue(File.Exists(Path.Combine(_cacheRoot, "data.bin")));
+
+        // Re-create the legacy source AFTER a successful init. The contract is "we don't migrate
+        // after we've successfully opened," so the migrator must not run again.
+        Directory.CreateDirectory(legacy);
+        await File.WriteAllBytesAsync(Path.Combine(legacy, "second.bin"), [2]);
+
+        await store.GetStatsAsync();
+
+        Assert.IsTrue(File.Exists(Path.Combine(legacy, "second.bin")), "Migrator must not run after a successful init.");
+    }
+
+    [TestMethod]
+    public async Task FolderMigrator_UsesSubfolderNameCapturedDuringPathResolution()
+    {
+        // A pathological store whose PayloadSubfolderName changes after its first read. The base
+        // must capture the validated value once during path resolution and reuse THAT value for
+        // both the migrator's final-target check and the default marker name — otherwise the
+        // store opens one folder while migration evaluates (or names its marker after) another.
+        // Here the migrator's final-target check would throw on the re-read "Second" (step targets
+        // "First"), and the default marker would be named "Second.json"; a passing call with a
+        // "First.json" marker proves the captured value was reused end-to-end.
+        Directory.Delete(_cacheRoot, recursive: true);
+
+        var legacy = Path.Combine(_cacheParent, "Legacy");
+        Directory.CreateDirectory(legacy);
+        await File.WriteAllBytesAsync(Path.Combine(legacy, "data.bin"), [1]);
+
+        using var store = new TestCacheStore(
+            Options.Create(new TestCacheOptions()),
+            new FixedAppFolderLocator(_cacheParent),
+            new NullLoggingService())
+        {
+            SubfolderName = "First",
+            SubfolderNameAfterFirstRead = "Second",
+            MigrationStepsValue = [new PayloadFolderMigrationStep(1, "Legacy", "First")],
+        };
+
+        var stats = await store.GetStatsAsync();
+
+        Assert.AreEqual(0, stats.EntryCount);
+        Assert.IsTrue(
+            File.Exists(Path.Combine(_cacheParent, "First", "data.bin")),
+            "Store must open and migrate the captured 'First' folder.");
+        Assert.IsFalse(Directory.Exists(legacy), "Legacy folder must be migrated.");
+        Assert.IsTrue(
+            File.Exists(Path.Combine(_cacheParent, "First.json")),
+            "Default marker name must derive from the captured subfolder.");
+        Assert.IsFalse(
+            File.Exists(Path.Combine(_cacheParent, "Second.json")),
+            "Marker name must not derive from a re-read of the subfolder virtual.");
+    }
+
     private static void AssertWithinMs(DateTimeOffset expected, DateTimeOffset actual)
     {
         var delta = (actual - expected).Duration();
@@ -992,8 +1088,23 @@ public class SqliteCacheStoreBaseTests
 
     private TestCacheStore CreateStore(long maximumBytes = 0)
     {
-        var options = new TestCacheOptions { RootPath = _cacheRoot, MaximumBytes = maximumBytes };
-        return new TestCacheStore(Options.Create(options), new NullLoggingService());
+        var options = new TestCacheOptions { MaximumBytes = maximumBytes };
+        return new TestCacheStore(
+            Options.Create(options),
+            new FixedAppFolderLocator(_cacheParent),
+            new NullLoggingService());
+    }
+
+    private TestCacheStore CreateMigratingStore(string subfolder, params PayloadFolderMigrationStep[] steps)
+    {
+        return new TestCacheStore(
+            Options.Create(new TestCacheOptions()),
+            new FixedAppFolderLocator(_cacheParent),
+            new NullLoggingService())
+        {
+            SubfolderName = subfolder,
+            MigrationStepsValue = steps,
+        };
     }
 
     private sealed class NullLogger : ILogger

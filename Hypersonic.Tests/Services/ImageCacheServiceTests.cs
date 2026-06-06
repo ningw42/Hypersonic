@@ -8,6 +8,7 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Models;
 using Hypersonic.Services;
+using Hypersonic.Tests.Services.Cache;
 
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -20,6 +21,7 @@ public class ImageCacheServiceTests
     private static readonly byte[] PngA = [0x89, 0x50, 0x4E, 0x47, 1, 2, 3, 4];
     private static readonly byte[] PngB = [0x89, 0x50, 0x4E, 0x47, 5, 6, 7, 8];
 
+    private string _cacheParent = null!;
     private string _cacheRoot = null!;
     private FakeTimeProvider _time = null!;
     private FakeSubsonicClient _client = null!;
@@ -36,7 +38,8 @@ public class ImageCacheServiceTests
     [TestInitialize]
     public void Setup()
     {
-        _cacheRoot = Path.Combine(Path.GetTempPath(), "hypersonic-image-cache-" + Guid.NewGuid().ToString("N"));
+        _cacheParent = Path.Combine(Path.GetTempPath(), "hypersonic-image-cache-" + Guid.NewGuid().ToString("N"));
+        _cacheRoot = Path.Combine(_cacheParent, "Images");
         Directory.CreateDirectory(_cacheRoot);
         _time = new FakeTimeProvider(new DateTimeOffset(2026, 5, 3, 0, 0, 0, TimeSpan.Zero));
         _client = new FakeSubsonicClient();
@@ -57,11 +60,11 @@ public class ImageCacheServiceTests
 
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
 
-        if (Directory.Exists(_cacheRoot))
+        if (Directory.Exists(_cacheParent))
         {
             try
             {
-                Directory.Delete(_cacheRoot, recursive: true);
+                Directory.Delete(_cacheParent, recursive: true);
             }
             catch (IOException)
             {
@@ -173,7 +176,6 @@ public class ImageCacheServiceTests
         _client.Images["cover-a"] = PngA;
         var service = CreateService(new ImageCacheOptions
         {
-            RootPath = _cacheRoot,
             TimeToLiveDays = 1,
         });
 
@@ -194,7 +196,6 @@ public class ImageCacheServiceTests
         _client.Images["cover-a"] = PngA;
         var service = CreateService(new ImageCacheOptions
         {
-            RootPath = _cacheRoot,
             TimeToLiveDays = 1,
         });
 
@@ -216,7 +217,6 @@ public class ImageCacheServiceTests
         _client.Images["cover-b"] = PngB;
         var service = CreateService(new ImageCacheOptions
         {
-            RootPath = _cacheRoot,
             MaximumBytes = PngA.Length + 1,
         });
 
@@ -396,15 +396,16 @@ public class ImageCacheServiceTests
 
     private SqliteImageCacheStore CreateStore(ImageCacheOptions? options = null)
     {
-        options ??= new ImageCacheOptions { RootPath = _cacheRoot };
-        options.RootPath = _cacheRoot;
-        return new SqliteImageCacheStore(Options.Create(options), new NullLoggingService());
+        options ??= new ImageCacheOptions();
+        return new SqliteImageCacheStore(
+            Options.Create(options),
+            new FixedAppFolderLocator(_cacheParent),
+            new NullLoggingService());
     }
 
     private CachedImageService CreateService(ImageCacheOptions? options = null)
     {
-        options ??= new ImageCacheOptions { RootPath = _cacheRoot };
-        options.RootPath = _cacheRoot;
+        options ??= new ImageCacheOptions();
         _store = CreateStore(options);
 
         return new CachedImageService(

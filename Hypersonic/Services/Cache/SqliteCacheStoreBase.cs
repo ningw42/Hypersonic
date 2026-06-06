@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 
+using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 
 namespace Hypersonic.Services.Cache;
@@ -11,7 +12,7 @@ namespace Hypersonic.Services.Cache;
 ///
 /// Each entity (image/lyrics/audio) ships its own subclass that supplies the schema
 /// SQL, column mapping, entity-specific UPSERT/select queries, and the
-/// <c>ResolvePayloadFolder</c> override for path resolution.
+/// <c>PayloadSubfolderName</c> the cache parent is composed with.
 ///
 /// Locking convention: every subclass DB method comes in two forms.
 /// <list type="bullet">
@@ -36,17 +37,23 @@ public abstract class SqliteCacheStoreBase<TEntry> : IDisposable
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly ILogger _log;
     private readonly CacheOptionsBase _options;
+    private readonly IAppFolderLocator _folderLocator;
 
     private string? _cacheFolderPath;
     private string? _databasePath;
+    private string? _payloadSubfolderName;
     private SqliteConnection? _connection;
     private bool _initialized;
     private bool _disposed;
     private int _inFlightStreams;
 
-    protected SqliteCacheStoreBase(CacheOptionsBase options, ILoggingService logService)
+    protected SqliteCacheStoreBase(
+        CacheOptionsBase options,
+        IAppFolderLocator folderLocator,
+        ILoggingService logService)
     {
         _options = options;
+        _folderLocator = folderLocator;
         _log = logService.GetLogger(GetType().Name);
     }
 
@@ -59,11 +66,40 @@ public abstract class SqliteCacheStoreBase<TEntry> : IDisposable
     protected abstract string TableName { get; }
 
     /// <summary>
-    /// Resolves the full path of the per-entity payload folder. Subclass owns this so
-    /// existing entities (image) can preserve their MSIX-vs-unpackaged path mapping
-    /// verbatim while greenfield entities use a uniform layout.
+    /// Leaf name of the per-entity payload subfolder (e.g. <c>"Images"</c>,
+    /// <c>"Lyrics"</c>, <c>"Audio"</c>). The base composes the full folder as
+    /// <c>IAppFolderLocator.GetCacheFolder()</c> + this name, so subclasses cannot
+    /// diverge on the cache parent. Must be a safe leaf name (no separators, not
+    /// rooted, not <c>"."</c>/<c>".."</c>, no invalid filename characters); the base
+    /// validates it on first path resolution.
     /// </summary>
-    protected abstract string ResolvePayloadFolder();
+    protected abstract string PayloadSubfolderName { get; }
+
+    /// <summary>
+    /// File name of this store's folder-migration marker, written at the cache
+    /// parent. Defaults to the captured <c>PayloadSubfolderName + ".json"</c> — derived
+    /// from the value resolved (and validated) once during path resolution, so the marker
+    /// name stays consistent with the folder the store actually opens even if a subclass
+    /// returns a non-constant <see cref="PayloadSubfolderName"/>. Override only if a
+    /// subclass renames itself and wants the marker name pinned across the rename.
+    /// </summary>
+    protected virtual string MetadataFileName
+    {
+        get
+        {
+            EnsureCacheFolderPath();
+            return _payloadSubfolderName + ".json";
+        }
+    }
+
+    /// <summary>
+    /// Ordered, declarative payload-folder renames applied before the connection
+    /// opens, symmetric with <see cref="MigrationSteps"/> for schema. Empty (the
+    /// default) means no folder migration: greenfield stores write no marker file
+    /// and pay no on-disk cost. The highest-version step's <c>TargetSubfolder</c>
+    /// must equal <see cref="PayloadSubfolderName"/>.
+    /// </summary>
+    protected virtual IReadOnlyList<PayloadFolderMigrationStep> PayloadFolderMigrationSteps => [];
 
     /// <summary>Current schema version emitted into <c>PRAGMA user_version</c>.</summary>
     protected abstract int CurrentSchemaVersion { get; }
@@ -1180,6 +1216,31 @@ public abstract class SqliteCacheStoreBase<TEntry> : IDisposable
 
         var cacheFolderPath = EnsureCacheFolderPath();
 
+        // Folder migration runs before the connection opens (the DB lives inside the
+        // folder being moved) and before Directory.CreateDirectory(target) (which would
+        // mask the "source exists && target absent" migration signal). A false return
+        // means the migrator must fail this init attempt (Directory.Move threw, preflight
+        // detected an ambiguous chain state, or a pre-final conflict): do not create the
+        // target or open the DB, and leave _initialized false so the next cache call
+        // retries init. Folder migration and SQL schema migration are fully decoupled —
+        // different state stores, different timing, different failure handling.
+        //
+        // Hand the migrator the subfolder name captured (and validated) by
+        // EnsureCacheFolderPath, not a fresh read of the virtual, so the folder the store
+        // opens is exactly the folder migration's final-target check evaluates against.
+        var migrated = await SqliteCacheFolderMigrator.EnsurePayloadFolderAsync(
+            _folderLocator,
+            _payloadSubfolderName!,
+            MetadataFileName,
+            PayloadFolderMigrationSteps,
+            _log,
+            cancellationToken).ConfigureAwait(false);
+
+        if (!migrated)
+        {
+            return null;
+        }
+
         try
         {
             Directory.CreateDirectory(cacheFolderPath);
@@ -1224,7 +1285,17 @@ public abstract class SqliteCacheStoreBase<TEntry> : IDisposable
     {
         if (_cacheFolderPath is null)
         {
-            _cacheFolderPath = ResolvePayloadFolder();
+            // Read the virtual exactly once and reuse the captured value, so the value
+            // we validate is the value we compose with (and later hand to the migrator).
+            // Lazy timing also avoids reading an abstract/virtual member from the base
+            // constructor before the derived class is fully initialized. The
+            // _cacheFolderPath is null guard makes this one-shot per instance.
+            var subfolderName = PayloadSubfolderName;
+            SqliteCacheFolderMigrator.ValidateLeafName(subfolderName, nameof(PayloadSubfolderName));
+
+            _payloadSubfolderName = subfolderName;
+            var parent = _folderLocator.GetCacheFolder();
+            _cacheFolderPath = Path.Combine(parent, subfolderName);
             _databasePath = Path.Combine(_cacheFolderPath, DatabaseFileName);
         }
 
