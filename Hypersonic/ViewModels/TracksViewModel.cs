@@ -444,6 +444,7 @@ public partial class TracksViewModel : ObservableRecipient, INavigationAware
                 BitRate = s.BitRate,
                 BitDepth = s.BitDepth,
                 SamplingRate = s.SamplingRate,
+                IsStarred = s.IsStarred,
             };
         }).ToList();
     }

@@ -239,7 +239,7 @@ Enforced via `.editorconfig`:
 
 ## XAML converters
 
-Registered globally in `Themes/Generic.xaml`. Key converters: `BoolToVisibilityConverter`, `InverseBoolToVisibilityConverter`, `StringToBoolConverter`, `PlayPauseGlyphConverter`, `SecondsToTimeConverter`, `VolumeToPercentageConverter`, `BoolToGlyphConverter`. Note: `EnumToBooleanConverter` (in Helpers) is registered locally in `SettingsPage.xaml`, not in Generic.xaml.
+Registered globally in `Themes/Generic.xaml`. Key converters: `BoolToVisibilityConverter`, `InverseBoolToVisibilityConverter`, `StringToBoolConverter`, `PlayPauseGlyphConverter`, `SecondsToTimeConverter`, `VolumeToPercentageConverter`, `BoolToGlyphConverter`, `BoolToFavoriteBrushConverter`. Note: `EnumToBooleanConverter` (in Helpers) is registered locally in `SettingsPage.xaml`, not in Generic.xaml.
 
 ## What's not in the repo
 

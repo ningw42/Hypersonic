@@ -78,7 +78,7 @@ public class PlayerViewModelRefreshQueueTests
     private static (PlayerViewModel vm, FakePlaybackService svc) Setup(IReadOnlyList<PlaybackTrack> effective, int index)
     {
         var svc = new FakePlaybackService { Effective = effective, EffectiveQueueIndex = index };
-        var vm = new PlayerViewModel(svc, new FakeAppStateService(), createTimer: false);
+        var vm = new PlayerViewModel(svc, new FakeAppStateService(), new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
         vm.RefreshQueue();
         return (vm, svc);
     }

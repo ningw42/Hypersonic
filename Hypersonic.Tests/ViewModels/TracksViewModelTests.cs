@@ -621,5 +621,21 @@ public class TracksViewModelTests
         Assert.AreEqual(96000, t.SamplingRate);
     }
 
+    [TestMethod]
+    public void BuildPlaybackTracks_PropagatesIsStarred()
+    {
+        var vm = CreateVm(new FakeSubsonicClient());
+        vm._allSongs = new List<SongInfo>
+        {
+            new SongInfo { Id = "s1", Title = "Starred", Artist = "A", Album = "Al", IsStarred = true },
+            new SongInfo { Id = "s2", Title = "Plain", Artist = "A", Album = "Al", IsStarred = false },
+        };
+
+        var tracks = vm.BuildPlaybackTracks();
+
+        Assert.IsTrue(tracks[0].IsStarred, "Starred song must propagate IsStarred = true");
+        Assert.IsFalse(tracks[1].IsStarred, "Unstarred song must propagate IsStarred = false");
+    }
+
     #endregion
 }

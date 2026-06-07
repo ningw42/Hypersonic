@@ -21,4 +21,5 @@ public class PlaybackTrack
     public int BitRate { get; set; }
     public int BitDepth { get; set; }
     public int SamplingRate { get; set; }
+    public bool IsStarred { get; set; }
 }

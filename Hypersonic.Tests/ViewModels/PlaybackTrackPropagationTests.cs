@@ -204,6 +204,7 @@ public class PlaybackTrackPropagationTests
         BitRate = 4608,
         BitDepth = 24,
         SamplingRate = 96000,
+        IsStarred = true,
     };
 
     [TestMethod]
@@ -222,6 +223,7 @@ public class PlaybackTrackPropagationTests
         Assert.AreEqual(4608, t.BitRate);
         Assert.AreEqual(24, t.BitDepth);
         Assert.AreEqual(96000, t.SamplingRate);
+        Assert.IsTrue(t.IsStarred, "IsStarred must propagate through BuildPlaybackTracks");
     }
 
     [TestMethod]
@@ -238,5 +240,6 @@ public class PlaybackTrackPropagationTests
         Assert.AreEqual(4608, t.BitRate);
         Assert.AreEqual(24, t.BitDepth);
         Assert.AreEqual(96000, t.SamplingRate);
+        Assert.IsTrue(t.IsStarred, "IsStarred must propagate through BuildPlaybackTracks");
     }
 }

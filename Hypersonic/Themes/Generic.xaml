@@ -13,6 +13,7 @@
     <converters:PlayPauseGlyphConverter x:Key="PlayPauseGlyphConverter"/>
     <converters:SecondsToTimeConverter x:Key="SecondsToTimeConverter"/>
     <converters:BoolToGlyphConverter x:Key="BoolToGlyphConverter"/>
+    <converters:BoolToFavoriteBrushConverter x:Key="BoolToFavoriteBrushConverter"/>
     <converters:RepeatModeGlyphConverter x:Key="RepeatModeGlyphConverter"/>
     <converters:RepeatModeToAccentBrushConverter x:Key="RepeatModeToAccentBrushConverter"/>
     <converters:BoolToAccentBrushConverter x:Key="BoolToAccentBrushConverter"/>
@@ -222,9 +223,60 @@
         </Setter>
     </Style>
 
+    <!-- Transparent icon button: transparent normally, subtle fill on hover/press,
+         dimmed content when disabled. Matches the other player-bar transport buttons,
+         which use the default Button template (same ControlFill hover brushes). Unlike
+         the default template, the Disabled state stays transparent (no background box)
+         and instead dims the content via opacity. -->
+    <Style x:Key="TransparentButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="RootGrid"
+                          Background="Transparent"
+                          CornerRadius="4">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal"/>
+                                <VisualState x:Name="PointerOver">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlFillColorSecondaryBrush}"/>
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid" Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlFillColorTertiaryBrush}"/>
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ContentPresenter"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0.4" Duration="0"/>
+                                    </Storyboard>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter x:Name="ContentPresenter"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Carousel arrow button: 36x36 circle with semi-transparent background -->
-    <Style x:Key="CarouselArrowButtonStyle" TargetType="Button">
-        <Setter Property="Width" Value="36"/>
+    <Style x:Key="CarouselArrowButtonStyle" TargetType="Button">        <Setter Property="Width" Value="36"/>
         <Setter Property="Height" Value="36"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="CornerRadius" Value="18"/>

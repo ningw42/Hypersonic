@@ -513,6 +513,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <Button Grid.Column="0"
@@ -567,7 +568,22 @@
                                FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                VerticalAlignment="Center" Width="36" Margin="8,0,0,0"/>
 
-                    <ToggleButton x:Name="QueueToggleButton" Grid.Column="8"
+                    <Button Grid.Column="8"
+                            Command="{x:Bind Player.ToggleStarCommand}"
+                            IsEnabled="{x:Bind Player.HasTrack, Mode=OneWay}"
+                            Style="{StaticResource TransparentButtonStyle}"
+                            Width="32" Height="32" Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Favorite">
+                        <FontIcon FontSize="14"
+                                  Glyph="{x:Bind Player.IsStarred, Mode=OneWay,
+                                          Converter={StaticResource BoolToGlyphConverter},
+                                          ConverterParameter='&#xEB52;|&#xEB51;'}"
+                                  Foreground="{x:Bind Player.IsStarred, Mode=OneWay,
+                                          Converter={StaticResource BoolToFavoriteBrushConverter}}"/>
+                    </Button>
+
+                    <ToggleButton x:Name="QueueToggleButton" Grid.Column="9"
                             IsChecked="{x:Bind Player.IsQueueOpen, Mode=TwoWay}"
                             Style="{StaticResource TransparentToggleButtonStyle}"
                             Width="32" Height="32" Padding="0" Margin="8,0,0,0"

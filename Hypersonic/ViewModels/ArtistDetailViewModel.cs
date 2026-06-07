@@ -606,6 +606,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
                 BitRate = s.BitRate,
                 BitDepth = s.BitDepth,
                 SamplingRate = s.SamplingRate,
+                IsStarred = s.IsStarred,
             };
         }).ToList();
     }

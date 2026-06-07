@@ -364,6 +364,7 @@ public partial class AlbumDetailViewModel : ObservableRecipient, INavigationAwar
                 BitRate = s.BitRate,
                 BitDepth = s.BitDepth,
                 SamplingRate = s.SamplingRate,
+                IsStarred = s.IsStarred,
             };
         }).ToList();
     }

@@ -86,7 +86,7 @@ public class PlayerViewModelJumpToQueueIndexTests
         playback.Effective = new[] { t0, t1, t2 };
         playback.EffectiveQueueIndex = 0;
         var appState = new FakeAppStateService();
-        var vm = new PlayerViewModel(playback, appState, createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
         vm.RefreshQueue();
 
         vm.JumpToQueueIndex(vm.QueueItems[1]);
@@ -104,7 +104,7 @@ public class PlayerViewModelJumpToQueueIndexTests
         playback.Effective = new[] { dup1, T("x"), dup2 };
         playback.EffectiveQueueIndex = 0;
         var appState = new FakeAppStateService();
-        var vm = new PlayerViewModel(playback, appState, createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
         vm.RefreshQueue();
 
         Assert.AreEqual(3, vm.QueueItems.Count);
@@ -120,7 +120,7 @@ public class PlayerViewModelJumpToQueueIndexTests
         playback.Effective = new[] { T("a") };
         playback.EffectiveQueueIndex = 0;
         var appState = new FakeAppStateService();
-        var vm = new PlayerViewModel(playback, appState, createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
         vm.RefreshQueue();
 
         var stranger = new QueueItem { Track = T("z") };

@@ -667,6 +667,7 @@ public class ArtistDetailViewModelTopSongsTests
             BitRate = 4608,
             BitDepth = 24,
             SamplingRate = 96000,
+            IsStarred = true,
         };
         vm.TopSongs.Add(song);
 
@@ -678,6 +679,7 @@ public class ArtistDetailViewModelTopSongsTests
         Assert.AreEqual(4608, t.BitRate);
         Assert.AreEqual(24, t.BitDepth);
         Assert.AreEqual(96000, t.SamplingRate);
+        Assert.IsTrue(t.IsStarred, "IsStarred must propagate through BuildTopSongsPlaybackTracks");
     }
 
     #endregion

@@ -88,7 +88,7 @@ public class PlayerViewModelMetadataTests
     {
         var playback = new FakePlaybackService();
         var appState = new FakeAppStateService();
-        var vm = new PlayerViewModel(playback, appState, createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
 
         var track = CreateMultiArtistTrack();
         playback.NowPlaying = track;
@@ -119,7 +119,7 @@ public class PlayerViewModelMetadataTests
     {
         var playback = new FakePlaybackService { NowPlaying = CreateMultiArtistTrack() };
         var appState = new FakeAppStateService();
-        var vm = new PlayerViewModel(playback, appState, createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
 
         playback.RaiseTrackChanged();
         Assert.IsTrue(vm.HasTrack);
@@ -145,7 +145,7 @@ public class PlayerViewModelMetadataTests
         var playback = new FakePlaybackService { NowPlaying = track, IsPlaying = true };
         var appState = new FakeAppStateService();
 
-        var vm = new PlayerViewModel(playback, appState, createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
 
         Assert.IsTrue(vm.HasTrack);
         Assert.AreEqual("Test Song", vm.TrackTitle);

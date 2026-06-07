@@ -226,6 +226,7 @@ public partial class PlaylistDetailViewModel : ObservableRecipient, INavigationA
                 BitRate = s.BitRate,
                 BitDepth = s.BitDepth,
                 SamplingRate = s.SamplingRate,
+                IsStarred = s.IsStarred,
             };
         }).ToList();
     }

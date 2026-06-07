@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Models;
@@ -13,6 +14,8 @@ public partial class PlayerViewModel : ObservableRecipient
 {
     private readonly IPlaybackService _playbackService;
     private readonly IAppStateService _appStateService;
+    private readonly ISubsonicClientService _subsonicClientService;
+    private readonly ILogger _log;
 
     private bool _isExternalUpdate;
     private bool _isSavingFromExternal;
@@ -96,6 +99,9 @@ public partial class PlayerViewModel : ObservableRecipient
     public partial bool HasTrack { get; set; }
 
     [ObservableProperty]
+    public partial bool IsStarred { get; set; }
+
+    [ObservableProperty]
     public partial string PositionText { get; set; } = "0:00";
 
     [ObservableProperty]
@@ -128,15 +134,26 @@ public partial class PlayerViewModel : ObservableRecipient
     [ObservableProperty]
     public partial RepeatMode RepeatMode { get; set; }
 
-    public PlayerViewModel(IPlaybackService playbackService, IAppStateService appStateService)
-        : this(playbackService, appStateService, createTimer: true)
+    public PlayerViewModel(
+        IPlaybackService playbackService,
+        IAppStateService appStateService,
+        ISubsonicClientService subsonicClientService,
+        ILoggingService logService)
+        : this(playbackService, appStateService, subsonicClientService, logService, createTimer: true)
     {
     }
 
-    internal PlayerViewModel(IPlaybackService playbackService, IAppStateService appStateService, bool createTimer)
+    internal PlayerViewModel(
+        IPlaybackService playbackService,
+        IAppStateService appStateService,
+        ISubsonicClientService subsonicClientService,
+        ILoggingService logService,
+        bool createTimer)
     {
         _playbackService = playbackService;
         _appStateService = appStateService;
+        _subsonicClientService = subsonicClientService;
+        _log = logService.GetLogger(nameof(PlayerViewModel));
         _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
         _playbackService.TrackChanged += OnTrackChanged;
         _playbackService.PositionChanged += OnPositionChanged;
@@ -180,6 +197,7 @@ public partial class PlayerViewModel : ObservableRecipient
             Duration = track.Duration;
             DurationText = FormatTime(track.Duration);
             IsPlaying = _playbackService.IsPlaying;
+            IsStarred = track.IsStarred;
         }
     }
 
@@ -192,6 +210,7 @@ public partial class PlayerViewModel : ObservableRecipient
         OnPropertyChanged(nameof(ShuffleEnabled));
         OnPropertyChanged(nameof(RepeatMode));
         OnPropertyChanged(nameof(IsQueueOpen));
+        OnPropertyChanged(nameof(IsStarred));
     }
 
     [RelayCommand]
@@ -257,6 +276,60 @@ public partial class PlayerViewModel : ObservableRecipient
         _playbackService.IsMuted = !_playbackService.IsMuted;
         _appStateService.State.Playback.IsMuted = _playbackService.IsMuted;
         _ = _appStateService.SavePlaybackAsync();
+    }
+
+    [RelayCommand]
+    private async Task ToggleStarAsync()
+    {
+        var track = _playbackService.NowPlaying;
+        if (!HasTrack || track is null || string.IsNullOrEmpty(track.Id))
+        {
+            return;
+        }
+
+        var client = _subsonicClientService.Client;
+        if (client is null)
+        {
+            return;
+        }
+
+        var wasStarred = IsStarred;
+        IsStarred = !wasStarred;
+        track.IsStarred = !wasStarred;
+
+        try
+        {
+            var response = wasStarred
+                ? await client.UnstarAsync(id: track.Id)
+                : await client.StarAsync(id: track.Id);
+
+            // Subsonic returns HTTP 200 even on logical failure (status="failed");
+            // the client only throws on transport errors, so check the status too.
+            if (response.Status == "failed")
+            {
+                RevertStar(track, wasStarred);
+                _log.Warning(
+                    "Star toggle returned a failed status",
+                    new { TrackId = track.Id, wasStarred, Code = response.Error?.Code, Message = response.Error?.Message });
+            }
+        }
+        catch (Exception ex)
+        {
+            RevertStar(track, wasStarred);
+            _log.Warning("Failed to toggle star", new { TrackId = track.Id, wasStarred }, ex);
+        }
+    }
+
+    /// <summary>
+    /// Reverts a failed star toggle. Always restores the captured track's own state,
+    /// but only refreshes the visible heart from the <em>current</em> NowPlaying — if
+    /// playback advanced during the request, <see cref="OnTrackChanged"/> already
+    /// hydrated <see cref="IsStarred"/> for the new track and must not be clobbered.
+    /// </summary>
+    private void RevertStar(PlaybackTrack track, bool wasStarred)
+    {
+        track.IsStarred = wasStarred;
+        IsStarred = _playbackService.NowPlaying?.IsStarred ?? false;
     }
 
     public event EventHandler? NowPlayingMetadataChanged;
@@ -411,6 +484,7 @@ public partial class PlayerViewModel : ObservableRecipient
 
         var track = _playbackService.NowPlaying;
         HasTrack = track != null;
+        IsStarred = track?.IsStarred ?? false;
         TrackTitle = track?.Title ?? string.Empty;
         AlbumName = track?.Album ?? string.Empty;
         AlbumId = track?.AlbumId;
