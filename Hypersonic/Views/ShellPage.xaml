@@ -1,5 +1,6 @@
 <Page
     x:Class="Hypersonic.Views.ShellPage"
+    x:Name="ShellPageRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -383,6 +384,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Cover art -->
@@ -416,6 +418,17 @@
                                                    Text="{x:Bind Track.Duration, Converter={StaticResource SecondsToTimeConverter}}"
                                                    FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                    VerticalAlignment="Center"/>
+
+                                        <!-- Favorite (PlaybackTrack.IsStarred notifies; Mode=OneWay is required) -->
+                                        <ToggleButton Grid.Column="3"
+                                                      IsChecked="{x:Bind Track.IsStarred, Mode=OneWay}"
+                                                      Padding="0" Width="28" Height="28" Margin="2,0,0,0"
+                                                      VerticalAlignment="Center"
+                                                      BorderThickness="0" Background="Transparent"
+                                                      Style="{StaticResource FavoriteToggleButtonStyle}"
+                                                      Command="{Binding Player.ToggleQueueItemStarCommand, ElementName=ShellPageRoot}"
+                                                      CommandParameter="{x:Bind}"
+                                                      ToolTipService.ToolTip="Favorite"/>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>

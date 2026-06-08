@@ -222,11 +222,18 @@ public class ArtistDetailViewModelTopSongsTests
         Starred = starred,
     };
 
-    private ArtistDetailViewModel CreateVm(FakeSubsonicClient client) =>
-        new(new FakeSubsonicClientService { Client = client },
+    private ArtistDetailViewModel CreateVm(FakeSubsonicClient client)
+    {
+        var clientService = new FakeSubsonicClientService { Client = client };
+        var messenger = new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger();
+        var favorites = new Hypersonic.Services.FavoritesService(clientService, new NullLoggingService(), messenger);
+        return new(clientService,
             new FakeNavigationService(),
             new NullPlaybackService(),
+            favorites,
+            messenger,
             new NullLoggingService());
+    }
 
     #endregion
 
@@ -650,10 +657,15 @@ public class ArtistDetailViewModelTopSongsTests
     public void PlayFromTopSong_PropagatesTechnicalFieldsToPlaybackTrack()
     {
         var playback = new NullPlaybackService();
+        var clientService = new FakeSubsonicClientService { Client = new FakeSubsonicClient() };
+        var messenger = new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger();
+        var favorites = new Hypersonic.Services.FavoritesService(clientService, new NullLoggingService(), messenger);
         var vm = new ArtistDetailViewModel(
-            new FakeSubsonicClientService { Client = new FakeSubsonicClient() },
+            clientService,
             new FakeNavigationService(),
             playback,
+            favorites,
+            messenger,
             new NullLoggingService());
 
         var song = new SongInfo

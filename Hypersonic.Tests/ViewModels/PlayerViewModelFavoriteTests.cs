@@ -1,5 +1,10 @@
+using CommunityToolkit.Mvvm.Messaging;
+
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
+using Hypersonic.Messages;
+using Hypersonic.Models;
+using Hypersonic.Services;
 using Hypersonic.Tests.Fakes;
 using Hypersonic.ViewModels;
 
@@ -8,13 +13,14 @@ namespace Hypersonic.Tests.ViewModels;
 [TestClass]
 public class PlayerViewModelFavoriteTests
 {
-    // Local fake: RaiseTrackChanged() triggers OnTrackChanged -> RefreshQueue,
-    // which calls GetEffectiveQueue()/EffectiveQueueIndex. This fake returns
-    // safe empties (the shared Hypersonic.Tests.Fakes.FakePlaybackService throws
-    // for those). The nested type takes precedence over the imported one here.
+    // Local fake: RaiseTrackChanged() triggers OnTrackChanged -> RefreshQueue, which calls
+    // GetEffectiveQueue()/EffectiveQueueIndex. This fake returns safe values (the shared
+    // FakePlaybackService throws for those). EffectiveQueue is settable so a broadcast can be
+    // observed updating the queued PlaybackTrack instances.
     private sealed class FakePlaybackService : IPlaybackService
     {
         public PlaybackTrack? NowPlaying { get; set; }
+        public List<PlaybackTrack> EffectiveQueue { get; set; } = new();
         public IReadOnlyList<PlaybackTrack> Queue => Array.Empty<PlaybackTrack>();
         public int QueueIndex => -1;
         public int EffectiveQueueIndex => -1;
@@ -51,7 +57,7 @@ public class PlayerViewModelFavoriteTests
         public void ClearAll() { }
         public void JumpToTrack(string trackId) { }
         public void JumpToQueueIndex(int effectiveIndex) { }
-        public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => Array.Empty<PlaybackTrack>();
+        public IReadOnlyList<PlaybackTrack> GetEffectiveQueue() => EffectiveQueue;
 
         public void RaiseTrackChanged() =>
             TrackChanged?.Invoke(this, new TrackChangedEventArgs(TrackChangeDirection.Jump));
@@ -69,21 +75,32 @@ public class PlayerViewModelFavoriteTests
         public void SaveSync() { }
     }
 
-    private static (PlayerViewModel vm, FakePlaybackService playback, RecordingSubsonicClient client)
+    private static (PlayerViewModel vm, FakePlaybackService playback, RecordingSubsonicClient client, WeakReferenceMessenger messenger)
         CreateViewModel(PlaybackTrack? nowPlaying = null)
     {
         var playback = new FakePlaybackService { NowPlaying = nowPlaying };
+        if (nowPlaying is not null)
+        {
+            playback.EffectiveQueue.Add(nowPlaying);
+        }
+
         var client = new RecordingSubsonicClient();
         var clientService = new FakeSubsonicClientService { Client = client };
-        var vm = new PlayerViewModel(playback, new FakeAppStateService(), clientService,
+        var messenger = new WeakReferenceMessenger();
+        // A real FavoritesService wired to the same messenger so toggles round-trip through
+        // the service and the optimistic flip arrives back at the VM via a broadcast.
+        var favorites = new FavoritesService(clientService, new NullLoggingService(), messenger);
+        var vm = new PlayerViewModel(playback, new FakeAppStateService(), favorites, messenger,
             new NullLoggingService(), createTimer: false);
-        return (vm, playback, client);
+        return (vm, playback, client, messenger);
     }
+
+    // ---- Hydration ----
 
     [TestMethod]
     public void OnTrackChanged_HydratesIsStarred()
     {
-        var (vm, playback, _) = CreateViewModel();
+        var (vm, playback, _, _) = CreateViewModel();
 
         playback.NowPlaying = new PlaybackTrack { Id = "s1", Title = "T", IsStarred = true };
         playback.RaiseTrackChanged();
@@ -97,7 +114,7 @@ public class PlayerViewModelFavoriteTests
     [TestMethod]
     public void OnTrackChanged_NoTrack_IsStarredFalse()
     {
-        var (vm, playback, _) = CreateViewModel(new PlaybackTrack { Id = "s1", IsStarred = true });
+        var (vm, playback, _, _) = CreateViewModel(new PlaybackTrack { Id = "s1", IsStarred = true });
         playback.RaiseTrackChanged(); // hydrate true
 
         playback.NowPlaying = null;
@@ -106,53 +123,54 @@ public class PlayerViewModelFavoriteTests
         Assert.IsFalse(vm.IsStarred, "No track => IsStarred false");
     }
 
+    // ---- Toggle delegation + broadcast round-trip ----
+
     [TestMethod]
-    public async Task ToggleStar_NotStarred_CallsStarAndFlips()
+    public async Task ToggleStar_NotStarred_DelegatesToServiceAndFlipsViaBroadcast()
     {
         var track = new PlaybackTrack { Id = "s1", Title = "T", IsStarred = false };
-        var (vm, _, client) = CreateViewModel(track);
-        vm.IsStarred = false;
+        var (vm, _, client, _) = CreateViewModel(track);
 
         await vm.ToggleStarCommand.ExecuteAsync(null);
 
-        Assert.IsTrue(vm.IsStarred, "VM flag flips to true");
-        Assert.IsTrue(track.IsStarred, "Live PlaybackTrack flag flips to true");
-        Assert.AreEqual(1, client.StarCallCount);
+        Assert.AreEqual(1, client.StarCallCount, "Toggle delegates to the service, which calls Star");
         Assert.AreEqual("s1", client.LastStarredId);
+        Assert.IsTrue(vm.IsStarred, "The optimistic broadcast flips the mirror reentrantly");
+        Assert.IsTrue(track.IsStarred, "The broadcast flips the queued PlaybackTrack instance");
     }
 
     [TestMethod]
-    public async Task ToggleStar_Starred_CallsUnstar()
+    public async Task ToggleStar_StarThenUnstar_CallsBoth()
     {
-        var track = new PlaybackTrack { Id = "s1", Title = "T", IsStarred = true };
-        var (vm, _, client) = CreateViewModel(track);
-        vm.IsStarred = true;
+        var track = new PlaybackTrack { Id = "s1", IsStarred = false };
+        var (vm, _, client, _) = CreateViewModel(track);
 
-        await vm.ToggleStarCommand.ExecuteAsync(null);
+        await vm.ToggleStarCommand.ExecuteAsync(null);    // star (store now knows s1)
+        Assert.IsTrue(vm.IsStarred);
+        Assert.AreEqual(1, client.StarCallCount);
 
+        await vm.ToggleStarCommand.ExecuteAsync(null);    // unstar
         Assert.IsFalse(vm.IsStarred);
-        Assert.IsFalse(track.IsStarred);
         Assert.AreEqual(1, client.UnstarCallCount);
     }
 
     [TestMethod]
-    public async Task ToggleStar_Failure_Reverts()
+    public async Task ToggleStar_Failure_RevertsMirrorAndTrackViaBroadcast()
     {
-        var track = new PlaybackTrack { Id = "s1", Title = "T", IsStarred = false };
-        var (vm, _, client) = CreateViewModel(track);
-        vm.IsStarred = false;
+        var track = new PlaybackTrack { Id = "s1", IsStarred = false };
+        var (vm, _, client, _) = CreateViewModel(track);
         client.StarShouldThrow = true;
 
         await vm.ToggleStarCommand.ExecuteAsync(null);
 
-        Assert.IsFalse(vm.IsStarred, "VM flag reverts on failure");
-        Assert.IsFalse(track.IsStarred, "Live track flag reverts on failure");
+        Assert.IsFalse(vm.IsStarred, "Service revert broadcast rolls the mirror back");
+        Assert.IsFalse(track.IsStarred, "And rolls the queued track back");
     }
 
     [TestMethod]
     public async Task ToggleStar_NoTrack_NoOp()
     {
-        var (vm, _, client) = CreateViewModel(nowPlaying: null);
+        var (vm, _, client, _) = CreateViewModel(nowPlaying: null);
 
         await vm.ToggleStarCommand.ExecuteAsync(null);
 
@@ -161,55 +179,62 @@ public class PlayerViewModelFavoriteTests
     }
 
     [TestMethod]
-    public async Task ToggleStar_ApiReturnsFailedStatus_Reverts()
+    public async Task ToggleQueueItemStar_DelegatesToService()
     {
-        // Subsonic returns HTTP 200 with status="failed"; the client does not throw,
-        // so the optimistic flip must be reverted based on the response status.
-        var track = new PlaybackTrack { Id = "s1", Title = "T", IsStarred = false };
-        var (vm, _, client) = CreateViewModel(track);
-        vm.IsStarred = false;
-        client.ResponseStatus = "failed";
+        var (vm, _, client, _) = CreateViewModel();
+        var item = new QueueItem { Track = new PlaybackTrack { Id = "q1", IsStarred = false } };
 
-        await vm.ToggleStarCommand.ExecuteAsync(null);
+        await vm.ToggleQueueItemStarCommand.ExecuteAsync(item);
 
-        Assert.IsFalse(vm.IsStarred, "Failed status must revert the VM flag");
-        Assert.IsFalse(track.IsStarred, "Failed status must revert the track flag");
+        Assert.AreEqual(1, client.StarCallCount);
+        Assert.AreEqual("q1", client.LastStarredId);
+    }
+
+    // ---- Broadcast handler (the mid-flight race) ----
+
+    [TestMethod]
+    public void Receive_MessageForNowPlaying_UpdatesMirror()
+    {
+        var track = new PlaybackTrack { Id = "s1", IsStarred = false };
+        var (vm, _, _, messenger) = CreateViewModel(track);
+
+        messenger.Send(new FavoritesChangedMessage(true, new[] { "s1" }));
+
+        Assert.IsTrue(vm.IsStarred, "A broadcast containing the now-playing id updates the mirror");
     }
 
     [TestMethod]
-    public async Task ToggleStar_TrackChangesDuringFailedRequest_DoesNotClobberNewTrack()
+    public void Receive_MessageForDifferentId_LeavesMirrorUnchanged()
     {
-        // Toggle track A, then have playback advance to B (starred) while the request
-        // is in flight, then fail the request. The revert must not overwrite B's heart.
-        var trackA = new PlaybackTrack { Id = "A", Title = "A", IsStarred = false };
-        var (vm, playback, client) = CreateViewModel(trackA);
-        playback.RaiseTrackChanged(); // hydrate A => IsStarred false
+        var track = new PlaybackTrack { Id = "s1", IsStarred = false };
+        var (vm, _, _, messenger) = CreateViewModel(track);
 
-        client.Gate = new TaskCompletionSource<bool>();
-        client.StarShouldThrow = true;
+        messenger.Send(new FavoritesChangedMessage(true, new[] { "OTHER" }));
 
-        var toggle = vm.ToggleStarCommand.ExecuteAsync(null); // optimistic A => true, awaits gate
+        Assert.IsFalse(vm.IsStarred, "A revert for a different id must not clobber the now-playing heart");
+    }
 
-        // Playback advances to a different, starred track mid-request.
-        var trackB = new PlaybackTrack { Id = "B", Title = "B", IsStarred = true };
-        playback.NowPlaying = trackB;
-        playback.RaiseTrackChanged(); // OnTrackChanged hydrates IsStarred = true (B)
-        Assert.IsTrue(vm.IsStarred, "Heart should reflect B (starred) before the request resolves");
+    [TestMethod]
+    public void Receive_MessageForQueuedTrack_UpdatesThatInstanceOnly()
+    {
+        var nowPlaying = new PlaybackTrack { Id = "s1", IsStarred = false };
+        var other = new PlaybackTrack { Id = "s2", IsStarred = false };
+        var (vm, playback, _, messenger) = CreateViewModel(nowPlaying);
+        playback.EffectiveQueue.Add(other);
 
-        client.Gate.SetResult(true); // release -> StarAsync throws -> revert path runs
-        await toggle;
+        messenger.Send(new FavoritesChangedMessage(true, new[] { "s2" }));
 
-        Assert.IsTrue(vm.IsStarred, "Revert must not clobber B's starred heart");
-        Assert.IsFalse(trackA.IsStarred, "A's own state must still be reverted");
+        Assert.IsTrue(other.IsStarred, "The matching queued track updates");
+        Assert.IsFalse(nowPlaying.IsStarred, "A non-matching queued track is left alone");
+        Assert.IsFalse(vm.IsStarred, "The mirror only follows the now-playing id");
     }
 
     [TestMethod]
     public void NotifyThemeChanged_RaisesIsStarred()
     {
-        // The hollow-heart Foreground binds IsStarred through a theme-dependent
-        // converter, so a theme change must re-raise IsStarred to re-resolve the
-        // brush (same mechanism as ShuffleEnabled/RepeatMode/IsQueueOpen).
-        var (vm, _, _) = CreateViewModel();
+        // The hollow-heart Foreground binds IsStarred through a theme-dependent converter, so a
+        // theme change must re-raise IsStarred (same mechanism as ShuffleEnabled/RepeatMode).
+        var (vm, _, _, _) = CreateViewModel();
         var raised = new List<string?>();
         vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 

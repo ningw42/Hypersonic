@@ -1,4 +1,5 @@
 using Hypersonic.Client;
+using Hypersonic.Client.Models.Entities;
 using Hypersonic.Client.Models.Responses;
 
 namespace Hypersonic.Tests.Fakes;
@@ -21,6 +22,23 @@ public sealed class RecordingSubsonicClient : ISubsonicClient
     /// <summary>When set, Star/Unstar await this gate before completing — lets a test
     /// interleave a track change mid-request to exercise the revert race.</summary>
     public TaskCompletionSource<bool>? Gate { get; set; }
+
+    // --- getStarred2 (FavoritesService poll/seed) ---
+
+    /// <summary>The server's current starred-song id set, returned by GetStarred2Async.</summary>
+    public HashSet<string> StarredSongIds { get; } = new();
+
+    /// <summary>Status returned from GetStarred2Async ("ok" or "failed").</summary>
+    public string GetStarred2Status { get; set; } = "ok";
+
+    /// <summary>When true, GetStarred2Async throws (simulates an unsupported/failed endpoint).</summary>
+    public bool GetStarred2ShouldThrow { get; set; }
+
+    public int GetStarred2CallCount { get; private set; }
+
+    /// <summary>When set, GetStarred2Async awaits this gate before completing — lets a test
+    /// interleave a toggle or a Start() while a refresh is in flight.</summary>
+    public TaskCompletionSource<bool>? GetStarred2Gate { get; set; }
 
     public async Task<SubsonicResponse> StarAsync(string? id = null, string? albumId = null, string? artistId = null)
     {
@@ -68,7 +86,20 @@ public sealed class RecordingSubsonicClient : ISubsonicClient
     public Task<GetSongsByGenreResponse> GetSongsByGenreAsync(string genre, int? count = null, int? offset = null, string? musicFolderId = null) => throw new NotImplementedException();
     public Task<GetNowPlayingResponse> GetNowPlayingAsync() => throw new NotImplementedException();
     public Task<GetStarredResponse> GetStarredAsync(string? musicFolderId = null) => throw new NotImplementedException();
-    public Task<GetStarred2Response> GetStarred2Async(string? musicFolderId = null) => throw new NotImplementedException();
+
+    public async Task<GetStarred2Response> GetStarred2Async(string? musicFolderId = null)
+    {
+        if (GetStarred2Gate is not null) await GetStarred2Gate.Task;
+        GetStarred2CallCount++;
+        if (GetStarred2ShouldThrow) throw new HttpRequestException("getStarred2 failed");
+
+        var songs = StarredSongIds.Select(id => new Song { Id = id, Starred = "2024-01-01T00:00:00Z" }).ToArray();
+        return new GetStarred2Response
+        {
+            Status = GetStarred2Status,
+            Starred2 = new Starred2 { Song = songs },
+        };
+    }
     public Task<Search2Response> Search2Async(string query, int? artistCount = null, int? artistOffset = null, int? albumCount = null, int? albumOffset = null, int? songCount = null, int? songOffset = null, string? musicFolderId = null) => throw new NotImplementedException();
     public Task<Search3Response> Search3Async(string query, int? artistCount = null, int? artistOffset = null, int? albumCount = null, int? albumOffset = null, int? songCount = null, int? songOffset = null, string? musicFolderId = null) => throw new NotImplementedException();
     public Task<GetPlaylistsResponse> GetPlaylistsAsync(string? username = null) => throw new NotImplementedException();

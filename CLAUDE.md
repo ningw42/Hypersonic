@@ -63,6 +63,7 @@ Hypersonic/                   # WinUI 3 app — references Hypersonic.Core
 ├── Converters/       # XAML value converters
 ├── Helpers/          # WinUI utilities (TitleBarHelper, RuntimeHelper, TrackListTemplateSelector)
 ├── Interop/          # COM interop (ITaskbarList3 for taskbar thumbnail buttons)
+├── Messages/         # WeakReferenceMessenger messages (FavoritesChangedMessage)
 ├── Models/           # Presentation models (SongInfo, QueueItem, DiscHeaderItem — use ObservableObject)
 ├── Services/         # WinUI services (PlaybackService, LocalSettingsService, etc.)
 ├── Strings/en-us/    # Localization resources (Resources.resw)
@@ -113,6 +114,11 @@ Services are split between Hypersonic.Core (platform-independent) and Hypersonic
 | **ITaskbarService** | Taskbar thumbnail buttons (Prev/Play-Pause/Next) via `ITaskbarList3` COM interop. |
 | **IBackdropSelectorService** | Persists and applies window backdrop: `None`, `Mica`, `MicaAlt`, `Acrylic`. |
 | **IActivationService** | Startup orchestration: app state init, credential migration, window restore, theme + taskbar + backdrop init. |
+| **IFavoritesService** | Single writer of the in-memory starred-song set. Owns the optimistic flip + `Star/Unstar` + status check + revert once, and broadcasts each change as a batched `FavoritesChangedMessage` over `WeakReferenceMessenger`. Fed by user toggles, a `getStarred2` poll, and page-load reconciles, all serialized through one epoch/seq/lease write gate. See `docs/design/service/2026-06-07-favorite-sync.md`. |
+
+### Cross-surface favorite (star) sync
+
+A song's starred state is one shared fact across every surface. `FavoritesService` (singleton) is the single writer; every surface is a pure subscriber that updates only the model instances it owns whose id is in the broadcast. This is the codebase's **first use of `WeakReferenceMessenger`** (the `IMessenger` is injected, not reached statically, so tests isolate it): participating ViewModels (`PlayerViewModel` and the four track-list VMs) pass it to `base(messenger)`, set `IsActive = true`, and implement `IRecipient<FavoritesChangedMessage>`. Messages live in `Hypersonic/Messages/`. `PlaybackTrack` carries a hand-rolled `INotifyPropertyChanged` where **only `IsStarred`** notifies (Core stays dependency-free), so queue-row hearts (`x:Bind Track.IsStarred, Mode=OneWay`) live-update. Toggles delegate to `FavoritesService.ToggleAsync` rather than calling the API per-surface; the optimistic flip arrives back via the broadcast. The store seeds on connect (`ActivationService` / `ConnectViewModel` call `Start()`) and re-polls on window activation (`MainWindow` `Activated` handler → `RefreshAsync`).
 
 ### Playback architecture
 

@@ -10,6 +10,8 @@ using Hypersonic.Services;
 using Hypersonic.ViewModels;
 using Hypersonic.Views;
 
+using CommunityToolkit.Mvvm.Messaging;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
@@ -117,6 +119,10 @@ public partial class App : Application
             services.AddSingleton<TimeProvider>(TimeProvider.System);
             services.AddSingleton<IScrobblingService, ScrobblingService>();
             services.AddSingleton<ISystemFontCatalog, SystemFontCatalog>();
+
+            // Cross-surface favorite (star) synchronization.
+            services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
+            services.AddSingleton<IFavoritesService, FavoritesService>();
 
             // Views and ViewModels
             services.AddSingleton<PlayerViewModel>();

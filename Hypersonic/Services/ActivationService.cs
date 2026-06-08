@@ -75,6 +75,11 @@ public class ActivationService : IActivationService
                         credential.ServerUrl = result.ResolvedUrl;
                         _subsonicClientService.CreateClient(credential);
                         _log.Info("Auto-connect succeeded, showing shell");
+
+                        // Seed the favorites store now that we have a connected client and are
+                        // about to show the shell (runs on the UI thread, so the poll timer starts).
+                        App.GetService<IFavoritesService>().Start();
+
                         ShowShell(activationArgs);
                     }
                     else

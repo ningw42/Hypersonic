@@ -190,6 +190,10 @@ public partial class ConnectViewModel : ObservableRecipient
             _subsonicClientService.CreateClient(credential);
             _log.Info("Connected and credentials saved", new { ResolvedUrl = result.ResolvedUrl, credential.Username });
 
+            // Seed the favorites store for the new connection (idempotent Start advances the
+            // epoch and reseeds, so the manual-connect path doesn't miss the seed).
+            App.GetService<IFavoritesService>().Start();
+
             // Swap to the shell with navigation
             var shell = App.GetService<ShellPage>();
             App.MainWindow.Content = shell;

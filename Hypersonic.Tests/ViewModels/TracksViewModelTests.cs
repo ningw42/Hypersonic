@@ -179,7 +179,9 @@ public class TracksViewModelTests
     private static TracksViewModel CreateVm(FakeSubsonicClient fakeClient, FakePlaybackService? playback = null)
     {
         var clientService = new FakeSubsonicClientService { Client = fakeClient };
-        return new TracksViewModel(clientService, playback ?? new FakePlaybackService(), new NullLoggingService());
+        var messenger = new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger();
+        var favorites = new Hypersonic.Services.FavoritesService(clientService, new NullLoggingService(), messenger);
+        return new TracksViewModel(clientService, playback ?? new FakePlaybackService(), favorites, messenger, new NullLoggingService());
     }
 
     #endregion

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 using Hypersonic.Collections;
 using Hypersonic.Contracts.Services;
@@ -8,14 +9,16 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Helpers;
 using Hypersonic.Core.Models;
 using Hypersonic.Helpers;
+using Hypersonic.Messages;
 using Hypersonic.Models;
 
 namespace Hypersonic.ViewModels;
 
-public partial class TracksViewModel : ObservableRecipient, INavigationAware
+public partial class TracksViewModel : ObservableRecipient, INavigationAware, IRecipient<FavoritesChangedMessage>
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly IPlaybackService _playbackService;
+    private readonly IFavoritesService _favorites;
     private readonly ILogger _log;
     internal List<SongInfo> _allSongs = [];
     internal NowPlayingTracker? _nowPlayingTracker;
@@ -77,13 +80,29 @@ public partial class TracksViewModel : ObservableRecipient, INavigationAware
 
     public IncrementalSongCollection Tracks { get; }
 
-    public TracksViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService, ILoggingService logService)
+    public TracksViewModel(ISubsonicClientService subsonicClientService, IPlaybackService playbackService, IFavoritesService favoritesService, IMessenger messenger, ILoggingService logService)
+        : base(messenger)
     {
         _subsonicClientService = subsonicClientService;
         _playbackService = playbackService;
+        _favorites = favoritesService;
         _log = logService.GetLogger(nameof(TracksViewModel));
         Tracks = new IncrementalSongCollection(LoadMoreSongsAsync);
         Tracks.OnBatchLoaded = OnListViewBatchLoaded;
+        IsActive = true;   // always-active subscriber; held weakly, off-screen lists stay current
+    }
+
+    /// <summary>Updates every owned <see cref="SongInfo"/> whose id is in a star-change broadcast.</summary>
+    public void Receive(FavoritesChangedMessage message)
+    {
+        var ids = message.Ids as IReadOnlySet<string> ?? new HashSet<string>(message.Ids);
+        foreach (var song in _allSongs)
+        {
+            if (ids.Contains(song.Id))
+            {
+                song.IsStarred = message.IsStarred;
+            }
+        }
     }
 
     private void OnListViewBatchLoaded()
@@ -256,6 +275,10 @@ public partial class TracksViewModel : ObservableRecipient, INavigationAware
 
         try
         {
+            // Capture the observation token BEFORE the fetch so a toggle that lands during it
+            // is protected by the write gate when we reconcile below.
+            var observation = _favorites.BeginObservation();
+
             var response = await client.Search3Async(
                 _searchQuery,
                 songCount: (int)count,
@@ -288,6 +311,14 @@ public partial class TracksViewModel : ObservableRecipient, INavigationAware
 
             _offset += songs.Length;
             _allSongs.AddRange(items);
+
+            // Feed the fresh observation through the gate (corrects other open surfaces), then
+            // overlay the store onto these instances so a just-toggled id shows correctly.
+            _favorites.Reconcile(items.Select(s => (s.Id, s.IsStarred)), observation);
+            foreach (var s in items)
+            {
+                s.IsStarred = _favorites.IsStarred(s.Id);
+            }
 
             _nowPlayingTracker?.Refresh(force: true);
 
@@ -387,31 +418,7 @@ public partial class TracksViewModel : ObservableRecipient, INavigationAware
             return;
         }
 
-        var client = _subsonicClientService.Client;
-        if (client == null)
-        {
-            return;
-        }
-
-        var wasStarred = song.IsStarred;
-        song.IsStarred = !wasStarred;
-
-        try
-        {
-            if (wasStarred)
-            {
-                await client.UnstarAsync(id: song.Id);
-            }
-            else
-            {
-                await client.StarAsync(id: song.Id);
-            }
-        }
-        catch (Exception ex)
-        {
-            song.IsStarred = wasStarred;
-            _log.Warning("Failed to toggle star", new { SongId = song.Id, wasStarred }, ex);
-        }
+        await _favorites.ToggleAsync(song.Id, !song.IsStarred);
     }
 
     internal List<PlaybackTrack> BuildPlaybackTracks()

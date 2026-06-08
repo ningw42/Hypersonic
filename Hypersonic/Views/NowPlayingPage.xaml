@@ -1,5 +1,6 @@
 <Page
     x:Class="Hypersonic.Views.NowPlayingPage"
+    x:Name="NowPlayingPageRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -95,6 +96,21 @@
                            TextAlignment="Center"
                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                            Visibility="{x:Bind ViewModel.TechnicalDetail, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}"/>
+
+                <!-- Favorite — reuses the player-bar VM state so the two hearts stay in lockstep. -->
+                <Button HorizontalAlignment="Center" Margin="0,8,0,0"
+                        Command="{x:Bind Player.ToggleStarCommand}"
+                        IsEnabled="{x:Bind Player.HasTrack, Mode=OneWay}"
+                        Style="{StaticResource TransparentButtonStyle}"
+                        Width="40" Height="40"
+                        ToolTipService.ToolTip="Favorite">
+                    <FontIcon FontSize="18"
+                              Glyph="{x:Bind Player.IsStarred, Mode=OneWay,
+                                      Converter={StaticResource BoolToGlyphConverter},
+                                      ConverterParameter='&#xEB52;|&#xEB51;'}"
+                              Foreground="{x:Bind Player.IsStarred, Mode=OneWay,
+                                      Converter={StaticResource BoolToFavoriteBrushConverter}}"/>
+                </Button>
             </StackPanel>
         </StackPanel>
 
@@ -173,6 +189,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="240"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid Grid.Column="0" Width="48" Height="48" CornerRadius="2">
                                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="2">
@@ -205,6 +222,17 @@
                                            FontSize="12"
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                            VerticalAlignment="Center"/>
+
+                                <!-- Favorite (PlaybackTrack.IsStarred notifies; Mode=OneWay is required) -->
+                                <ToggleButton Grid.Column="4"
+                                              IsChecked="{x:Bind Track.IsStarred, Mode=OneWay}"
+                                              Padding="0" Width="32" Height="32" Margin="4,0,0,0"
+                                              VerticalAlignment="Center"
+                                              BorderThickness="0" Background="Transparent"
+                                              Style="{StaticResource FavoriteToggleButtonStyle}"
+                                              Command="{Binding Player.ToggleQueueItemStarCommand, ElementName=NowPlayingPageRoot}"
+                                              CommandParameter="{x:Bind}"
+                                              ToolTipService.ToolTip="Favorite"/>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

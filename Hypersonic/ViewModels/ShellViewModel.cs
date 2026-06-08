@@ -18,6 +18,7 @@ public partial class ShellViewModel : ObservableRecipient
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly IPlaybackService _playbackService;
     private readonly IAppStateService _appStateService;
+    private readonly IFavoritesService _favorites;
     private readonly ILogger _log;
     private CancellationTokenSource? _searchCts;
 
@@ -59,6 +60,7 @@ public partial class ShellViewModel : ObservableRecipient
         ISubsonicClientService subsonicClientService,
         IPlaybackService playbackService,
         IAppStateService appStateService,
+        IFavoritesService favoritesService,
         ILoggingService logService)
     {
         NavigationService = navigationService;
@@ -67,6 +69,7 @@ public partial class ShellViewModel : ObservableRecipient
         _subsonicClientService = subsonicClientService;
         _playbackService = playbackService;
         _appStateService = appStateService;
+        _favorites = favoritesService;
         _log = logService.GetLogger(nameof(ShellViewModel));
     }
 
@@ -247,6 +250,10 @@ public partial class ShellViewModel : ObservableRecipient
                     BitRate = item.BitRate,
                     BitDepth = item.BitDepth,
                     SamplingRate = item.SamplingRate,
+                    // Search suggestions carry no star field; seed from the store so a
+                    // search-played track that's already favorited shows starred immediately
+                    // (no future poll delta would otherwise ever fire for it).
+                    IsStarred = _favorites.IsStarred(item.Id),
                 };
                 _playbackService.PlayQueue([track], 0);
                 break;

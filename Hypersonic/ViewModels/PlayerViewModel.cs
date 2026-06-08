@@ -1,20 +1,22 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
+using Hypersonic.Messages;
 using Hypersonic.Models;
 
 using Microsoft.UI.Dispatching;
 
 namespace Hypersonic.ViewModels;
 
-public partial class PlayerViewModel : ObservableRecipient
+public partial class PlayerViewModel : ObservableRecipient, IRecipient<FavoritesChangedMessage>
 {
     private readonly IPlaybackService _playbackService;
     private readonly IAppStateService _appStateService;
-    private readonly ISubsonicClientService _subsonicClientService;
+    private readonly IFavoritesService _favorites;
     private readonly ILogger _log;
 
     private bool _isExternalUpdate;
@@ -137,22 +139,25 @@ public partial class PlayerViewModel : ObservableRecipient
     public PlayerViewModel(
         IPlaybackService playbackService,
         IAppStateService appStateService,
-        ISubsonicClientService subsonicClientService,
+        IFavoritesService favoritesService,
+        IMessenger messenger,
         ILoggingService logService)
-        : this(playbackService, appStateService, subsonicClientService, logService, createTimer: true)
+        : this(playbackService, appStateService, favoritesService, messenger, logService, createTimer: true)
     {
     }
 
     internal PlayerViewModel(
         IPlaybackService playbackService,
         IAppStateService appStateService,
-        ISubsonicClientService subsonicClientService,
+        IFavoritesService favoritesService,
+        IMessenger messenger,
         ILoggingService logService,
         bool createTimer)
+        : base(messenger)
     {
         _playbackService = playbackService;
         _appStateService = appStateService;
-        _subsonicClientService = subsonicClientService;
+        _favorites = favoritesService;
         _log = logService.GetLogger(nameof(PlayerViewModel));
         _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
         _playbackService.TrackChanged += OnTrackChanged;
@@ -199,6 +204,10 @@ public partial class PlayerViewModel : ObservableRecipient
             IsPlaying = _playbackService.IsPlaying;
             IsStarred = track.IsStarred;
         }
+
+        // Always-active subscriber: WeakReferenceMessenger holds this weakly, so an
+        // off-screen player still stays current and is collected with no explicit unregister.
+        IsActive = true;
     }
 
     /// <summary>
@@ -287,49 +296,47 @@ public partial class PlayerViewModel : ObservableRecipient
             return;
         }
 
-        var client = _subsonicClientService.Client;
-        if (client is null)
+        // Delegate to the single writer. The optimistic flip arrives back here reentrantly
+        // via the FavoritesChangedMessage broadcast (see Receive), so the heart updates
+        // instantly without any per-VM optimistic/revert code.
+        await _favorites.ToggleAsync(track.Id, !IsStarred);
+    }
+
+    [RelayCommand]
+    private async Task ToggleQueueItemStarAsync(QueueItem? item)
+    {
+        if (item?.Track is null || string.IsNullOrEmpty(item.Track.Id))
         {
             return;
         }
 
-        var wasStarred = IsStarred;
-        IsStarred = !wasStarred;
-        track.IsStarred = !wasStarred;
-
-        try
-        {
-            var response = wasStarred
-                ? await client.UnstarAsync(id: track.Id)
-                : await client.StarAsync(id: track.Id);
-
-            // Subsonic returns HTTP 200 even on logical failure (status="failed");
-            // the client only throws on transport errors, so check the status too.
-            if (response.Status == "failed")
-            {
-                RevertStar(track, wasStarred);
-                _log.Warning(
-                    "Star toggle returned a failed status",
-                    new { TrackId = track.Id, wasStarred, Code = response.Error?.Code, Message = response.Error?.Message });
-            }
-        }
-        catch (Exception ex)
-        {
-            RevertStar(track, wasStarred);
-            _log.Warning("Failed to toggle star", new { TrackId = track.Id, wasStarred }, ex);
-        }
+        await _favorites.ToggleAsync(item.Track.Id, !item.Track.IsStarred);
     }
 
     /// <summary>
-    /// Reverts a failed star toggle. Always restores the captured track's own state,
-    /// but only refreshes the visible heart from the <em>current</em> NowPlaying — if
-    /// playback advanced during the request, <see cref="OnTrackChanged"/> already
-    /// hydrated <see cref="IsStarred"/> for the new track and must not be clobbered.
+    /// Reacts to a star change broadcast by <c>FavoritesService</c>. Updates only the
+    /// instances this VM owns: every effective-queue <see cref="PlaybackTrack"/> whose id is
+    /// in the message (which redraws the bound queue rows), and the player mirror
+    /// <see cref="IsStarred"/> only when the now-playing track is in the message — so a revert
+    /// that lands after playback advanced never clobbers the new track's heart.
     /// </summary>
-    private void RevertStar(PlaybackTrack track, bool wasStarred)
+    public void Receive(FavoritesChangedMessage message)
     {
-        track.IsStarred = wasStarred;
-        IsStarred = _playbackService.NowPlaying?.IsStarred ?? false;
+        var ids = message.Ids as IReadOnlySet<string> ?? new HashSet<string>(message.Ids);
+
+        foreach (var track in _playbackService.GetEffectiveQueue())
+        {
+            if (ids.Contains(track.Id))
+            {
+                track.IsStarred = message.IsStarred;
+            }
+        }
+
+        var nowPlaying = _playbackService.NowPlaying;
+        if (nowPlaying is not null && ids.Contains(nowPlaying.Id))
+        {
+            IsStarred = message.IsStarred;
+        }
     }
 
     public event EventHandler? NowPlayingMetadataChanged;

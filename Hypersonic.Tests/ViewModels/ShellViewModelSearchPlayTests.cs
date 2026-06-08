@@ -129,6 +129,7 @@ public class ShellViewModelSearchPlayTests
             new FakeSubsonicClientService(),
             playback,
             new FakeAppStateService(),
+            new Hypersonic.Tests.Fakes.FakeFavoritesService(),
             new NullLoggingService());
 
         var item = new SearchSuggestionItem
@@ -176,6 +177,7 @@ public class ShellViewModelSearchPlayTests
             new FakeSubsonicClientService(),
             playback,
             new FakeAppStateService(),
+            new Hypersonic.Tests.Fakes.FakeFavoritesService(),
             new NullLoggingService());
 
         var item = new SearchSuggestionItem
@@ -199,5 +201,39 @@ public class ShellViewModelSearchPlayTests
         Assert.AreEqual(4608, track.BitRate);
         Assert.AreEqual(24, track.BitDepth);
         Assert.AreEqual(96000, track.SamplingRate);
+    }
+
+    [TestMethod]
+    public void HandleSuggestionChosen_Song_HydratesIsStarredFromStore()
+    {
+        // Search suggestions carry no star field. If the store already knows the song is
+        // starred, the search-played track must show favorited even though no poll delta fires.
+        var messenger = new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger();
+        var favorites = new Hypersonic.Services.FavoritesService(
+            new FakeSubsonicClientService(), new NullLoggingService(), messenger);
+        favorites.Reconcile(new[] { ("s1", true) }, favorites.BeginObservation());   // seed store
+
+        var playback = new CapturingPlaybackService();
+        var vm = new ShellViewModel(
+            new FakeNavigationService(),
+            new FakeNavigationViewService(),
+            new FakeSubsonicClientService(),
+            playback,
+            new FakeAppStateService(),
+            favorites,
+            new NullLoggingService());
+
+        vm.HandleSuggestionChosen(new SearchSuggestionItem
+        {
+            Type = SearchResultType.Song,
+            Id = "s1",
+            PrimaryText = "Starred Song",
+            Artist = "Artist",
+            Album = "Album",
+        });
+
+        Assert.AreEqual(1, playback.LastPlayedTracks.Count);
+        Assert.IsTrue(playback.LastPlayedTracks[0].IsStarred,
+            "PlaybackTrack.IsStarred hydrates from the store at creation");
     }
 }

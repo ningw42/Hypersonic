@@ -119,6 +119,8 @@ public class PlaybackTrackPropagationTests
             new FakeSubsonicClientService(),
             new FakePlaybackService(),
             new FakeNavigationService(),
+            new Hypersonic.Tests.Fakes.FakeFavoritesService(),
+            new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger(),
             new NullLoggingService());
 
         vm._allSongs = [CreateMultiArtistSong()];
@@ -144,6 +146,8 @@ public class PlaybackTrackPropagationTests
         var vm = new PlaylistDetailViewModel(
             new FakeSubsonicClientService(),
             new FakePlaybackService(),
+            new Hypersonic.Tests.Fakes.FakeFavoritesService(),
+            new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger(),
             new NullLoggingService());
 
         vm._allSongs = [CreateMultiArtistSong()];
@@ -167,6 +171,8 @@ public class PlaybackTrackPropagationTests
             new FakeSubsonicClientService(),
             new FakePlaybackService(),
             new FakeNavigationService(),
+            new Hypersonic.Tests.Fakes.FakeFavoritesService(),
+            new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger(),
             new NullLoggingService());
 
         var song = new SongInfo
@@ -214,6 +220,8 @@ public class PlaybackTrackPropagationTests
             new FakeSubsonicClientService(),
             new FakePlaybackService(),
             new FakeNavigationService(),
+            new Hypersonic.Tests.Fakes.FakeFavoritesService(),
+            new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger(),
             new NullLoggingService());
         vm._allSongs = [CreateTechnicalSong()];
         vm.AlbumName = "Album";
@@ -232,6 +240,8 @@ public class PlaybackTrackPropagationTests
         var vm = new PlaylistDetailViewModel(
             new FakeSubsonicClientService(),
             new FakePlaybackService(),
+            new Hypersonic.Tests.Fakes.FakeFavoritesService(),
+            new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger(),
             new NullLoggingService());
         vm._allSongs = [CreateTechnicalSong()];
 

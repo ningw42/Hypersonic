@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
@@ -10,15 +11,17 @@ using Hypersonic.Core.Helpers;
 using Hypersonic.Contracts.ViewModels;
 using Hypersonic.Core.Models;
 using Hypersonic.Helpers;
+using Hypersonic.Messages;
 using Hypersonic.Models;
 
 namespace Hypersonic.ViewModels;
 
-public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAware
+public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAware, IRecipient<FavoritesChangedMessage>
 {
     private readonly ISubsonicClientService _subsonicClientService;
     private readonly INavigationService _navigationService;
     private readonly IPlaybackService _playbackService;
+    private readonly IFavoritesService _favorites;
     private readonly ILogger _log;
     private List<AlbumInfo> _allAlbums = [];
     private List<SongInfo> _communityTopSongs = [];
@@ -118,12 +121,41 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
         ISubsonicClientService subsonicClientService,
         INavigationService navigationService,
         IPlaybackService playbackService,
+        IFavoritesService favoritesService,
+        IMessenger messenger,
         ILoggingService logService)
+        : base(messenger)
     {
         _subsonicClientService = subsonicClientService;
         _navigationService = navigationService;
         _playbackService = playbackService;
+        _favorites = favoritesService;
         _log = logService.GetLogger(nameof(ArtistDetailViewModel));
+        IsActive = true;
+    }
+
+    /// <summary>
+    /// Updates every owned <see cref="SongInfo"/> whose id is in a star-change broadcast —
+    /// across both the community and personal top-song lists (which is why the within-VM
+    /// <c>SyncStarInBothCaches</c> is gone; the broadcast covers both).
+    /// </summary>
+    public void Receive(FavoritesChangedMessage message)
+    {
+        var ids = message.Ids as IReadOnlySet<string> ?? new HashSet<string>(message.Ids);
+        foreach (var song in _communityTopSongs)
+        {
+            if (ids.Contains(song.Id))
+            {
+                song.IsStarred = message.IsStarred;
+            }
+        }
+        foreach (var song in _personalTopSongs)
+        {
+            if (ids.Contains(song.Id))
+            {
+                song.IsStarred = message.IsStarred;
+            }
+        }
     }
 
     public async void OnNavigatedTo(object parameter)
@@ -229,34 +261,7 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
             return;
         }
 
-        var client = _subsonicClientService.Client;
-        if (client == null)
-        {
-            return;
-        }
-
-        var wasStarred = song.IsStarred;
-        song.IsStarred = !wasStarred;
-
-        SyncStarInBothCaches(song.Id, !wasStarred);
-
-        try
-        {
-            if (wasStarred)
-            {
-                await client.UnstarAsync(id: song.Id);
-            }
-            else
-            {
-                await client.StarAsync(id: song.Id);
-            }
-        }
-        catch (Exception ex)
-        {
-            song.IsStarred = wasStarred;
-            SyncStarInBothCaches(song.Id, wasStarred);
-            _log.Warning("Failed to toggle star", new { SongId = song.Id, wasStarred }, ex);
-        }
+        await _favorites.ToggleAsync(song.Id, !song.IsStarred);
     }
 
     internal async Task LoadArtistAsync(string artistId)
@@ -372,6 +377,9 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 
         try
         {
+            // Capture before the fetches so a concurrent toggle is protected by the write gate.
+            var observation = _favorites.BeginObservation();
+
             var communityTask = LoadCommunityTopSongsAsync(client);
             var personalTask = LoadPersonalTopSongsAsync(client, artistId);
 
@@ -379,6 +387,15 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
 
             _communityTopSongs = communityTask.Result;
             _personalTopSongs = personalTask.Result;
+
+            // Reconcile both lists' fresh observations through the gate, then overlay the store
+            // onto every instance (covers ids that appear in both the community and personal lists).
+            var allTopSongs = _communityTopSongs.Concat(_personalTopSongs).ToList();
+            _favorites.Reconcile(allTopSongs.Select(s => (s.Id, s.IsStarred)), observation);
+            foreach (var s in allTopSongs)
+            {
+                s.IsStarred = _favorites.IsStarred(s.Id);
+            }
 
             IsCommunityAvailable = _communityTopSongs.Count > 0;
             IsPersonalAvailable = _personalTopSongs.Count > 0;
@@ -554,25 +571,6 @@ public partial class ArtistDetailViewModel : ObservableRecipient, INavigationAwa
         foreach (var song in source)
         {
             TopSongs.Add(song);
-        }
-    }
-
-    private void SyncStarInBothCaches(string songId, bool isStarred)
-    {
-        foreach (var song in _communityTopSongs)
-        {
-            if (song.Id == songId)
-            {
-                song.IsStarred = isStarred;
-            }
-        }
-
-        foreach (var song in _personalTopSongs)
-        {
-            if (song.Id == songId)
-            {
-                song.IsStarred = isStarred;
-            }
         }
     }
 

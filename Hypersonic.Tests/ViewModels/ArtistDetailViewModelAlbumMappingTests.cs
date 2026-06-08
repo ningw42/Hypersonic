@@ -187,10 +187,14 @@ public class ArtistDetailViewModelAlbumMappingTests
         };
 
         var clientService = new FakeSubsonicClientService { Client = fakeClient };
+        var messenger = new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger();
+        var favorites = new Hypersonic.Services.FavoritesService(clientService, new NullLoggingService(), messenger);
         var vm = new ArtistDetailViewModel(
             clientService,
             new FakeNavigationService(),
             new NullPlaybackService(),
+            favorites,
+            messenger,
             new NullLoggingService());
 
         await vm.LoadArtistAsync("ar1");

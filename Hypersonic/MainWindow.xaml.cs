@@ -43,6 +43,11 @@ public sealed partial class MainWindow : WindowEx
         SizeChanged += MainWindow_SizeChanged;
         AppWindow.Changed += AppWindow_Changed;
         AppWindow.Closing += AppWindow_Closing;
+
+        // Dedicated window-activation hook for favorites polling — separate from ShellPage's
+        // transient titlebar Activated handler, so a recreated shell can't leak a stale
+        // subscription on this single long-lived window.
+        Activated += MainWindow_Activated;
     }
 
     private void EnsureAppStateService()
@@ -132,6 +137,26 @@ public sealed partial class MainWindow : WindowEx
             WriteWindowState(sync: true);
 
             this.Hide(enableEfficiencyMode: false);
+        }
+    }
+
+    private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated)
+        {
+            return;
+        }
+
+        // Re-poll starred state on window activation to catch external stars (Navidrome web,
+        // another device). Resolve lazily: App.MainWindow is constructed before the DI host,
+        // so a constructor-time resolve would be premature. No-ops cleanly if disconnected.
+        try
+        {
+            _ = App.GetService<IFavoritesService>().RefreshAsync();
+        }
+        catch
+        {
+            // DI host / service not available during very early activation.
         }
     }
 

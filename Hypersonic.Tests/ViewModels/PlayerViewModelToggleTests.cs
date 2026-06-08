@@ -84,7 +84,7 @@ public class PlayerViewModelToggleTests
     {
         var playback = new FakePlaybackService();
         var appState = new FakeAppStateService();
-        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
+        var vm = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeFavoritesService(), new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
         return (vm, playback, appState);
     }
 
@@ -178,7 +178,7 @@ public class PlayerViewModelToggleTests
         };
         var appState = new FakeAppStateService();
 
-        _ = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeSubsonicClientService(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
+        _ = new PlayerViewModel(playback, appState, new Hypersonic.Tests.Fakes.FakeFavoritesService(), new CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger(), new Hypersonic.Tests.Fakes.NullLoggingService(), createTimer: false);
 
         Assert.AreEqual(0, appState.PlaybackSaveCount, "Hydration must not trigger saves");
     }
