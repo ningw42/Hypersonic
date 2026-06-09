@@ -188,7 +188,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="240"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="60"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid Grid.Column="0" Width="48" Height="48" CornerRadius="2">
@@ -221,6 +221,8 @@
                                            Text="{x:Bind Track.Duration, Converter={StaticResource SecondsToTimeConverter}}"
                                            FontSize="12"
                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                           HorizontalAlignment="Stretch"
+                                           TextAlignment="Right"
                                            VerticalAlignment="Center"/>
 
                                 <!-- Favorite (PlaybackTrack.IsStarred notifies; Mode=OneWay is required) -->
