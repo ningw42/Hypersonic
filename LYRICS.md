@@ -46,14 +46,16 @@ No behavior, no parsing — just types and validation invariants (monotonic time
 
 ### Phase 1 — Lyrics provider + service (`Hypersonic.Core` + `Hypersonic`)
 
-- `ILyricsProvider` — one source, returns `Lyrics?` for a given track. Stateless.
-- `LyricsService` — orchestrator. Holds ordered provider list (DI), owns the disk cache, owns the fallback policy.
+- `ILyricsProvider` — one source. Fetches a track's lyrics, surfacing both the parsed `Lyrics?` (to rank providers) and the raw payload + its format (what the cache persists and later re-parses). Stateless.
+- `LyricsService` — orchestrator and cache **policy layer**, the analog of `CachedImageService`. Holds the ordered provider list (DI) and the fallback policy; delegates all persistence — index row and payload file alike — to a `SqliteLyricsCacheStore`.
 - Providers, in priority order:
   1. `SubsonicLyricsProvider` — wraps existing `getLyricsBySongId` call, adapts `StructuredLyrics` → `Lyrics`.
   2. `LrcLibLyricsProvider` — `https://lrclib.net/api/get` line-synced LRC.
   3. *(Deferred)* `NeteaseLyricsProvider`, `AmllTtmlDbLyricsProvider` — word-synced sources.
 - Fallback policy: **quality-tiered with time budget**. Try providers concurrently up to a timeout; prefer `Word > Line > Plain`; first-result wins within a tier. Bias toward word-sync when available.
-- Cache: per-track JSON at `Lyrics/{songId}.json` via existing `IFileService`. Keyed by Subsonic song ID. No EF/SQLite (overkill at this scale).
+- Cache: **mirror the cover-art cache, end to end.** Lyrics get the same two-part shape as images — a policy layer (`LyricsService`, mirroring `CachedImageService`) over a SQLite-backed store (`SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEntry>`, payload subfolder `"Lyrics"`, mirroring `SqliteImageCacheStore`). The shared base owns both halves: the SQLite **category index** (schema/migration, the write gate, LRU eviction, reconcile, negative-cache rows for no-lyrics-found, self-heal) and the payload-file lifecycle (atomic temp-file write + rename via `WritePayloadAsync`, URI lookup via `TryGetPayloadUriAsync`). The subclass supplies only the schema/column mapping.
+  - **Payload is the raw provider response, parsed on read — not a serialized `Lyrics`.** Store exactly what the provider returned (lrclib LRC, AMLL TTML, NetEase YRC, the Subsonic `StructuredLyrics` body) byte-for-byte, the way the image cache stores raw image bytes; the payload file's extension reflects that format and the store's filename predicate recognizes it, mirroring how `SqliteImageCacheStore` recognizes image extensions. The `Lyrics` container is rebuilt by running the format's parser (chosen from the stored format, independent of the network provider) over the raw bytes on each cache read — once per track load — and is never itself persisted, so the cached source of truth stays lossless and the `Lyrics` model can gain fields without touching the cache.
+  - **Index row:** keyed by Subsonic song ID; carries the metadata needed to pick the read-time parser and make cache decisions without touching disk — source provider, payload format, sync kind (`Word | Line | Plain | None`), language, offset ms — plus the standard `CreatedAt / LastAccess / ExpiresAt` lifecycle columns and the payload file name.
 - Migrate existing `NowPlayingViewModel` fetch/cache logic into `LyricsService`. **Open call:** singleton service feeding singleton `PlayerViewModel` (preferred), vs leaving lyrics scoped to `NowPlayingViewModel`. Decide before Phase 3.
 
 ### Phase 2 — Win2D lyrics control (`Hypersonic`)
@@ -99,3 +101,4 @@ With Phase 1 already shipped, the control can be exercised against real provider
 - lrclib API: https://lrclib.net/docs
 - AMLL TTML DB: https://github.com/Steve-xmh/amll-ttml-db
 - Existing Hypersonic surface (verified): `Hypersonic.Client/SubsonicClient.cs:455-458` (`GetLyricsBySongIdAsync`), `Hypersonic.Client/Models/Entities/StructuredLyrics.cs`, `Hypersonic/ViewModels/NowPlayingViewModel.cs` (existing fetch/cache).
+- Cache pattern to mirror (verified): `Hypersonic/Services/CachedImageService.cs` (per-entity policy layer), `Hypersonic/Services/SqliteImageCacheStore.cs` (image subclass), `Hypersonic/Services/Cache/SqliteCacheStoreBase.cs` (generic SQLite category store — gate, eviction, reconcile, negative-cache, self-heal). Lyrics add a parallel `SqliteLyricsCacheStore` subclass.
