@@ -29,7 +29,7 @@ The lyrics surface is a **Win2D `CanvasAnimatedControl` embedded inside the exis
 
 ## 2. Task split
 
-Four phases, each independently shippable to `master`. Order is mandatory: the data model defines the contracts both ends depend on; providers/service land before the renderer so the renderer can be exercised against real fetched data; integration is last.
+A phased split, each phase independently shippable to `master`. Order is mandatory: the data model defines the contracts both ends depend on; providers/service land before the renderer so the renderer can be exercised against real fetched data; integration is last. (Phase 1 carries a 1.5 fast-follow for external providers + concurrency.)
 
 ### Phase 0 — Data model (`Hypersonic.Core`) — ✅ shipped
 
@@ -46,17 +46,26 @@ No behavior, no parsing — just types and validation invariants (monotonic time
 
 ### Phase 1 — Lyrics provider + service (`Hypersonic.Core` + `Hypersonic`)
 
-- `ILyricsProvider` — one source. Fetches a track's lyrics, surfacing both the parsed `Lyrics?` (to rank providers) and the raw payload + its format (what the cache persists and later re-parses). Stateless.
-- `LyricsService` — orchestrator and cache **policy layer**, the analog of `CachedImageService`. Holds the ordered provider list (DI) and the fallback policy; delegates all persistence — index row and payload file alike — to a `SqliteLyricsCacheStore`.
-- Providers, in priority order:
-  1. `SubsonicLyricsProvider` — wraps existing `getLyricsBySongId` call, adapts `StructuredLyrics` → `Lyrics`.
-  2. `LrcLibLyricsProvider` — `https://lrclib.net/api/get` line-synced LRC.
-  3. *(Deferred)* `NeteaseLyricsProvider`, `AmllTtmlDbLyricsProvider` — word-synced sources.
-- Fallback policy: **quality-tiered with time budget**. Try providers concurrently up to a timeout; prefer `Word > Line > Plain`; first-result wins within a tier. Bias toward word-sync when available.
-- Cache: **mirror the cover-art cache, end to end.** Lyrics get the same two-part shape as images — a policy layer (`LyricsService`, mirroring `CachedImageService`) over a SQLite-backed store (`SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEntry>`, payload subfolder `"Lyrics"`, mirroring `SqliteImageCacheStore`). The shared base owns both halves: the SQLite **category index** (schema/migration, the write gate, LRU eviction, reconcile, negative-cache rows for no-lyrics-found, self-heal) and the payload-file lifecycle (atomic temp-file write + rename via `WritePayloadAsync`, URI lookup via `TryGetPayloadUriAsync`). The subclass supplies only the schema/column mapping.
-  - **Payload is the raw provider response, parsed on read — not a serialized `Lyrics`.** Store exactly what the provider returned (lrclib LRC, AMLL TTML, NetEase YRC, the Subsonic `StructuredLyrics` body) byte-for-byte, the way the image cache stores raw image bytes; the payload file's extension reflects that format and the store's filename predicate recognizes it, mirroring how `SqliteImageCacheStore` recognizes image extensions. The `Lyrics` container is rebuilt by running the format's parser (chosen from the stored format, independent of the network provider) over the raw bytes on each cache read — once per track load — and is never itself persisted, so the cached source of truth stays lossless and the `Lyrics` model can gain fields without touching the cache.
-  - **Index row:** keyed by Subsonic song ID; carries the metadata needed to pick the read-time parser and make cache decisions without touching disk — source provider, payload format, sync kind (`Word | Line | Plain | None`), language, offset ms — plus the standard `CreatedAt / LastAccess / ExpiresAt` lifecycle columns and the payload file name.
-- Migrate existing `NowPlayingViewModel` fetch/cache logic into `LyricsService`. **Open call:** singleton service feeding singleton `PlayerViewModel` (preferred), vs leaving lyrics scoped to `NowPlayingViewModel`. Decide before Phase 3.
+> **Source of truth:** [`docs/design/service/2026-06-09-lyrics-provider-service.md`](docs/design/service/2026-06-09-lyrics-provider-service.md). This slice builds the full provider/service/durable-cache architecture but ships **only the Subsonic source, fetched sequentially**; external providers + concurrency move to Phase 1.5. Where the bullets below and the design doc diverge, the design doc wins.
+
+- `ILyricsProvider` — **one real source, self-contained.** A provider owns its internal endpoint fallback and format selection and returns its single best result: the parsed + validated `LyricsDocument`, the raw payload + format tag, and a `definitive` bit. Stateless.
+- `SubsonicLyricsProvider` — the one source this phase. Hosts the structured (`getLyricsBySongId`) → legacy (`getLyrics`) fallback **internally**; today's `LyricsFetchPolicy.Combine` relocates here (the semantics are Subsonic-specific), not into the cross-provider policy.
+- `LyricsService` (singleton) — orchestrator and cache **policy layer**, the analog of `CachedImageService`. Holds the ordered provider list (DI) and the cross-provider fallback policy, with in-flight dedup by key; delegates all persistence to `SqliteLyricsCacheStore`.
+- Fallback policy: **sequential** this phase — walk providers in priority order, first usable Content wins; positive-cache gated by the `definitive` bit; negative-cache only when every provider was definitive (any transient blocks it). Generalizes `Combine` to N providers. The concurrent quality-tiered variant (time budget, cross-provider `Word > Line > Plain` ranking) is **Phase 1.5**.
+- Parsing: a format → parser registry rebuilds `LyricsDocument` from raw bytes, shared by the provider (fetch time) and the cache (read time). Interface + registry live in Core; the two Subsonic parsers live in `Hypersonic` (they reuse `Hypersonic.Client` DTOs), keeping Core dependency-free.
+- Cache: **mirror the cover-art cache, end to end.** A policy layer (`LyricsService`, mirroring `CachedImageService`) over a SQLite-backed store (`SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEntry>`, payload subfolder `"Lyrics"`, mirroring `SqliteImageCacheStore`). The shared base owns both halves: the SQLite **category index** (schema/migration, write gate, LRU eviction, reconcile, negative-cache rows for no-lyrics-found, self-heal) and the payload-file lifecycle. The subclass supplies schema/column mapping plus a `ReadPayloadAsync` (entry + bytes) for in-process parse-on-read — lyrics need the bytes, not the file URI that images hand to XAML.
+  - **Payload is the raw provider response, parsed on read — not a serialized `LyricsDocument`.** Store exactly what the provider returned (the Subsonic `StructuredLyrics` body now; lrclib LRC, AMLL TTML, NetEase YRC later) byte-for-byte; the payload file's extension reflects that format and the store's filename predicate recognizes it. The `LyricsDocument` is rebuilt by the format's parser over the raw bytes on each cache read and is never itself persisted, so the cached source of truth stays lossless and the model can gain fields without touching the cache.
+  - **Index row:** keyed by the image cache's Subsonic scope — **server hash + active-user identity hash + song-id hash** (not the bare song id, which is unique only within one server + account). Carries source provider, payload format, sync kind (`Word | Line | Plain | None`), language, offset ms — plus `CreatedAt / LastAccess / ExpiresAt` lifecycle columns and the payload file name. Positive TTL long; negative TTL shorter so a track that later gains lyrics gets re-checked.
+- Migrate existing `NowPlayingViewModel` fetch/cache logic into `LyricsService`; the VM becomes a pure consumer of the singleton service and gains a `CurrentLyrics` (`LyricsDocument?`) for the Phase 2 renderer. Whether `PlayerViewModel` also consumes the service is the **Phase 3** call.
+
+### Phase 1.5 — External providers + concurrency (`Hypersonic`) — fast-follow
+
+Same `ILyricsProvider` contract and parser registry; only the service's orchestration strategy changes, so this is purely additive.
+
+- `LrcLibLyricsProvider` — `https://lrclib.net/api/get` (returns synced + plain in one response; the provider picks its best internally — one source, not two sub-providers).
+- *(Deferred further)* `NeteaseLyricsProvider`, `AmllTtmlDbLyricsProvider` — word-synced sources.
+- Fallback policy upgrades to **concurrent quality-tiered with a time budget**: fan out, prefer `Word > Line > Plain`, first-result wins within a tier.
+- `IHttpClientFactory` registration — needed once providers make their own outbound HTTP.
 
 ### Phase 2 — Win2D lyrics control (`Hypersonic`)
 
@@ -83,10 +92,10 @@ With Phase 1 already shipped, the control can be exercised against real provider
 ## 3. Risks and open questions
 
 - **`CanvasAnimatedControl` text layout perf** — validated by BetterLyrics on similar hardware, but worth a Phase 2 smoke test before building the full effect stack.
-- **Lyrics state ownership** — service-owned (singleton, feeds `PlayerViewModel`) vs page-owned (scoped to `NowPlayingViewModel`). Decide before Phase 3 starts.
-- **Provider-result schema for word-sync** — `Lyrics` model is fixed in Phase 0, so word-sync providers in Phase 1 must conform. Confirm AMLL TTML and NetEase YRC both map cleanly to `LyricsLine`/`LyricsWord` during the Phase 0 design.
+- **Lyrics state ownership** — resolved for Phase 1: a singleton `LyricsService` is consumed by `NowPlayingViewModel` (a pure subscriber). Whether `PlayerViewModel` also consumes it remains the **Phase 3** call.
+- **Provider-result schema for word-sync** — `LyricsDocument` is fixed in Phase 0, so the word-sync providers (Phase 1.5) must conform. AMLL TTML and NetEase YRC were confirmed to map cleanly to `LyricsLine`/`LyricsWord` during the Phase 0 design; Subsonic structured is `Line`/`Plain` only.
 - **Legal posture of external providers** — lrclib and AMLL (CC0/MIT) ship by default. NetEase/QQ Music gated behind a settings toggle, off by default.
-- **`HttpClient` fan-out** — each `SubsonicClient` currently owns its own `HttpClient`. Introduce `IHttpClientFactory` registration before Phase 1 to avoid socket exhaustion as provider count grows.
+- **`HttpClient` fan-out** — each `SubsonicClient` currently owns its own `HttpClient`. Subsonic-only Phase 1 makes no new outbound HTTP; introduce `IHttpClientFactory` before **Phase 1.5**, when external providers start making their own requests.
 
 ---
 
