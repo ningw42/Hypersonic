@@ -62,11 +62,13 @@ No behavior, no parsing — just types and validation invariants (monotonic time
 
 ### Phase 1.5 — External providers + concurrency (`Hypersonic`) — fast-follow
 
-Same `ILyricsProvider` contract and parser registry; only the service's orchestration strategy changes, so this is purely additive.
+> **Source of truth:** [`docs/design/service/2026-06-10-lyrics-lrclib-provider.md`](docs/design/service/2026-06-10-lyrics-lrclib-provider.md). Same `ILyricsProvider` contract and parser registry; only the service's orchestration strategy + public surface change, so this is purely additive. Where these bullets and the design doc diverge, the design doc wins.
 
-- `LrcLibLyricsProvider` — `https://lrclib.net/api/get` (returns synced + plain in one response; the provider picks its best internally — one source, not two sub-providers).
-- *(Deferred further)* `NeteaseLyricsProvider`, `AmllTtmlDbLyricsProvider` — word-synced sources.
-- Fallback policy upgrades to **concurrent quality-tiered with a time budget**: fan out, prefer `Word > Line > Plain`, first-result wins within a tier.
+- `LrcLibLyricsProvider` — self-contained external source: `https://lrclib.net/api/get` (track + artist required; album/duration sent as optional filters when available) with an internal `/api/search` fallback (track+artist query, album/duration used only in client-side ranking) for metadata-variant resilience; picks its single best result (synced → `Line`, plain → `Plain`, empty/instrumental → definitively empty). Two new **Core** parsers: `lrclib-synced` (LRC, honors `[offset:]`) and `lrclib-plain`.
+- *(Deferred further)* `NeteaseLyricsProvider`, `AmllTtmlDbLyricsProvider` — word-synced sources, with their legal-posture settings toggle.
+- Fallback policy upgrades to **concurrent quality-tiered with a per-call time budget**: fan out, prefer `Word > Line > Plain`, early-exit on all-complete or top-tier; Subsonic wins an equal-tier tie (registration order).
+- Caching for the concurrent outcome: **eager-pin the positive winner at full TTL**, suppress the negative write when a peer was truncated; a **manual force-refresh** (large budget, cache-overwrite) is the on-demand recovery path. The `GetLyricsAsync` surface gains optional `budget` + `forceRefresh`; the refresh **button UI is Phase 3**. (Background cache-upgrade noted as a future enhancement.)
+- External lookup ships **always on, no settings toggle** (lrclib is CC0/openly accessible); the privacy/legal gate arrives with NetEase/QQ.
 - `IHttpClientFactory` registration — needed once providers make their own outbound HTTP.
 
 ### Phase 2 — Win2D lyrics control (`Hypersonic`)
