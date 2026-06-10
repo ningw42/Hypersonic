@@ -5,6 +5,7 @@ using Hypersonic.Client;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
+using Hypersonic.Services.Cache;
 
 namespace Hypersonic.Services;
 
@@ -56,10 +57,10 @@ internal sealed class SubsonicImageResolver : IImageResolver
         key = new ImageCacheKey(
             image.Provider,
             image.Kind,
-            GetSubsonicServerHash(_subsonicClientService.Client),
-            Hash(_subsonicClientService.ActiveUserIdentity),
-            Hash(image.Identity),
-            Hash(image.Version ?? string.Empty),
+            SubsonicCacheScope.GetServerHash(_subsonicClientService.Client),
+            SubsonicCacheScope.Hash(_subsonicClientService.ActiveUserIdentity),
+            SubsonicCacheScope.Hash(image.Identity),
+            SubsonicCacheScope.Hash(image.Version ?? string.Empty),
             options.NormalizedSize);
 
         _log.Debug(
@@ -82,60 +83,6 @@ internal sealed class SubsonicImageResolver : IImageResolver
             ?? throw new InvalidOperationException("No Subsonic client is available.");
 
         return client.GetCoverArtAsync(image.Identity, options.NormalizedSize);
-    }
-
-    private static string GetSubsonicServerHash(ISubsonicClient client)
-    {
-        if (client is SubsonicClient subsonicClient)
-        {
-            return Hash(NormalizeUri(subsonicClient.BaseUri, removeLastPathSegment: false));
-        }
-
-        try
-        {
-            var probe = client.GetCoverArtUri("__hypersonic_cache_probe__", "1");
-            return Hash(NormalizeUri(probe, removeLastPathSegment: true));
-        }
-        catch
-        {
-            return Hash(client.GetType().FullName ?? "unknown-subsonic-client");
-        }
-    }
-
-    private static string NormalizeUri(string uri, bool removeLastPathSegment)
-    {
-        return Uri.TryCreate(uri, UriKind.Absolute, out var parsed)
-            ? NormalizeUri(parsed, removeLastPathSegment)
-            : uri.Trim().TrimEnd('/').ToLowerInvariant();
-    }
-
-    private static string NormalizeUri(Uri uri, bool removeLastPathSegment)
-    {
-        var builder = new UriBuilder(uri)
-        {
-            UserName = string.Empty,
-            Password = string.Empty,
-            Fragment = string.Empty,
-            Query = string.Empty,
-            Scheme = uri.Scheme.ToLowerInvariant(),
-            Host = uri.Host.ToLowerInvariant(),
-        };
-
-        var path = builder.Path.TrimEnd('/');
-        if (removeLastPathSegment)
-        {
-            var lastSlash = path.LastIndexOf('/');
-            path = lastSlash > 0 ? path[..lastSlash] : string.Empty;
-        }
-
-        builder.Path = path;
-        return builder.Uri.GetComponents(UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.Unescaped).TrimEnd('/');
-    }
-
-    private static string Hash(string value)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static string Short(string hash) => hash.Length >= 8 ? hash[..8] : hash;

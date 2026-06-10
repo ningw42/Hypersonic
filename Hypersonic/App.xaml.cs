@@ -1,12 +1,15 @@
 using Hypersonic.Activation;
 using Hypersonic.Contracts.Services;
+using Hypersonic.Core.Contracts.Lyrics;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Core.Services;
+using Hypersonic.Core.Services.Lyrics;
 using Hypersonic.Core.Services.Logging;
 using Hypersonic.Helpers;
 using Hypersonic.Models;
 using Hypersonic.Services;
+using Hypersonic.Services.Lyrics;
 using Hypersonic.ViewModels;
 using Hypersonic.Views;
 
@@ -109,6 +112,16 @@ public partial class App : Application
             services.AddSingleton<IAppFolderLocator, AppFolderLocator>();
             services.AddSingleton<IImageCacheStore, SqliteImageCacheStore>();
             services.AddSingleton<IImageService, CachedImageService>();
+
+            // Lyrics: durable cache store, the shared parser registry, the parsers, the providers (in
+            // priority order, so the service receives an ordered IEnumerable), and the orchestrator.
+            services.AddSingleton<ILyricsCacheStore, SqliteLyricsCacheStore>();
+            services.AddSingleton<ILyricsParserRegistry, LyricsParserRegistry>();
+            services.AddSingleton<ILyricsPayloadParser, SubsonicStructuredLyricsParser>();
+            services.AddSingleton<ILyricsPayloadParser, SubsonicLegacyLyricsParser>();
+            services.AddSingleton<ILyricsProvider, SubsonicLyricsProvider>();
+            services.AddSingleton<ILyricsService, LyricsService>();
+
             services.AddSingleton<IPlaybackService, PlaybackService>();
             services.AddSingleton<ITaskbarService, TaskbarService>();
             services.AddSingleton<ITrayIconService, TrayIconService>();
@@ -154,6 +167,7 @@ public partial class App : Application
             // Configuration
             services.Configure<LocalSettingsOptions>(context.Configuration.GetSection(nameof(LocalSettingsOptions)));
             services.Configure<ImageCacheOptions>(context.Configuration.GetSection(nameof(ImageCacheOptions)));
+            services.Configure<LyricsCacheOptions>(context.Configuration.GetSection(nameof(LyricsCacheOptions)));
         }).
         Build();
 
@@ -172,6 +186,7 @@ public partial class App : Application
 
         await App.GetService<IActivationService>().ActivateAsync(args);
         _ = ReconcileImageCacheAsync();
+        _ = ReconcileLyricsCacheAsync();
     }
 
     private static async Task ReconcileImageCacheAsync()
@@ -188,6 +203,23 @@ public partial class App : Application
             App.GetService<ILoggingService>()
                 .GetLogger(nameof(App))
                 .Warning("Image cache reconciliation failed", exception: ex);
+        }
+    }
+
+    private static async Task ReconcileLyricsCacheAsync()
+    {
+        try
+        {
+            await App.GetService<ILyricsService>().ReconcileAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            App.GetService<ILoggingService>()
+                .GetLogger(nameof(App))
+                .Warning("Lyrics cache reconciliation failed", exception: ex);
         }
     }
 }

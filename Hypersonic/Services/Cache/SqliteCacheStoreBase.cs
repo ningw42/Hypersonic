@@ -486,6 +486,72 @@ public abstract class SqliteCacheStoreBase<TEntry> : IDisposable
     }
 
     /// <summary>
+    /// Reads a key hash's index row and payload bytes together, under the gate, so the pair is
+    /// atomic with respect to eviction and orphan-row cleanup. Returns <c>null</c> on miss, on a
+    /// negative-cache row (empty <c>FileName</c>), or when the payload file is missing (the orphaned
+    /// row is auto-removed before returning). Unlike <see cref="TryGetPayloadUriAsync"/> this hands
+    /// the bytes back in-process, for parse-on-read callers (lyrics, future audio). Does <b>not</b>
+    /// bump <c>LastAccessUtc</c> and does <b>not</b> apply TTL — that is service-layer policy.
+    /// </summary>
+    public async Task<CachePayload<TEntry>?> ReadPayloadAsync(string keyHash, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var connection = await EnsureInitializedLockedAsync(cancellationToken).ConfigureAwait(false);
+            if (connection is null)
+            {
+                return null;
+            }
+
+            var entry = await GetEntryLockedAsync(connection, keyHash, cancellationToken).ConfigureAwait(false);
+            if (entry is null || string.IsNullOrEmpty(entry.FileName))
+            {
+                // Miss, or a negative-cache row (surfaced via GetEntryAsync, not as payload bytes).
+                return null;
+            }
+
+            var fullPath = Path.Combine(_cacheFolderPath!, entry.FileName);
+            if (!File.Exists(fullPath))
+            {
+                // Orphan-row cleanup. Best-effort; don't propagate failure.
+                try
+                {
+                    await RemoveEntryLockedAsync(connection, keyHash, cancellationToken).ConfigureAwait(false);
+                }
+                catch (SqliteException ex)
+                {
+                    LogWarning("Cache orphan-row removal failed in ReadPayloadAsync", ex);
+                }
+
+                return null;
+            }
+
+            byte[] bytes;
+            try
+            {
+                bytes = await File.ReadAllBytesAsync(fullPath, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                LogWarning("Cache payload read failed in ReadPayloadAsync", ex);
+                return null;
+            }
+
+            return new CachePayload<TEntry>(entry, bytes);
+        }
+        catch (SqliteException ex)
+        {
+            LogWarning("Cache ReadPayloadAsync failed; returning null", ex);
+            return null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
     /// Buffered atomic write: temp file → move → delete prior file (if FileName changed)
     /// → UPSERT → post-write eviction.
     ///
@@ -1030,9 +1096,11 @@ public abstract class SqliteCacheStoreBase<TEntry> : IDisposable
 
     /// <summary>
     /// Writes a negative-cache row: <c>Length=0</c> and empty <c>FileName</c>. No
-    /// payload file is created. Service-layer reads negative entries via
-    /// <see cref="GetEntryAsync"/>; <see cref="TryGetPayloadUriAsync"/> always returns
-    /// <c>null</c> for them. Warn-and-noop on SQLite failure.
+    /// payload file is created. If a positive entry previously occupied this key, its
+    /// payload file is now orphaned (the new row references no file), so it is best-effort
+    /// deleted after the row commits rather than left for the next reconcile. Service-layer
+    /// reads negative entries via <see cref="GetEntryAsync"/>; <see cref="TryGetPayloadUriAsync"/>
+    /// always returns <c>null</c> for them. Warn-and-noop on SQLite failure.
     /// </summary>
     public async Task WriteNegativeAsync(string keyHash, TEntry entry, CancellationToken cancellationToken = default)
     {
@@ -1059,7 +1127,25 @@ public abstract class SqliteCacheStoreBase<TEntry> : IDisposable
                 return;
             }
 
+            TEntry? oldEntry;
+            try
+            {
+                oldEntry = await GetEntryLockedAsync(connection, keyHash, cancellationToken).ConfigureAwait(false);
+            }
+            catch (SqliteException ex)
+            {
+                LogWarning("Cache WriteNegativeAsync: prior-entry lookup failed; skipping orphan cleanup", ex);
+                oldEntry = default;
+            }
+
             await UpsertEntryLockedAsync(connection, keyHash, entry, cancellationToken).ConfigureAwait(false);
+
+            // Positive→negative transition: the prior payload is now unreferenced. Delete it after the
+            // row commits (atomic-on-success; if the delete fails, reconcile sweeps it later).
+            if (oldEntry is not null && !string.IsNullOrEmpty(oldEntry.FileName))
+            {
+                TryDeleteFile(Path.Combine(_cacheFolderPath!, oldEntry.FileName));
+            }
         }
         catch (SqliteException ex)
         {
