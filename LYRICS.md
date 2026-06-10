@@ -44,9 +44,11 @@ Define platform-independent lyric types in `Hypersonic.Core/Models/Lyrics/`. Bot
 
 No behavior, no parsing — just types and validation invariants (monotonic timestamps, word timestamps within line bounds when present).
 
-### Phase 1 — Lyrics provider + service (`Hypersonic.Core` + `Hypersonic`)
+### Phase 1 — Lyrics provider + service (`Hypersonic.Core` + `Hypersonic`) — ✅ shipped
 
 > **Source of truth:** [`docs/design/service/2026-06-09-lyrics-provider-service.md`](docs/design/service/2026-06-09-lyrics-provider-service.md). This slice builds the full provider/service/durable-cache architecture but ships **only the Subsonic source, fetched sequentially**; external providers + concurrency move to Phase 1.5. Where the bullets below and the design doc diverge, the design doc wins.
+>
+> See implementation: [`docs/implementation/service/2026-06-09-lyrics-provider-service.md`](docs/implementation/service/2026-06-09-lyrics-provider-service.md) — records the deviations from the plan and the details surfaced during implementation and review.
 
 - `ILyricsProvider` — **one real source, self-contained.** A provider owns its internal endpoint fallback and format selection and returns its single best result: the parsed + validated `LyricsDocument`, the raw payload + format tag, and a `definitive` bit. Stateless.
 - `SubsonicLyricsProvider` — the one source this phase. Hosts the structured (`getLyricsBySongId`) → legacy (`getLyrics`) fallback **internally**; today's `LyricsFetchPolicy.Combine` relocates here (the semantics are Subsonic-specific), not into the cross-provider policy.
