@@ -2,7 +2,7 @@
 
 Companion to the design at [`../../design/service/2026-06-10-lyrics-lrclib-provider.md`](../../design/service/2026-06-10-lyrics-lrclib-provider.md). Records only what the design (and the plan it spawned) does **not** already say: the concrete shape the code took, where it diverged, and the details settled during implementation and code review. The design's semantics — one-provider-per-source, the concurrent quality-tiered fan-out, eager-pin / negative-suppress caching, the `budget`/`forceRefresh` surface, and raw-payload parse-on-read — were implemented faithfully and are not re-explained here.
 
-Landed on branch `feat/lyrics-lrclib-provider` (will squash to `master`), on top of the design commit `a09b798b5daf15732bc98209a3155a72d3786783`. The Phase 1 provider/parser/cache/policy contracts did not change.
+Landed on `master` as a single **squashed** commit on top of the design commit `a09b798b5daf15732bc98209a3155a72d3786783` (the feature was built across eleven TDD/review commits, squashed at merge). The Phase 1 provider/parser/cache/policy contracts did not change.
 
 What shipped, in dependency order:
 
@@ -52,12 +52,16 @@ The named `lrclib` client sends `User-Agent: Hypersonic v{version} (https://gith
 
 The plain-text → `Plain` line-splitting duplicates `SubsonicLegacyLyricsParser`'s shape. This is deliberate: the design asked only the **LRC line-parsing** to be factored into a reusable Core helper (`LrcLineParser`); the two Subsonic parsers stay in `Hypersonic`, so the small plain-text split is not shared across the project boundary.
 
+### `lrclib-plain` shares the `.txt` payload extension with `subsonic-legacy`
+
+`ExtensionForFormat` maps `lrclib-synced → .lrc` and `lrclib-plain → .txt`, and `.txt` is also `subsonic-legacy`'s extension. The collision is harmless: the cache's read path selects the parser from the index row's stored **format tag**, never from the file extension, so two `.txt` payloads from different sources still rebuild through their correct parsers. The store's filename predicate already reserved `.lrc` in Phase 1, so the store needed no change beyond the two `ExtensionForFormat` cases.
+
 ### Review-driven hardening
 
 Three issues surfaced in a review pass after the feature landed and were corrected (each TDD'd):
 
 - **lrclib parse failure → `Transient`, not `DefinitiveEmpty`.** `MapRecord` originally returned `DefinitiveEmpty` whenever neither lyric field yielded a usable document — including when a field was *present but unparseable*, which would negative-cache a track that actually has lyrics. It now distinguishes "no field present" (empty/instrumental → `DefinitiveEmpty`) from "a field was present but nothing parsed" (→ `Transient`), matching the design's outcome table ("parse failure → Transient"). Plain still rescues an unparseable synced field.
-- **Cancellation reaches the Subsonic HTTP calls.** The fan-out cancels stragglers via the provider token, but `SubsonicClient`'s request helpers ignored it, so a budget-truncated Subsonic call leaked in the background (lrclib already honored its token). A defaulted `CancellationToken` now threads through the two `getLyrics*` methods and the two generic request helpers to `HttpClient.GetAsync`/`ReadAsStreamAsync`; every non-lyrics endpoint is unchanged (binds to `None`).
+- **Cancellation reaches the Subsonic HTTP calls.** The fan-out cancels stragglers via the provider token, but `SubsonicClient`'s request helpers ignored it, so a budget-truncated Subsonic call leaked in the background (lrclib already honored its token). A defaulted `CancellationToken` now threads through the two `getLyrics*` methods and the two generic request helpers to `HttpClient.GetAsync`/`ReadAsStreamAsync`; every non-lyrics endpoint is unchanged (binds to `None`). Because the token sits on the `ISubsonicClient` interface, the signature change rippled to every `ISubsonicClient` test double in the suite (about a dozen, most unrelated to lyrics) — each updated as a behaviour-neutral signature change.
 - **Negative budgets are clamped.** A caller-supplied negative `budget` bypassed the options-default `> 0` guard and would throw in `Task.Delay` (or, at the `-1ms` sentinel, disable truncation). `GetLyricsAsync` now clamps a negative resolved budget back to the default window. No current caller passes one; this is defensive hygiene for the Phase 3 manual-refresh path.
 
 ---
@@ -65,10 +69,10 @@ Three issues surfaced in a review pass after the feature landed and were correct
 ## Testing notes
 
 - **Provider** — driven by a hand-rolled `HttpMessageHandler` + a fake `IHttpClientFactory` (consistent with the repo's no-mock-library posture), exercising real `LyricsParserRegistry` + real LRC parsers end-to-end. Routing branches, outcome mapping, disambiguation ranking, and the exact query strings are all asserted.
-- **Fan-out** — fake providers (gated via `TaskCompletionSource`) + `FakeTimeProvider`. Budget-truncation tests drive the fake clock with a guarded background advancer (no wall-clock waits; an iteration cap turns a never-completing regression into a clear assertion failure instead of a hang).
+- **Fan-out** — fake providers (gated via `TaskCompletionSource`) + `FakeTimeProvider`, added to the existing `LyricsServiceTests` (reusing its fakes) rather than a separate file. Budget-truncation tests drive the fake clock with a guarded **background** advancer: the fan-out arms its budget `Task.Delay` on a pool thread, and `FakeTimeProvider` only fires advances issued *after* the timer is armed, so a foreground advance loop races the arm and can starve it in a cold-pool isolated run. A background advancer that keeps pushing the clock until the fetch completes makes truncation deterministic with no wall-clock waits; an iteration cap turns a never-completing regression into a clear assertion failure instead of a hang. (`FakeLyricsProvider.CallCount` was made `Volatile`/`Interlocked`-safe for the advancer's cross-thread read.)
 - **Parsers** — timestamp variants, multi-timestamp lines, `[offset:]` sign, ignored metadata tags, validator-discard, and a raw→parse round-trip, all in `Hypersonic.Core.Tests`.
 
-Suite at completion: Core 196, Client 52, App 591 — all green.
+Suite at completion (after the review-driven hardening): Core 196, Client 52, App 595 — **843 total**, all green.
 
 ---
 
