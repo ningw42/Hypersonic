@@ -81,7 +81,7 @@ internal sealed class SubsonicLyricsProvider : ILyricsProvider
     {
         try
         {
-            var response = await client.GetLyricsBySongIdAsync(query.SongId).ConfigureAwait(false);
+            var response = await client.GetLyricsBySongIdAsync(query.SongId, cancellationToken).ConfigureAwait(false);
             if (response.Status == "failed")
             {
                 var kind = SubsonicLyricsClassifier.ClassifyFailedStatus(response.Error?.Code ?? 0);
@@ -124,7 +124,7 @@ internal sealed class SubsonicLyricsProvider : ILyricsProvider
     {
         try
         {
-            var response = await client.GetLyricsAsync(query.Artist, query.Title).ConfigureAwait(false);
+            var response = await client.GetLyricsAsync(query.Artist, query.Title, cancellationToken).ConfigureAwait(false);
             if (response.Status == "failed")
             {
                 var kind = SubsonicLyricsClassifier.ClassifyFailedStatus(response.Error?.Code ?? 0);

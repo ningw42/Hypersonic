@@ -16,7 +16,16 @@ namespace Hypersonic.Contracts.Services;
 /// </summary>
 public interface ILyricsService
 {
-    Task<LyricsDocument?> GetLyricsAsync(LyricsQuery query, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Resolves lyrics for <paramref name="query"/>. <paramref name="budget"/> is the fan-out wait
+    /// window (null → the default from options). <paramref name="forceRefresh"/> bypasses the cache
+    /// read and overwrites the entry (the on-demand recovery path).
+    /// </summary>
+    Task<LyricsDocument?> GetLyricsAsync(
+        LyricsQuery query,
+        TimeSpan? budget = null,
+        bool forceRefresh = false,
+        CancellationToken cancellationToken = default);
 
     Task ReconcileAsync(CancellationToken cancellationToken = default);
 }

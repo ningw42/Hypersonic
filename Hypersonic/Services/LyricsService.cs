@@ -4,6 +4,7 @@ using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Lyrics;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models.Lyrics;
+using Hypersonic.Core.Services.Lyrics;
 using Hypersonic.Models;
 using Hypersonic.Services.Cache;
 using Hypersonic.Services.Lyrics;
@@ -26,6 +27,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
     private readonly ILyricsCacheStore _store;
     private readonly ILyricsParserRegistry _parserRegistry;
     private readonly LyricsCacheOptions _options;
+    private readonly LyricsOrchestrationOptions _orchestrationOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _log;
     private readonly CancellationTokenSource _disposeCts = new();
@@ -38,6 +40,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
         ILyricsCacheStore store,
         ILyricsParserRegistry parserRegistry,
         IOptions<LyricsCacheOptions> options,
+        IOptions<LyricsOrchestrationOptions> orchestrationOptions,
         TimeProvider timeProvider,
         ILoggingService logService)
     {
@@ -46,11 +49,13 @@ public sealed class LyricsService : ILyricsService, IDisposable
         _store = store;
         _parserRegistry = parserRegistry;
         _options = options.Value;
+        _orchestrationOptions = orchestrationOptions.Value;
         _timeProvider = timeProvider;
         _log = logService.GetLogger(nameof(LyricsService));
     }
 
-    public async Task<LyricsDocument?> GetLyricsAsync(LyricsQuery query, CancellationToken cancellationToken = default)
+    public async Task<LyricsDocument?> GetLyricsAsync(
+        LyricsQuery query, TimeSpan? budget = null, bool forceRefresh = false, CancellationToken cancellationToken = default)
     {
         if (query is null || string.IsNullOrWhiteSpace(query.SongId) || IsDisposed)
         {
@@ -69,14 +74,16 @@ public sealed class LyricsService : ILyricsService, IDisposable
         {
             if (!SubsonicCacheScope.TryBuildSongKeyHash(_subsonicClientService, query.SongId, out var keyHash))
             {
-                // No active client / user identity — lookup and fetch are skipped (mirrors the image cache).
                 return null;
             }
 
-            var (hit, cachedDocument) = await TryReadCacheAsync(keyHash, allowStale: false, token).ConfigureAwait(false);
-            if (hit)
+            if (!forceRefresh)
             {
-                return cachedDocument;
+                var (hit, cachedDocument) = await TryReadCacheAsync(keyHash, allowStale: false, token).ConfigureAwait(false);
+                if (hit)
+                {
+                    return cachedDocument;
+                }
             }
 
             if (IsDisposed)
@@ -84,7 +91,16 @@ public sealed class LyricsService : ILyricsService, IDisposable
                 return null;
             }
 
-            var fetchTask = _inFlightFetches.GetOrAdd(keyHash, _ => CreateInFlightFetchTask(query, keyHash));
+            var defaultBudgetMs = _orchestrationOptions.DefaultFanOutBudgetMs > 0 ? _orchestrationOptions.DefaultFanOutBudgetMs : 700;
+            var resolvedBudget = budget ?? TimeSpan.FromMilliseconds(defaultBudgetMs);
+            if (resolvedBudget < TimeSpan.Zero)
+            {
+                // A caller-supplied negative budget (incl. the -1ms "infinite" sentinel) would throw in Task.Delay
+                // or disable truncation — fall back to the default wait window.
+                resolvedBudget = TimeSpan.FromMilliseconds(defaultBudgetMs);
+            }
+
+            var fetchTask = _inFlightFetches.GetOrAdd(keyHash, _ => CreateInFlightFetchTask(query, keyHash, resolvedBudget));
             return await fetchTask.WaitAsync(token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (IsDisposed)
@@ -153,9 +169,9 @@ public sealed class LyricsService : ILyricsService, IDisposable
         _disposeCts.Dispose();
     }
 
-    private Task<LyricsDocument?> CreateInFlightFetchTask(LyricsQuery query, string keyHash)
+    private Task<LyricsDocument?> CreateInFlightFetchTask(LyricsQuery query, string keyHash, TimeSpan budget)
     {
-        var task = FetchAndStoreAsync(query, keyHash, GetDisposeToken());
+        var task = FetchAndStoreAsync(query, keyHash, budget, GetDisposeToken());
         _ = task.ContinueWith(
             completed => _inFlightFetches.TryRemove(new KeyValuePair<string, Task<LyricsDocument?>>(keyHash, completed)),
             CancellationToken.None,
@@ -165,7 +181,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
         return task;
     }
 
-    private async Task<LyricsDocument?> FetchAndStoreAsync(LyricsQuery query, string keyHash, CancellationToken cancellationToken)
+    private async Task<LyricsDocument?> FetchAndStoreAsync(LyricsQuery query, string keyHash, TimeSpan budget, CancellationToken cancellationToken)
     {
         // Yield so this task never completes synchronously inside the GetOrAdd factory — otherwise the
         // in-flight removal continuation could run before the entry is added, stranding a completed task
@@ -177,51 +193,124 @@ public sealed class LyricsService : ILyricsService, IDisposable
             return null;
         }
 
-        // Sequential walk in priority order, short-circuited on the first usable content. Phase 1.5
-        // swaps this for concurrent fan-out without changing the provider contract or the policy below.
-        var results = new List<LyricsProviderResult>(_providers.Length);
-        foreach (var provider in _providers)
-        {
-            if (cancellationToken.IsCancellationRequested || IsDisposed)
-            {
-                return null;
-            }
-
-            LyricsProviderResult result;
-            try
-            {
-                result = await provider.FetchAsync(query, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || IsDisposed)
-            {
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _log.Warning("Lyrics provider threw; treating as transient", new { provider.Id, query.SongId }, ex);
-                result = LyricsProviderResult.Transient;
-            }
-
-            results.Add(result);
-            if (result.Kind == LyricsOutcomeKind.Content)
-            {
-                break;
-            }
-        }
+        var (completed, anyTruncated) = await RunFanOutAsync(query, budget, cancellationToken).ConfigureAwait(false);
 
         if (cancellationToken.IsCancellationRequested || IsDisposed)
         {
             return null;
         }
 
-        var decision = LyricsFallbackPolicy.Decide(results);
+        var decision = LyricsFallbackPolicy.Decide(completed);
         return decision.Action switch
         {
+            // Eager-pin the winner at full TTL even if a peer was truncated.
             LyricsCacheAction.WritePositive => await WritePositiveAsync(keyHash, decision.Winner!, cancellationToken).ConfigureAwait(false),
-            LyricsCacheAction.WriteNegative => await WriteNegativeAsync(keyHash, cancellationToken).ConfigureAwait(false),
+            // Suppress the negative write when a peer was truncated/incomplete (it might have had content).
+            LyricsCacheAction.WriteNegative when !anyTruncated => await WriteNegativeAsync(keyHash, cancellationToken).ConfigureAwait(false),
+            LyricsCacheAction.WriteNegative => LyricsDocument.Empty(), // show "no lyrics" this attempt, do not pin
             _ when decision.Winner is not null => decision.Winner.Document, // non-definitive content: shown, not cached
             _ => (await TryReadCacheAsync(keyHash, allowStale: true, cancellationToken).ConfigureAwait(false)).Document,
         };
+    }
+
+    /// <summary>
+    /// Fires all providers concurrently under one linked CTS, bounded by <paramref name="budget"/>.
+    /// Decides early the moment all providers complete OR a top-tier (Word) result arrives; if the
+    /// budget elapses first, cancels the stragglers and decides on what completed. The returned list is
+    /// ordered by provider precedence (registration order), NOT completion order — load-bearing for the
+    /// policy's equal-tier tiebreak. <c>anyTruncated</c> is "any provider slot unfilled at decision time".
+    /// </summary>
+    private async Task<(IReadOnlyList<LyricsProviderResult> Completed, bool AnyTruncated)> RunFanOutAsync(
+        LyricsQuery query, TimeSpan budget, CancellationToken cancellationToken)
+    {
+        var n = _providers.Length;
+        if (n == 0)
+        {
+            return (Array.Empty<LyricsProviderResult>(), false);
+        }
+
+        var slots = new LyricsProviderResult?[n];
+        var earlyExit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var remaining = n;
+
+        using var fanoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = fanoutCts.Token;
+
+        var providerTasks = new Task[n];
+        for (var i = 0; i < n; i++)
+        {
+            var idx = i;
+            providerTasks[idx] = RunOne(idx);
+        }
+
+        // Budget timer on the injected TimeProvider (deterministic under FakeTimeProvider). Rides
+        // fanoutCts.Token so an early-exit win — or a dispose/parent cancel — tears the timer down at
+        // once via fanoutCts.Cancel(), rather than leaving it ticking for the full budget.
+        var budgetTask = Task.Delay(budget, _timeProvider, token);
+        await Task.WhenAny(earlyExit.Task, budgetTask).ConfigureAwait(false);
+
+        // Snapshot at decision time, THEN cancel any stragglers.
+        var snapshot = new LyricsProviderResult?[n];
+        for (var i = 0; i < n; i++)
+        {
+            snapshot[i] = Volatile.Read(ref slots[i]);
+        }
+
+        try
+        {
+            fanoutCts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        var completed = new List<LyricsProviderResult>(n);
+        var anyTruncated = false;
+        for (var i = 0; i < n; i++)
+        {
+            if (snapshot[i] is { } result)
+            {
+                completed.Add(result);
+            }
+            else
+            {
+                anyTruncated = true;
+            }
+        }
+
+        return (completed, anyTruncated);
+
+        async Task RunOne(int idx)
+        {
+            LyricsProviderResult? result = null;
+            try
+            {
+                result = await _providers[idx].FetchAsync(query, token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Truncated (budget) or disposed — leave the slot null.
+            }
+            catch (Exception ex)
+            {
+                _log.Warning("Lyrics provider threw; treating as transient", new { _providers[idx].Id, query.SongId }, ex);
+                result = LyricsProviderResult.Transient;
+            }
+
+            if (result is not null)
+            {
+                Volatile.Write(ref slots[idx], result);
+                if (result.Kind == LyricsOutcomeKind.Content && result.Document!.SyncKind == LyricsSyncKind.Word)
+                {
+                    earlyExit.TrySetResult(); // top tier — nothing can beat it
+                }
+            }
+
+            if (Interlocked.Decrement(ref remaining) == 0)
+            {
+                earlyExit.TrySetResult(); // all providers complete
+            }
+        }
     }
 
     private async Task<LyricsDocument?> WritePositiveAsync(string keyHash, LyricsProviderResult winner, CancellationToken cancellationToken)
@@ -375,6 +464,8 @@ public sealed class LyricsService : ILyricsService, IDisposable
     {
         SubsonicLyricsConstants.StructuredFormat => ".json",
         SubsonicLyricsConstants.LegacyFormat => ".txt",
+        LrcLibLyricsConstants.SyncedFormat => ".lrc",
+        LrcLibLyricsConstants.PlainFormat => ".txt",
         _ => ".txt",
     };
 

@@ -102,9 +102,9 @@ public interface ISubsonicClient
 
     public Uri GetCoverArtUri(string id, string? size = null);
 
-    public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null);
+    public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null, CancellationToken cancellationToken = default);
 
-    public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id);
+    public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id, CancellationToken cancellationToken = default);
 
     public Task<Stream> GetAvatarAsync(string username);
 
@@ -447,14 +447,14 @@ public class SubsonicClient : ISubsonicClient
         return this.GetUri(request);
     }
 
-    public async Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null)
+    public async Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null, CancellationToken cancellationToken = default)
     {
-        return await this.MakeSubsonicRequestAsync<GetLyricsRequest, GetLyricsResponse>(new GetLyricsRequest(this.BaseRequest, artist, title));
+        return await this.MakeSubsonicRequestAsync<GetLyricsRequest, GetLyricsResponse>(new GetLyricsRequest(this.BaseRequest, artist, title), cancellationToken);
     }
 
-    public async Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id)
+    public async Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id, CancellationToken cancellationToken = default)
     {
-        return await this.MakeSubsonicRequestAsync<GetLyricsBySongIdRequest, GetLyricsBySongIdResponse>(new GetLyricsBySongIdRequest(this.BaseRequest, id));
+        return await this.MakeSubsonicRequestAsync<GetLyricsBySongIdRequest, GetLyricsBySongIdResponse>(new GetLyricsBySongIdRequest(this.BaseRequest, id), cancellationToken);
     }
 
     public async Task<Stream> GetAvatarAsync(string username)
@@ -548,20 +548,20 @@ public class SubsonicClient : ISubsonicClient
         return new Uri($"{this.BaseUri}/{request.Action}{request.ToQueryString()}");
     }
 
-    private async Task<TResponse> MakeSubsonicRequestAsync<TRequest, TResponse>(TRequest request) where TRequest : SubsonicRequest
+    private async Task<TResponse> MakeSubsonicRequestAsync<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken = default) where TRequest : SubsonicRequest
     {
-        Stream content = await this.MakeSubsonicRequestWithoutDeserializationAsync(request);
+        Stream content = await this.MakeSubsonicRequestWithoutDeserializationAsync(request, cancellationToken);
 
         return this.Deserialize<TResponse>(content);
     }
 
-    private async Task<Stream> MakeSubsonicRequestWithoutDeserializationAsync<TRequest>(TRequest request) where TRequest : SubsonicRequest
+    private async Task<Stream> MakeSubsonicRequestWithoutDeserializationAsync<TRequest>(TRequest request, CancellationToken cancellationToken = default) where TRequest : SubsonicRequest
     {
         Uri uri = this.GetUri(request);
-        HttpResponseMessage response = await this.HttpClient.GetAsync(uri);
+        HttpResponseMessage response = await this.HttpClient.GetAsync(uri, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        return await response.Content.ReadAsStreamAsync();
+        return await response.Content.ReadAsStreamAsync(cancellationToken);
     }
 
     private T Deserialize<T>(Stream stream)

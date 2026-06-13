@@ -19,7 +19,8 @@ public class NowPlayingViewModelTests
         public int CallCount { get; private set; }
         public LyricsQuery? LastQuery { get; private set; }
 
-        public Task<LyricsDocument?> GetLyricsAsync(LyricsQuery query, CancellationToken cancellationToken = default)
+        public Task<LyricsDocument?> GetLyricsAsync(
+            LyricsQuery query, TimeSpan? budget = null, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
             CallCount++;
             LastQuery = query;

@@ -42,14 +42,19 @@ public class LyricsServiceTests
     }
 
     private LyricsService CreateService(LyricsCacheOptions? options, params ILyricsProvider[] providers)
+        => CreateService(options, null, providers);
+
+    private LyricsService CreateService(LyricsCacheOptions? cacheOptions, LyricsOrchestrationOptions? orchestration, params ILyricsProvider[] providers)
     {
-        options ??= new LyricsCacheOptions();
+        cacheOptions ??= new LyricsCacheOptions();
+        orchestration ??= new LyricsOrchestrationOptions();
         return new LyricsService(
             _clientService,
             providers,
             _store,
             _registry,
-            Options.Create(options),
+            Options.Create(cacheOptions),
+            Options.Create(orchestration),
             _time,
             new NullLoggingService());
     }
@@ -247,7 +252,7 @@ public class LyricsServiceTests
         });
         var service = new LyricsService(
             _clientService, Array.Empty<ILyricsProvider>(), _store, registry,
-            Options.Create(new LyricsCacheOptions()), _time, new NullLoggingService());
+            Options.Create(new LyricsCacheOptions()), Options.Create(new LyricsOrchestrationOptions()), _time, new NullLoggingService());
 
         var doc = await service.GetLyricsAsync(Query);
 
@@ -288,13 +293,204 @@ public class LyricsServiceTests
         });
         var service = new LyricsService(
             _clientService, Array.Empty<ILyricsProvider>(), _store, registry,
-            Options.Create(new LyricsCacheOptions()), _time, new NullLoggingService());
+            Options.Create(new LyricsCacheOptions()), Options.Create(new LyricsOrchestrationOptions()), _time, new NullLoggingService());
 
         var doc = await service.GetLyricsAsync(Query);
 
         Assert.AreEqual("parsed-src", doc!.SourceProvider);
         Assert.AreEqual("parsed-lang", doc.LanguageCode);
         Assert.AreEqual(222, doc.OffsetMs);
+    }
+
+    // ---- Fan-out (Phase 1.5) ----
+
+    private static LyricsProviderResult LineContent(string source)
+    {
+        var doc = new LyricsDocument
+        {
+            SyncKind = LyricsSyncKind.Line,
+            Lines = new[] { new LyricsLine { StartMs = 0, Text = "x" } },
+            SourceProvider = source,
+        };
+        return LyricsProviderResult.Content(doc, new byte[] { 1 }, LrcLibLyricsConstants.SyncedFormat, definitive: true);
+    }
+
+    private static LyricsProviderResult PlainContent(string source)
+    {
+        var doc = new LyricsDocument
+        {
+            SyncKind = LyricsSyncKind.Plain,
+            Lines = new[] { new LyricsLine { StartMs = 0, Text = "x" } },
+            SourceProvider = source,
+        };
+        return LyricsProviderResult.Content(doc, new byte[] { 1 }, SubsonicLyricsConstants.LegacyFormat, definitive: true);
+    }
+
+    /// <summary>
+    /// Drives a budget-bounded fetch to completion under the fake clock, deterministically and with no
+    /// wall-clock waits. A <c>Task.Delay</c> on a <see cref="FakeTimeProvider"/> only fires for advances
+    /// that happen AFTER it is armed, and the fan-out arms its budget timer on a pool thread whose timing
+    /// relative to this method is unknowable (and, in a cold/low-thread test process, easy to starve with
+    /// a tight advance loop). So rather than guess when to advance, we run a CONCURRENT advancer that
+    /// keeps pushing the clock forward by <paramref name="advance"/> (&gt; budget) until the fetch
+    /// completes: whenever the fan-out finally arms its timer, a later advance is guaranteed to fire it.
+    /// The advancer yields each turn (no wall-clock waits) and stops the instant the fetch completes.
+    /// </summary>
+    private async Task<LyricsDocument?> CompleteUnderBudget(Task<LyricsDocument?> task, TimeSpan advance)
+    {
+        var advancer = Task.Run(async () =>
+        {
+            // Cap iterations so a regression that never completes the fetch fails the assert below
+            // instead of spinning forever. The advance is fake-time only — no wall-clock waits.
+            for (var i = 0; i < 100_000 && !task.IsCompleted; i++)
+            {
+                _time.Advance(advance);
+                await Task.Yield();
+            }
+        });
+
+        await advancer.ConfigureAwait(false);
+        Assert.IsTrue(task.IsCompleted, "budget-bounded fetch did not complete under the fake clock");
+        return await task.ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task FanOut_HigherTierWinsAcrossProviders()
+    {
+        var subsonic = new FakeLyricsProvider(_ => PlainContent("subsonic")) { Id = "subsonic" };
+        var lrclib = new FakeLyricsProvider(_ => LineContent("lrclib")) { Id = "lrclib" };
+        var service = CreateService(null, subsonic, lrclib);
+
+        var doc = await service.GetLyricsAsync(Query);
+
+        Assert.AreEqual(LyricsSyncKind.Line, doc!.SyncKind);
+        Assert.AreEqual("lrclib", doc.SourceProvider);
+    }
+
+    [TestMethod]
+    public async Task FanOut_EqualTier_KeepsEarliestRegisteredProvider()
+    {
+        var subsonic = new FakeLyricsProvider(_ => LineContent("subsonic")) { Id = "subsonic" };
+        var lrclib = new FakeLyricsProvider(_ => LineContent("lrclib")) { Id = "lrclib" };
+        var service = CreateService(null, subsonic, lrclib); // registration order: subsonic first
+
+        var doc = await service.GetLyricsAsync(Query);
+
+        Assert.AreEqual("subsonic", doc!.SourceProvider, "equal tier keeps the earliest-registered provider");
+    }
+
+    [TestMethod]
+    public async Task FanOut_AllComplete_DecidesWithoutAdvancingClock()
+    {
+        var subsonic = new FakeLyricsProvider(_ => PlainContent("subsonic")) { Id = "subsonic" };
+        var lrclib = new FakeLyricsProvider(_ => LineContent("lrclib")) { Id = "lrclib" };
+        var service = CreateService(null, subsonic, lrclib);
+
+        // Both providers complete synchronously → all-complete early-exit; no clock advance needed.
+        var doc = await service.GetLyricsAsync(Query);
+
+        Assert.AreEqual(LyricsSyncKind.Line, doc!.SyncKind);
+    }
+
+    [TestMethod]
+    public async Task FanOut_BudgetTruncation_SuppressesNegativeWrite()
+    {
+        var fast = new FakeLyricsProvider(_ => LyricsProviderResult.DefinitiveEmpty) { Id = "subsonic" };
+        var slowGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var slow = new FakeLyricsProvider(_ => LyricsProviderResult.DefinitiveEmpty) { Id = "lrclib", Gate = slowGate };
+        var options = new LyricsOrchestrationOptions { DefaultFanOutBudgetMs = 700 };
+        var service = CreateService(null, options, fast, slow);
+
+        var task = service.GetLyricsAsync(Query);
+        var doc = await CompleteUnderBudget(task, TimeSpan.FromMilliseconds(750));
+
+        Assert.AreEqual(LyricsSyncKind.None, doc!.SyncKind, "no winner → empty this attempt");
+        Assert.AreEqual(0, _store.WriteNegativeCount, "negative suppressed because a peer was truncated");
+    }
+
+    [TestMethod]
+    public async Task FanOut_BudgetTruncation_EagerPinsPresentWinner()
+    {
+        var fast = new FakeLyricsProvider(_ => PlainContent("subsonic")) { Id = "subsonic" };
+        var slowGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var slow = new FakeLyricsProvider(_ => LineContent("lrclib")) { Id = "lrclib", Gate = slowGate };
+        var options = new LyricsOrchestrationOptions { DefaultFanOutBudgetMs = 700 };
+        var service = CreateService(null, options, fast, slow);
+
+        var task = service.GetLyricsAsync(Query);
+        var doc = await CompleteUnderBudget(task, TimeSpan.FromMilliseconds(750));
+
+        Assert.AreEqual(LyricsSyncKind.Plain, doc!.SyncKind, "truncated higher tier → user sees the present lower tier");
+        Assert.AreEqual("subsonic", doc.SourceProvider);
+        Assert.AreEqual(1, _store.WritePositiveCount, "the present winner is eager-pinned despite the truncated peer");
+    }
+
+    [TestMethod]
+    public async Task Budget_Parameter_ThreadsThrough_AndTruncates()
+    {
+        var fast = new FakeLyricsProvider(_ => PlainContent("subsonic")) { Id = "subsonic" };
+        var slowGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var slow = new FakeLyricsProvider(_ => LineContent("lrclib")) { Id = "lrclib", Gate = slowGate };
+        var service = CreateService(null, fast, slow);
+
+        var task = service.GetLyricsAsync(Query, budget: TimeSpan.FromMilliseconds(300));
+        var doc = await CompleteUnderBudget(task, TimeSpan.FromMilliseconds(350));
+
+        Assert.AreEqual(LyricsSyncKind.Plain, doc!.SyncKind, "explicit budget elapsed → only the fast provider's result");
+    }
+
+    [TestMethod]
+    public async Task NegativeBudget_FallsBackToDefault_DoesNotThrow()
+    {
+        var provider = new FakeLyricsProvider(_ => PlainContent("subsonic")) { Id = "subsonic" };
+        var service = CreateService(null, provider);
+
+        // A negative budget would throw inside Task.Delay; it must clamp to the default and complete.
+        var doc = await service.GetLyricsAsync(Query, budget: TimeSpan.FromMilliseconds(-5));
+
+        Assert.AreEqual(LyricsSyncKind.Plain, doc!.SyncKind);
+    }
+
+    [TestMethod]
+    public async Task Dispose_DuringInFlightFanOut_ReturnsNull_NoHang()
+    {
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var provider = new FakeLyricsProvider(_ => LegacyContent("x")) { Id = "subsonic", Gate = gate };
+        var service = CreateService(null, provider);
+
+        var task = service.GetLyricsAsync(Query);
+
+        // Wait until the fan-out has actually invoked the (gated) provider, so the dispose lands
+        // mid-flight. CallCount is Volatile/Interlocked-safe for this cross-thread read.
+        for (var i = 0; i < 1000 && provider.CallCount == 0; i++)
+        {
+            await Task.Yield();
+        }
+        Assert.AreEqual(1, provider.CallCount, "the gated provider should be in flight before dispose");
+
+        service.Dispose();
+        gate.SetResult(true); // release the parked provider after dispose
+
+        var doc = await task;
+        Assert.IsNull(doc, "a fan-out in flight when the service is disposed resolves to null without hanging");
+    }
+
+    [TestMethod]
+    public async Task ForceRefresh_BypassesCacheRead_AndOverwrites()
+    {
+        var calls = 0;
+        var provider = new FakeLyricsProvider(_ => LegacyContent(++calls == 1 ? "v1" : "v2")) { Id = "subsonic" };
+        var service = CreateService(null, provider);
+
+        var first = await service.GetLyricsAsync(Query);
+        Assert.AreEqual("v1", first!.Lines[0].Text);
+        Assert.AreEqual(1, provider.CallCount);
+
+        var refreshed = await service.GetLyricsAsync(Query, forceRefresh: true);
+
+        Assert.AreEqual("v2", refreshed!.Lines[0].Text, "forceRefresh bypasses the cached v1 and refetches");
+        Assert.AreEqual(2, provider.CallCount, "forceRefresh refetches even though a positive entry exists");
+        Assert.AreEqual(2, _store.WritePositiveCount, "forceRefresh overwrites the cache entry");
     }
 
     // ---- Fakes ----
@@ -311,16 +507,20 @@ public class LyricsServiceTests
     private sealed class FakeLyricsProvider : ILyricsProvider
     {
         private readonly Func<LyricsQuery, LyricsProviderResult> _handler;
+        private int _callCount;
 
         public FakeLyricsProvider(Func<LyricsQuery, LyricsProviderResult> handler) => _handler = handler;
 
         public string Id { get; set; } = "subsonic";
-        public int CallCount { get; private set; }
+
+        // Volatile-safe: the fan-out invokes FetchAsync on a pool thread while a test pump may read
+        // CallCount on another thread to detect that the fan-out has started (the budget-timer arm proxy).
+        public int CallCount => Volatile.Read(ref _callCount);
         public TaskCompletionSource<bool>? Gate { get; set; }
 
         public async Task<LyricsProviderResult> FetchAsync(LyricsQuery query, CancellationToken cancellationToken)
         {
-            CallCount++;
+            Interlocked.Increment(ref _callCount);
             if (Gate is not null)
             {
                 await Gate.Task;

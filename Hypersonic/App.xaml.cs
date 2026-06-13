@@ -13,6 +13,8 @@ using Hypersonic.Services.Lyrics;
 using Hypersonic.ViewModels;
 using Hypersonic.Views;
 
+using System.Reflection;
+
 using CommunityToolkit.Mvvm.Messaging;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -119,8 +121,22 @@ public partial class App : Application
             services.AddSingleton<ILyricsParserRegistry, LyricsParserRegistry>();
             services.AddSingleton<ILyricsPayloadParser, SubsonicStructuredLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, SubsonicLegacyLyricsParser>();
+            services.AddSingleton<ILyricsPayloadParser, LrcSyncedLyricsParser>();
+            services.AddSingleton<ILyricsPayloadParser, LrcPlainLyricsParser>();
             services.AddSingleton<ILyricsProvider, SubsonicLyricsProvider>();
+            services.AddSingleton<ILyricsProvider, LrcLibLyricsProvider>(); // AFTER Subsonic → Subsonic wins an equal-tier tie
             services.AddSingleton<ILyricsService, LyricsService>();
+
+            // Named HTTP client for lrclib (the first outbound HTTP outside SubsonicClient). The
+            // per-request bound is the fan-out budget via the linked CTS; Timeout is only a generous
+            // backstop that must never pre-empt the largest legitimate budget (a manual refresh).
+            var lrclibVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+            services.AddHttpClient("lrclib", client =>
+            {
+                client.BaseAddress = new Uri("https://lrclib.net");
+                client.DefaultRequestHeaders.UserAgent.ParseAdd($"Hypersonic v{lrclibVersion} (https://github.com/ningw42/Hypersonic)");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
 
             services.AddSingleton<IPlaybackService, PlaybackService>();
             services.AddSingleton<ITaskbarService, TaskbarService>();
@@ -168,6 +184,7 @@ public partial class App : Application
             services.Configure<LocalSettingsOptions>(context.Configuration.GetSection(nameof(LocalSettingsOptions)));
             services.Configure<ImageCacheOptions>(context.Configuration.GetSection(nameof(ImageCacheOptions)));
             services.Configure<LyricsCacheOptions>(context.Configuration.GetSection(nameof(LyricsCacheOptions)));
+            services.Configure<LyricsOrchestrationOptions>(context.Configuration.GetSection(nameof(LyricsOrchestrationOptions)));
         }).
         Build();
 

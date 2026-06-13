@@ -328,4 +328,20 @@ public class SubsonicLyricsProviderTests
         Assert.AreEqual(LyricsOutcomeKind.Content, result.Kind);
         Assert.AreEqual("legacy", Encoding.UTF8.GetString(result.RawPayload.Span));
     }
+
+    [TestMethod]
+    public async Task FetchAsync_ThreadsCancellationToken_ToStructuredAndLegacyCalls()
+    {
+        using var cts = new CancellationTokenSource();
+        var client = new FakeLyricsSubsonicClient
+        {
+            StructuredHandler = _ => Task.FromResult(StructuredFailed(70)), // empty → falls to legacy
+            LegacyHandler = (_, _) => Task.FromResult(LegacyOk("legacy text")),
+        };
+
+        await Provider(client).FetchAsync(Query, cts.Token);
+
+        Assert.AreEqual(cts.Token, client.LastStructuredToken, "structured call must receive the provider token");
+        Assert.AreEqual(cts.Token, client.LastLegacyToken, "legacy call must receive the provider token");
+    }
 }

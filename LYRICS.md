@@ -60,9 +60,11 @@ No behavior, no parsing — just types and validation invariants (monotonic time
   - **Index row:** keyed by the image cache's Subsonic scope — **server hash + active-user identity hash + song-id hash** (not the bare song id, which is unique only within one server + account). Carries source provider, payload format, sync kind (`Word | Line | Plain | None`), language, offset ms — plus `CreatedAt / LastAccess / ExpiresAt` lifecycle columns and the payload file name. Positive TTL long; negative TTL shorter so a track that later gains lyrics gets re-checked.
 - Migrate existing `NowPlayingViewModel` fetch/cache logic into `LyricsService`; the VM becomes a pure consumer of the singleton service and gains a `CurrentLyrics` (`LyricsDocument?`) for the Phase 2 renderer. Whether `PlayerViewModel` also consumes the service is the **Phase 3** call.
 
-### Phase 1.5 — External providers + concurrency (`Hypersonic`) — fast-follow
+### Phase 1.5 — External providers + concurrency (`Hypersonic`) — ✅ shipped
 
 > **Source of truth:** [`docs/design/service/2026-06-10-lyrics-lrclib-provider.md`](docs/design/service/2026-06-10-lyrics-lrclib-provider.md). Same `ILyricsProvider` contract and parser registry; only the service's orchestration strategy + public surface change, so this is purely additive. Where these bullets and the design doc diverge, the design doc wins.
+>
+> See implementation: [`docs/implementation/service/2026-06-10-lyrics-lrclib-provider.md`](docs/implementation/service/2026-06-10-lyrics-lrclib-provider.md) — records the LRC `[offset:]` sign decision, the fan-out budget-timer choice, the disambiguation heuristic, and the other details surfaced during implementation and review.
 
 - `LrcLibLyricsProvider` — self-contained external source: `https://lrclib.net/api/get` (track + artist required; album/duration sent as optional filters when available) with an internal `/api/search` fallback (track+artist query, album/duration used only in client-side ranking) for metadata-variant resilience; picks its single best result (synced → `Line`, plain → `Plain`, empty/instrumental → definitively empty). Two new **Core** parsers: `lrclib-synced` (LRC, honors `[offset:]`) and `lrclib-plain`.
 - *(Deferred further)* `NeteaseLyricsProvider`, `AmllTtmlDbLyricsProvider` — word-synced sources, with their legal-posture settings toggle.

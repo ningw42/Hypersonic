@@ -103,7 +103,7 @@ public class RandomPicksCacheServiceTests
         public Task<Stream> StreamAsync(string id, int? maxBitrate = null, string? format = null, int? timeOffset = null, string? size = null, bool estimateContentLength = false, bool converted = false) => throw new NotImplementedException();
         public Task<Stream> DownloadAsync(string id) => throw new NotImplementedException();
         public Task<Stream> GetCoverArtAsync(string id, string? size = null) => throw new NotImplementedException();
-        public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null) => throw new NotImplementedException();
+        public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<SubsonicResponse> StarAsync(string? id = null, string? albumId = null, string? artistId = null) => throw new NotImplementedException();
         public Task<SubsonicResponse> UnstarAsync(string? id = null, string? albumId = null, string? artistId = null) => throw new NotImplementedException();
         public Task<SubsonicResponse> SetRatingAsync(string id, int rating) => throw new NotImplementedException();
@@ -112,7 +112,7 @@ public class RandomPicksCacheServiceTests
         public Task<GetUsersResponse> GetUsersAsync() => throw new NotImplementedException();
         public Task<GetScanStatusResponse> GetScanStatusAsync() => throw new NotImplementedException();
         public Task<StartScanResponse> StartScanAsync() => throw new NotImplementedException();
-        public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id) => throw new NotImplementedException();
+        public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<Stream> GetAvatarAsync(string username) => throw new NotImplementedException();
         public Uri GetAvatarUri(string username) => throw new NotImplementedException();
     }

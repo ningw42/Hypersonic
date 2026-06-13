@@ -137,7 +137,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         try
         {
             var query = new LyricsQuery(track.Id, track.Artist, track.Title, track.Album, track.Duration);
-            var document = await _lyricsService.GetLyricsAsync(query, CancellationToken.None);
+            var document = await _lyricsService.GetLyricsAsync(query, cancellationToken: CancellationToken.None);
 
             if (!_vmActive || Volatile.Read(ref _lyricsGeneration) != generation)
             {

@@ -102,8 +102,8 @@ public class ScrobblingServiceTests
         public Task<Stream> DownloadAsync(string id) => throw new NotImplementedException();
         public Task<Stream> GetCoverArtAsync(string id, string? size = null) => throw new NotImplementedException();
         public Uri GetCoverArtUri(string id, string? size = null) => throw new NotImplementedException();
-        public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null) => throw new NotImplementedException();
-        public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id) => throw new NotImplementedException();
+        public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<Stream> GetAvatarAsync(string username) => throw new NotImplementedException();
         public Uri GetAvatarUri(string username) => throw new NotImplementedException();
         public Task<SubsonicResponse> StarAsync(string? id = null, string? albumId = null, string? artistId = null) => throw new NotImplementedException();

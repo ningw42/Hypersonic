@@ -17,20 +17,24 @@ public sealed class FakeLyricsSubsonicClient : ISubsonicClient
     public int LegacyCallCount { get; private set; }
     public string? LastStructuredId { get; private set; }
     public (string? Artist, string? Title) LastLegacyArgs { get; private set; }
+    public CancellationToken LastStructuredToken { get; private set; }
+    public CancellationToken LastLegacyToken { get; private set; }
 
-    public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id)
+    public Task<GetLyricsBySongIdResponse> GetLyricsBySongIdAsync(string id, CancellationToken cancellationToken = default)
     {
         StructuredCallCount++;
         LastStructuredId = id;
+        LastStructuredToken = cancellationToken;
         return StructuredHandler is null
             ? throw new InvalidOperationException("StructuredHandler not configured.")
             : StructuredHandler(id);
     }
 
-    public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null)
+    public Task<GetLyricsResponse> GetLyricsAsync(string? artist = null, string? title = null, CancellationToken cancellationToken = default)
     {
         LegacyCallCount++;
         LastLegacyArgs = (artist, title);
+        LastLegacyToken = cancellationToken;
         return LegacyHandler is null
             ? throw new InvalidOperationException("LegacyHandler not configured.")
             : LegacyHandler(artist, title);
