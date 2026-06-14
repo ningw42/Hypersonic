@@ -75,17 +75,22 @@ No behavior, no parsing — just types and validation invariants (monotonic time
 
 ### Phase 2 — Win2D lyrics control (`Hypersonic`)
 
-Standalone `LyricsCanvasControl` (Win2D) that takes `IReadOnlyList<LyricsLine>` + `currentPositionMs` as inputs.
+> **Source of truth:** [`docs/design/ui/2026-06-13-lyrics-canvas-control.md`](docs/design/ui/2026-06-13-lyrics-canvas-control.md). Where these bullets and the design doc diverge, the design doc wins.
+
+Standalone `LyricsCanvasControl` (Win2D) — **pure presentation**, fed `LyricsDocument?` + `PositionMs` + `IsPlaying` + `TrackDurationMs?` + colors from outside (no fetch, no cache, no VM/`MediaPlayer` reach-in). Targets the **Apple-faithful** effect set; clean-room reimplementation from BetterLyrics' *techniques* (it is GPL-3.0, so no source is copied).
 
 Renderer responsibilities:
 
-- Resolve active line via cached linear scan (port BetterLyrics' `LyricsSynchronizer`, ~50 LOC).
-- Vertical layout with active-line centering; smooth scroll between lines.
-- Active-line emphasis: scale/opacity transition.
-- Word-level highlight when word data is present: gradient brush across the active line, edge advancing through played-width fraction.
-- No data fetching, no caching, no `PlayerViewModel` binding — pure presentation, fed inputs from the outside.
+- Resolve active line via cached linear scan (port BetterLyrics' `LyricsSynchronizer`, single-lane).
+- Vertical layout with active-line centering (~40% top-offset); critically-damped **spring** scroll between lines. **Wrapping enabled** — a long line becomes multiple visual rows.
+- Active-line **gradient wipe**: a played-head walks the line's words; rendered as a 4-stop gradient **per visual row** so wrapped lines flow correctly (word-level when word data is present; one synthetic word per line otherwise → graceful line-level fill). `Plain` → static.
+- Per-word **bloom** (word timing + enabled): scale pop + upward float + glow, fixed short onset independent of word length. Bloom unit is the **word** (no sub-word synthesis).
+- Inactive-line **falloff**: opacity down, gaussian blur up, slight scale-down with distance.
+- **Line-end resolution**: line end = `EndMs ?? nextLine.StartMs`; final line = `EndMs ?? TrackDurationMs ?? (StartMs + ~4s tail)` so the last line still wipes (guards the Line/Plain fallback).
 
-With Phase 1 already shipped, the control can be exercised against real provider output during development (e.g., a temporary scaffolding page consuming `LyricsService` directly) without requiring full `PlayerViewModel` integration.
+Key refinements over the original sketch (see design doc): a self-interpolating **`PlaybackClock`** so the wipe stays fluid between the 500ms position updates; **Approach C** animation (analytic wipe + a ~60-LOC spring/tween primitive, *not* a ported keyframe engine); colors are **inputs** (theme accent now, album-art palette a future enhancement); display-only but the scroll model is built to accept a user-scroll offset + pointer hit-testing so Phase 3 interaction is wiring, not a rewrite.
+
+**Verification vehicle** (folded into this phase): a Core **`TtmlLyricsParser`** (registered as format `ttml`, reused later by the deferred AMLL provider) + a **`LocalFileLyricsSource`** reading a sideloaded `%LOCALAPPDATA%\Hypersonic\LyricsOverride\<songId>.ttml`. It is an **override source, not a fan-out provider**: `LyricsService` consults it **before the cache read** (one small isolated hook), and a present file wins outright — bypassing cache + fan-out + write, and reversible (delete the file to revert). A real song's word-timed TTML thus plays back live in a throwaway dev harness page. Win2D (`Microsoft.Graphics.Win2D`) is already referenced — no new dependency.
 
 ### Phase 3 — Integration on `NowPlayingPage`
 
