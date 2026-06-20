@@ -28,4 +28,19 @@ public sealed class AppFolderLocator : IAppFolderLocator
             "Hypersonic",
             "Cache");
     }
+
+    public string GetLyricsOverrideFolder()
+    {
+        if (RuntimeHelper.IsMSIX)
+        {
+            // %LOCALAPPDATA%\Packages\<package family name>\LocalState\LyricsOverride
+            return Path.Combine(ApplicationData.Current.LocalFolder.Path, "LyricsOverride");
+        }
+
+        // %LOCALAPPDATA%\Hypersonic\LyricsOverride
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Hypersonic",
+            "LyricsOverride");
+    }
 }

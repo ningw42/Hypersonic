@@ -493,7 +493,83 @@ public class LyricsServiceTests
         Assert.AreEqual(2, _store.WritePositiveCount, "forceRefresh overwrites the cache entry");
     }
 
+    // ---- Local override source (Phase 2) ----
+
+    [TestMethod]
+    public async Task Override_Present_ReturnsItDirectly_NoFetch_NoCacheWrite()
+    {
+        var overrideDoc = new LyricsDocument
+        {
+            SyncKind = LyricsSyncKind.Word,
+            Lines = new[]
+            {
+                new LyricsLine
+                {
+                    StartMs = 0,
+                    EndMs = 1000,
+                    Text = "ov",
+                    Words = new[] { new LyricsWord { StartMs = 0, EndMs = 1000, Text = "ov" } },
+                },
+            },
+            SourceProvider = "ttml",
+        };
+        var provider = new FakeLyricsProvider(_ => LegacyContent("from network"));
+        var service = CreateServiceWithOverride(new FakeOverrideSource(_ => overrideDoc), provider);
+
+        var doc = await service.GetLyricsAsync(Query);
+
+        Assert.AreSame(overrideDoc, doc, "a present override wins outright");
+        Assert.AreEqual(0, provider.CallCount, "override bypasses the fan-out");
+        Assert.AreEqual(0, _store.WritePositiveCount, "override writes nothing to the cache");
+    }
+
+    [TestMethod]
+    public async Task Override_Present_WinsEvenOnForceRefresh()
+    {
+        var overrideDoc = new LyricsDocument { SyncKind = LyricsSyncKind.Plain, Lines = new[] { new LyricsLine { StartMs = 0, Text = "ov" } } };
+        var provider = new FakeLyricsProvider(_ => LegacyContent("from network"));
+        var service = CreateServiceWithOverride(new FakeOverrideSource(_ => overrideDoc), provider);
+
+        var doc = await service.GetLyricsAsync(Query, forceRefresh: true);
+
+        Assert.AreSame(overrideDoc, doc, "override takes precedence over a force-refresh too");
+        Assert.AreEqual(0, provider.CallCount);
+    }
+
+    [TestMethod]
+    public async Task Override_Absent_FallsThroughToNormalPath()
+    {
+        var provider = new FakeLyricsProvider(_ => LegacyContent("from network"));
+        var service = CreateServiceWithOverride(new FakeOverrideSource(_ => null), provider);
+
+        var doc = await service.GetLyricsAsync(Query);
+
+        Assert.AreEqual("from network", doc!.Lines[0].Text, "absent override → normal cache/fan-out path");
+        Assert.AreEqual(1, provider.CallCount);
+    }
+
+    private LyricsService CreateServiceWithOverride(ILocalLyricsOverrideSource overrideSource, params ILyricsProvider[] providers)
+        => new(
+            _clientService,
+            providers,
+            _store,
+            _registry,
+            Options.Create(new LyricsCacheOptions()),
+            Options.Create(new LyricsOrchestrationOptions()),
+            _time,
+            new NullLoggingService(),
+            overrideSource);
+
     // ---- Fakes ----
+
+    private sealed class FakeOverrideSource : ILocalLyricsOverrideSource
+    {
+        private readonly Func<string, LyricsDocument?> _handler;
+        public FakeOverrideSource(Func<string, LyricsDocument?> handler) => _handler = handler;
+
+        public Task<LyricsDocument?> TryGetOverrideAsync(string songId, CancellationToken cancellationToken = default)
+            => Task.FromResult(_handler(songId));
+    }
 
     private sealed class StubRegistry : ILyricsParserRegistry
     {

@@ -13,4 +13,12 @@ public interface IAppFolderLocator
     /// Unpackaged: <c>%LOCALAPPDATA%\Hypersonic\Cache</c>.
     /// </summary>
     string GetCacheFolder();
+
+    /// <summary>
+    /// Folder holding user-sideloaded lyrics overrides (<c>&lt;songId&gt;.ttml</c>). User-managed, not
+    /// cache, so it survives a cache clear.
+    /// MSIX: <c>ApplicationData.Current.LocalFolder\LyricsOverride</c>.
+    /// Unpackaged: <c>%LOCALAPPDATA%\Hypersonic\LyricsOverride</c>.
+    /// </summary>
+    string GetLyricsOverrideFolder();
 }

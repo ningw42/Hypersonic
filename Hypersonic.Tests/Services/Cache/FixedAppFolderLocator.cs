@@ -17,4 +17,6 @@ internal sealed class FixedAppFolderLocator : IAppFolderLocator
     }
 
     public string GetCacheFolder() => _cacheFolder;
+
+    public string GetLyricsOverrideFolder() => Path.Combine(_cacheFolder, "LyricsOverride");
 }

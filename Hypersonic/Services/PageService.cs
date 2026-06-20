@@ -23,6 +23,7 @@ public class PageService : IPageService
         Configure<PlaylistsViewModel, PlaylistsPage>();
         Configure<PlaylistDetailViewModel, PlaylistDetailPage>();
         Configure<NowPlayingViewModel, NowPlayingPage>();
+        Configure<LyricsLabViewModel, LyricsLabPage>(); // Phase 2 throwaway dev harness
         Configure<SettingsViewModel, SettingsPage>();
     }
 

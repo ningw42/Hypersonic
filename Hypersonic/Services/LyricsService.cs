@@ -26,6 +26,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
     private readonly ILyricsProvider[] _providers;
     private readonly ILyricsCacheStore _store;
     private readonly ILyricsParserRegistry _parserRegistry;
+    private readonly ILocalLyricsOverrideSource? _overrideSource;
     private readonly LyricsCacheOptions _options;
     private readonly LyricsOrchestrationOptions _orchestrationOptions;
     private readonly TimeProvider _timeProvider;
@@ -42,12 +43,14 @@ public sealed class LyricsService : ILyricsService, IDisposable
         IOptions<LyricsCacheOptions> options,
         IOptions<LyricsOrchestrationOptions> orchestrationOptions,
         TimeProvider timeProvider,
-        ILoggingService logService)
+        ILoggingService logService,
+        ILocalLyricsOverrideSource? overrideSource = null)
     {
         _subsonicClientService = subsonicClientService;
         _providers = providers.ToArray();
         _store = store;
         _parserRegistry = parserRegistry;
+        _overrideSource = overrideSource;
         _options = options.Value;
         _orchestrationOptions = orchestrationOptions.Value;
         _timeProvider = timeProvider;
@@ -72,6 +75,19 @@ public sealed class LyricsService : ILyricsService, IDisposable
 
         try
         {
+            // Local override wins outright (Phase 2 §3.8): a sideloaded <songId>.ttml takes hard
+            // precedence over the cache and every provider — bypassing the cache read, the fan-out, and
+            // any cache write. Absent → fall through to the unchanged cache → fan-out path. The check is
+            // a cheap existence test run only here (track change), never per frame.
+            if (_overrideSource is not null)
+            {
+                var overrideDocument = await _overrideSource.TryGetOverrideAsync(query.SongId, token).ConfigureAwait(false);
+                if (overrideDocument is not null)
+                {
+                    return overrideDocument;
+                }
+            }
+
             if (!SubsonicCacheScope.TryBuildSongKeyHash(_subsonicClientService, query.SongId, out var keyHash))
             {
                 return null;

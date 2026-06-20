@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Hypersonic.Views.LyricsLabPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:lyrics="using:Hypersonic.Controls.Lyrics"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Dev-harness hint: shows the live, resolved override folder (correct for packaged + unpackaged). -->
+        <TextBlock
+            Grid.Row="0"
+            Style="{ThemeResource CaptionTextBlockStyle}"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            TextWrapping="Wrap"
+            IsTextSelectionEnabled="True"
+            Text="{x:Bind ViewModel.OverrideHint}" />
+
+        <!-- The control under test. No background: the canvas clears to transparent, so it blends with
+             the page (no card boundary). Colours are inputs — here we feed theme-aware resources so the
+             harness tracks light/dark; the real driver supplies them at the Phase 3 integration. -->
+        <lyrics:LyricsCanvasControl
+            Grid.Row="1"
+            Lyrics="{x:Bind ViewModel.CurrentLyrics, Mode=OneWay}"
+            PositionMs="{x:Bind ViewModel.PositionMs, Mode=OneWay}"
+            IsPlaying="{x:Bind ViewModel.IsPlaying, Mode=OneWay}"
+            TrackDurationMs="{x:Bind ViewModel.TrackDurationMs, Mode=OneWay}"
+            Alignment="{x:Bind ViewModel.Alignment, Mode=OneWay}"
+            EnableBloom="{x:Bind ViewModel.EnableBloom, Mode=OneWay}"
+            EnableNeighborBlur="{x:Bind ViewModel.EnableNeighborBlur, Mode=OneWay}"
+            EnableKaraokeWipe="{x:Bind ViewModel.EnableKaraokeWipe, Mode=OneWay}"
+            PlayedColor="{ThemeResource SystemAccentColor}"
+            UnplayedColor="{ThemeResource TextFillColorTertiary}" />
+
+        <!-- Status + effect toggles -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+            <TextBlock
+                VerticalAlignment="Center"
+                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
+            <ComboBox VerticalAlignment="Center" SelectedIndex="{x:Bind ViewModel.AlignmentIndex, Mode=TwoWay}">
+                <ComboBoxItem>Left</ComboBoxItem>
+                <ComboBoxItem>Center</ComboBoxItem>
+                <ComboBoxItem>Right</ComboBoxItem>
+            </ComboBox>
+            <CheckBox Content="Karaoke wipe" IsChecked="{x:Bind ViewModel.EnableKaraokeWipe, Mode=TwoWay}" />
+            <CheckBox Content="Bloom" IsChecked="{x:Bind ViewModel.EnableBloom, Mode=TwoWay}" />
+            <CheckBox Content="Neighbour blur" IsChecked="{x:Bind ViewModel.EnableNeighborBlur, Mode=TwoWay}" />
+        </StackPanel>
+    </Grid>
+</Page>

@@ -123,8 +123,11 @@ public partial class App : Application
             services.AddSingleton<ILyricsPayloadParser, SubsonicLegacyLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, LrcSyncedLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, LrcPlainLyricsParser>();
+            services.AddSingleton<ILyricsPayloadParser, TtmlLyricsParser>();
             services.AddSingleton<ILyricsProvider, SubsonicLyricsProvider>();
             services.AddSingleton<ILyricsProvider, LrcLibLyricsProvider>(); // AFTER Subsonic → Subsonic wins an equal-tier tie
+            // Local override source (NOT a fan-out provider): LyricsService consults it ahead of the cache.
+            services.AddSingleton<ILocalLyricsOverrideSource, LocalFileLyricsSource>();
             services.AddSingleton<ILyricsService, LyricsService>();
 
             // Named HTTP client for lrclib (the first outbound HTTP outside SubsonicClient). The
@@ -175,6 +178,8 @@ public partial class App : Application
             services.AddTransient<PlaylistDetailPage>();
             services.AddTransient<NowPlayingViewModel>();
             services.AddTransient<NowPlayingPage>();
+            services.AddTransient<LyricsLabViewModel>(); // Phase 2 throwaway dev harness
+            services.AddTransient<LyricsLabPage>();
             services.AddTransient<ConnectViewModel>();
             services.AddTransient<ConnectPage>();
             services.AddTransient<ShellPage>();

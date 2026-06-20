@@ -73,9 +73,11 @@ No behavior, no parsing — just types and validation invariants (monotonic time
 - External lookup ships **always on, no settings toggle** (lrclib is CC0/openly accessible); the privacy/legal gate arrives with NetEase/QQ.
 - `IHttpClientFactory` registration — needed once providers make their own outbound HTTP.
 
-### Phase 2 — Win2D lyrics control (`Hypersonic`)
+### Phase 2 — Win2D lyrics control (`Hypersonic`) — ✅ shipped
 
 > **Source of truth:** [`docs/design/ui/2026-06-13-lyrics-canvas-control.md`](docs/design/ui/2026-06-13-lyrics-canvas-control.md). Where these bullets and the design doc diverge, the design doc wins.
+>
+> See implementation: [`docs/implementation/ui/2026-06-13-lyrics-canvas-control.md`](docs/implementation/ui/2026-06-13-lyrics-canvas-control.md) — code complete, all automated tests green, and exercised in the `Lyrics Lab` harness against real word- and line-synced songs (intra-word wipe, bloom, alignment confirmed); formal 60 fps profiling on lower-end hardware is still advisable. Records the AMLL TTML dialect pick, the staged bloom/glow/edge-fade deferrals, the behaviours pinned in code, and the Phase 3 input contract.
 
 Standalone `LyricsCanvasControl` (Win2D) — **pure presentation**, fed `LyricsDocument?` + `PositionMs` + `IsPlaying` + `TrackDurationMs?` + colors from outside (no fetch, no cache, no VM/`MediaPlayer` reach-in). Targets the **Apple-faithful** effect set; clean-room reimplementation from BetterLyrics' *techniques* (it is GPL-3.0, so no source is copied).
 
