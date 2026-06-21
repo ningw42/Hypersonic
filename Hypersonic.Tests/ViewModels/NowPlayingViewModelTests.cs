@@ -2,8 +2,11 @@ using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Helpers;
+using Hypersonic.Models;
 using Hypersonic.Tests.Fakes;
 using Hypersonic.ViewModels;
+
+using Microsoft.Extensions.Options;
 
 namespace Hypersonic.Tests.ViewModels;
 
@@ -18,12 +21,16 @@ public class NowPlayingViewModelTests
 
         public int CallCount { get; private set; }
         public LyricsQuery? LastQuery { get; private set; }
+        public TimeSpan? LastBudget { get; private set; }
+        public bool LastForceRefresh { get; private set; }
 
         public Task<LyricsDocument?> GetLyricsAsync(
             LyricsQuery query, TimeSpan? budget = null, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
             CallCount++;
             LastQuery = query;
+            LastBudget = budget;
+            LastForceRefresh = forceRefresh;
             return _handler(query);
         }
 
@@ -39,11 +46,25 @@ public class NowPlayingViewModelTests
         Lines = lines.Select((t, i) => new LyricsLine { StartMs = i * 1000, Text = t }).ToList(),
     };
 
+    private static LyricsDocument WordDoc(params string[] lines) => new()
+    {
+        SyncKind = LyricsSyncKind.Word,
+        Lines = lines.Select((t, i) => new LyricsLine
+        {
+            StartMs = i * 1000,
+            Text = t,
+            Words = new[] { new LyricsWord { StartMs = i * 1000, EndMs = i * 1000 + 500, Text = t } },
+        }).ToList(),
+    };
+
+    private static readonly IOptions<LyricsOrchestrationOptions> Opts =
+        Options.Create(new LyricsOrchestrationOptions());
+
     private static NowPlayingViewModel Build(FakePlaybackService svc, Func<LyricsQuery, Task<LyricsDocument?>> handler, Action<Action>? enqueueOverride = null)
-        => new(svc, new FakeLyricsService(handler), new NullLoggingService(), synchronous: true, enqueueOverride: enqueueOverride);
+        => new(svc, new FakeLyricsService(handler), Opts, new NullLoggingService(), synchronous: true, enqueueOverride: enqueueOverride);
 
     private static NowPlayingViewModel Build(FakePlaybackService svc, FakeLyricsService service, Action<Action>? enqueueOverride = null)
-        => new(svc, service, new NullLoggingService(), synchronous: true, enqueueOverride: enqueueOverride);
+        => new(svc, service, Opts, new NullLoggingService(), synchronous: true, enqueueOverride: enqueueOverride);
 
     [TestMethod]
     public async Task NullTrack_OnNavigatedTo_LandsOnNoTrack()
@@ -54,14 +75,13 @@ public class NowPlayingViewModelTests
         vm.OnNavigatedTo(null!);
 
         Assert.AreEqual(LyricsLoadState.NoTrack, vm.LyricsLoadState);
-        Assert.IsNull(vm.LyricsText);
         Assert.IsNull(vm.CurrentLyrics);
         Assert.IsNull(vm.TechnicalDetail);
         if (vm.PendingLyricsFetch != null) await vm.PendingLyricsFetch;
     }
 
     [TestMethod]
-    public async Task TrackWithDocument_LandsOnLoaded_SetsCurrentLyricsAndFlattenedText()
+    public async Task TrackWithDocument_LandsOnLoaded_SetsCurrentLyrics()
     {
         var svc = new FakePlaybackService { NowPlaying = T("a") };
         var doc = LineDoc("line one", "line two");
@@ -72,7 +92,6 @@ public class NowPlayingViewModelTests
 
         Assert.AreEqual(LyricsLoadState.Loaded, vm.LyricsLoadState);
         Assert.AreSame(doc, vm.CurrentLyrics);
-        Assert.AreEqual("line one\nline two", vm.LyricsText);
     }
 
     [TestMethod]
@@ -86,7 +105,6 @@ public class NowPlayingViewModelTests
 
         Assert.AreEqual(LyricsLoadState.NoLyrics, vm.LyricsLoadState);
         Assert.IsNull(vm.CurrentLyrics);
-        Assert.IsNull(vm.LyricsText);
     }
 
     [TestMethod]
@@ -136,7 +154,6 @@ public class NowPlayingViewModelTests
         svc.RaiseTrackChanged();
 
         Assert.AreEqual(LyricsLoadState.NoTrack, vm.LyricsLoadState);
-        Assert.IsNull(vm.LyricsText);
         Assert.IsNull(vm.CurrentLyrics);
         Assert.IsNull(vm.TechnicalDetail);
     }
@@ -198,7 +215,7 @@ public class NowPlayingViewModelTests
         tcsB.SetResult(LineDoc("b-text"));
         await vm.PendingLyricsFetch!;
 
-        Assert.AreEqual("b-text", vm.LyricsText);
+        Assert.AreEqual("b-text", vm.CurrentLyrics!.Lines[0].Text);
     }
 
     [TestMethod]
@@ -215,7 +232,6 @@ public class NowPlayingViewModelTests
 
         // Pre-OnNavigatedFrom state was Loading; the late completion must not flip it.
         Assert.AreEqual(LyricsLoadState.Loading, vm.LyricsLoadState);
-        Assert.IsNull(vm.LyricsText);
         Assert.IsNull(vm.CurrentLyrics);
     }
 
@@ -225,7 +241,7 @@ public class NowPlayingViewModelTests
         var captured = new Queue<Action>();
         var service = new FakeLyricsService(_ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
         var svc = new FakePlaybackService { NowPlaying = T("a") };
-        var vm = new NowPlayingViewModel(svc, service, new NullLoggingService(), synchronous: false, enqueueOverride: a => captured.Enqueue(a));
+        var vm = new NowPlayingViewModel(svc, service, Opts, new NullLoggingService(), synchronous: false, enqueueOverride: a => captured.Enqueue(a));
 
         vm.OnNavigatedTo(null!);
         if (vm.PendingLyricsFetch != null) await vm.PendingLyricsFetch;
@@ -240,5 +256,177 @@ public class NowPlayingViewModelTests
         // The _vmActive guard inside the queued lambda must short-circuit — no fetch starts.
         captured.Dequeue()();
         Assert.AreEqual(callsAfterInit, service.CallCount);
+    }
+
+    [TestMethod]
+    public void Proxies_SeedFromPlaybackService_OnNavigatedTo()
+    {
+        var svc = new FakePlaybackService
+        {
+            NowPlaying = T("a"), Position = 12.5, Duration = 200, IsPlaying = true,
+        };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
+
+        vm.OnNavigatedTo(null!);
+
+        Assert.AreEqual(12500.0, vm.PositionMs);
+        Assert.AreEqual(200000.0, vm.TrackDurationMs);
+        Assert.IsTrue(vm.IsPlaying);
+    }
+
+    [TestMethod]
+    public void PositionChanged_UpdatesPositionMs()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a"), Position = 0 };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
+        vm.OnNavigatedTo(null!);
+
+        svc.Position = 3.0;
+        svc.RaisePositionChanged();
+
+        Assert.AreEqual(3000.0, vm.PositionMs);
+    }
+
+    [TestMethod]
+    public void PlaybackStateChanged_UpdatesIsPlaying()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a"), IsPlaying = false };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
+        vm.OnNavigatedTo(null!);
+
+        svc.IsPlaying = true;
+        svc.RaisePlaybackStateChanged();
+
+        Assert.IsTrue(vm.IsPlaying);
+    }
+
+    [TestMethod]
+    public void TrackDurationMs_IsNull_WhenDurationNonPositive()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a"), Duration = 0 };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
+
+        vm.OnNavigatedTo(null!);
+
+        Assert.IsNull(vm.TrackDurationMs);
+    }
+
+    [TestMethod]
+    public void PositionChanged_AfterOnNavigatedFrom_DoesNotUpdate()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a"), Position = 1.0 };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
+        vm.OnNavigatedTo(null!);
+        vm.OnNavigatedFrom();
+
+        svc.Position = 99.0;
+        svc.RaisePositionChanged();
+
+        Assert.AreEqual(1000.0, vm.PositionMs); // frozen at the last value before detach
+    }
+
+    [TestMethod]
+    public async Task EnableKaraokeWipe_TrueForWordSynced()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a") };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(WordDoc("la")));
+
+        vm.OnNavigatedTo(null!);
+        await vm.PendingLyricsFetch!;
+
+        Assert.IsTrue(vm.EnableKaraokeWipe);
+    }
+
+    [TestMethod]
+    public async Task EnableKaraokeWipe_FalseForLineSynced()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a") };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(LineDoc("la")));
+
+        vm.OnNavigatedTo(null!);
+        await vm.PendingLyricsFetch!;
+
+        Assert.IsFalse(vm.EnableKaraokeWipe);
+    }
+
+    [TestMethod]
+    public async Task EnableKaraokeWipe_FalseWhenNoLyrics()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a") };
+        var vm = Build(svc, _ => Task.FromResult<LyricsDocument?>(null));
+
+        vm.OnNavigatedTo(null!);
+        await vm.PendingLyricsFetch!;
+
+        Assert.IsFalse(vm.EnableKaraokeWipe);
+    }
+
+    [TestMethod]
+    public async Task Refresh_ForceRefreshesWithManualBudget()
+    {
+        var svc = new FakePlaybackService { NowPlaying = T("a") };
+        var service = new FakeLyricsService(_ => Task.FromResult<LyricsDocument?>(LineDoc("fresh")));
+        var vm = Build(svc, service);
+        vm.OnNavigatedTo(null!);
+        await vm.PendingLyricsFetch!;
+
+        await vm.RefreshLyricsCommand.ExecuteAsync(null);
+
+        Assert.IsTrue(service.LastForceRefresh);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(new LyricsOrchestrationOptions().ManualRefreshBudgetMs), service.LastBudget);
+        Assert.AreEqual("fresh", vm.CurrentLyrics!.Lines[0].Text);
+    }
+
+    [TestMethod]
+    public async Task Refresh_DoesNotClearCurrentLyricsWhileRunning()
+    {
+        var tcs = new TaskCompletionSource<LyricsDocument?>();
+        var svc = new FakePlaybackService { NowPlaying = T("a") };
+        var first = LineDoc("original");
+        var calls = 0;
+        var service = new FakeLyricsService(_ => ++calls == 1 ? Task.FromResult<LyricsDocument?>(first) : tcs.Task);
+        var vm = Build(svc, service);
+        vm.OnNavigatedTo(null!);
+        await vm.PendingLyricsFetch!;
+        Assert.AreSame(first, vm.CurrentLyrics);
+
+        var refresh = vm.RefreshLyricsCommand.ExecuteAsync(null);
+        // While the refresh is in flight, the original lyrics remain on screen.
+        Assert.AreSame(first, vm.CurrentLyrics);
+        Assert.AreEqual(LyricsLoadState.Loaded, vm.LyricsLoadState);
+
+        tcs.SetResult(LineDoc("updated"));
+        await refresh;
+        Assert.AreEqual("updated", vm.CurrentLyrics!.Lines[0].Text);
+    }
+
+    [TestMethod]
+    public async Task Refresh_StaleResultDiscarded_WhenTrackChangesMidRefresh()
+    {
+        var tcs = new TaskCompletionSource<LyricsDocument?>();
+        var svc = new FakePlaybackService { NowPlaying = T("a") };
+        var calls = 0;
+        // Track b resolves immediately; track a's refresh (call #2) is deferred via tcs so it completes late.
+        var service = new FakeLyricsService(q =>
+        {
+            calls++;
+            if (q.SongId == "b") return Task.FromResult<LyricsDocument?>(LineDoc("b-text"));
+            return calls <= 1 ? Task.FromResult<LyricsDocument?>(LineDoc("a-orig")) : tcs.Task;
+        });
+        var vm = Build(svc, service);
+        vm.OnNavigatedTo(null!);
+        await vm.PendingLyricsFetch!;
+
+        var refresh = vm.RefreshLyricsCommand.ExecuteAsync(null); // refresh for track a → deferred via tcs (gen N)
+        // Track changes before the refresh completes; track b's fetch resolves right away (gen N+1).
+        svc.NowPlaying = T("b");
+        svc.RaiseTrackChanged();
+        if (vm.PendingLyricsFetch != null) await vm.PendingLyricsFetch;
+
+        tcs.SetResult(LineDoc("a-stale")); // the stale refresh for track a completes late
+        await refresh;
+
+        // The stale refresh result must not overwrite track b's state.
+        Assert.AreEqual("b-text", vm.CurrentLyrics!.Lines[0].Text);
     }
 }

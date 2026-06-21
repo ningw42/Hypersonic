@@ -94,7 +94,9 @@ Key refinements over the original sketch (see design doc): a self-interpolating 
 
 **Verification vehicle** (folded into this phase): a Core **`TtmlLyricsParser`** (registered as format `ttml`, reused later by the deferred AMLL provider) + a **`LocalFileLyricsSource`** reading a sideloaded `%LOCALAPPDATA%\Hypersonic\LyricsOverride\<songId>.ttml`. It is an **override source, not a fan-out provider**: `LyricsService` consults it **before the cache read** (one small isolated hook), and a present file wins outright — bypassing cache + fan-out + write, and reversible (delete the file to revert). A real song's word-timed TTML thus plays back live in a throwaway dev harness page. Win2D (`Microsoft.Graphics.Win2D`) is already referenced — no new dependency.
 
-### Phase 3 — Integration on `NowPlayingPage`
+### Phase 3 — Integration on `NowPlayingPage` — ✅ shipped
+
+> **Source of truth:** [`docs/design/ui/2026-06-21-lyrics-now-playing-integration.md`](docs/design/ui/2026-06-21-lyrics-now-playing-integration.md). Two refinements emerged: all sync kinds (including Plain) route through the canvas, and the manual refresh button's feedback lives entirely in the button. Position/play-state/duration are sourced from `IPlaybackService` (the true origin) rather than `PlayerViewModel`.
 
 - Expose `CurrentLyrics` and `CurrentPositionMs` on `PlayerViewModel` (or whichever ViewModel owns the binding after the Phase 1 call).
 - Replace the existing text-only lyrics area on `NowPlayingPage` with the `LyricsCanvasControl` from Phase 2.

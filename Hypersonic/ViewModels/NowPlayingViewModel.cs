@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 using Hypersonic.Contracts.Services;
 using Hypersonic.Contracts.ViewModels;
@@ -6,7 +7,9 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Helpers;
+using Hypersonic.Models;
 
+using Microsoft.Extensions.Options;
 using Microsoft.UI.Dispatching;
 
 namespace Hypersonic.ViewModels;
@@ -14,14 +17,15 @@ namespace Hypersonic.ViewModels;
 /// <summary>
 /// Now Playing surface state. Lyric resolution and caching now live in the singleton
 /// <see cref="ILyricsService"/>; the VM is a pure consumer that maps a track change to a
-/// <see cref="LyricsDocument"/> (for the Phase 2 renderer) plus a flattened-text fallback and a
-/// load state. The generation guard, dispatcher marshalling, active/inactive lifecycle, and
+/// <see cref="LyricsDocument"/> (for the lyrics canvas) plus a load state. The generation
+/// guard, dispatcher marshalling, active/inactive lifecycle, and
 /// <see cref="TechnicalDetail"/> are unchanged from the pre-migration VM.
 /// </summary>
 public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
 {
     private readonly IPlaybackService _playbackService;
     private readonly ILyricsService _lyricsService;
+    private readonly LyricsOrchestrationOptions _orchestrationOptions;
     private readonly ILogger _log;
     private readonly DispatcherQueue? _vmDispatcher;
     private readonly bool _synchronous;
@@ -33,13 +37,25 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     [ObservableProperty]
     public partial NowPlayingTab SelectedTab { get; set; } = NowPlayingTab.Lyrics;
 
-    /// <summary>Flattened lyric text — fallback for today's text UI until the Phase 2 renderer replaces it.</summary>
+    /// <summary>The validated lyrics document for the current track, consumed by the lyrics canvas.</summary>
     [ObservableProperty]
-    public partial string? LyricsText { get; set; }
-
-    /// <summary>The validated lyrics document for the current track, consumed by the Phase 2 renderer.</summary>
-    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EnableKaraokeWipe))]
     public partial LyricsDocument? CurrentLyrics { get; set; }
+
+    /// <summary>Karaoke gradient wipe is enabled only for word-synced lyrics (§4); line/plain get a solid highlight.</summary>
+    public bool EnableKaraokeWipe => CurrentLyrics?.SyncKind == LyricsSyncKind.Word;
+
+    /// <summary>Playback position in milliseconds — the lyrics canvas's clock anchor (seconds → ms).</summary>
+    [ObservableProperty]
+    public partial double PositionMs { get; set; }
+
+    /// <summary>Whether playback is advancing — drives the canvas clock.</summary>
+    [ObservableProperty]
+    public partial bool IsPlaying { get; set; }
+
+    /// <summary>Track length in milliseconds, or null when unknown (duration ≤ 0).</summary>
+    [ObservableProperty]
+    public partial double? TrackDurationMs { get; set; }
 
     [ObservableProperty]
     public partial LyricsLoadState LyricsLoadState { get; set; } = LyricsLoadState.NoTrack;
@@ -53,10 +69,12 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     public NowPlayingViewModel(
         IPlaybackService playbackService,
         ILyricsService lyricsService,
+        IOptions<LyricsOrchestrationOptions> orchestrationOptions,
         ILoggingService logService)
     {
         _playbackService = playbackService;
         _lyricsService = lyricsService;
+        _orchestrationOptions = orchestrationOptions.Value;
         _log = logService.GetLogger(nameof(NowPlayingViewModel));
         _vmDispatcher = DispatcherQueue.GetForCurrentThread();
         _synchronous = false;
@@ -66,12 +84,14 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     internal NowPlayingViewModel(
         IPlaybackService playbackService,
         ILyricsService lyricsService,
+        IOptions<LyricsOrchestrationOptions> orchestrationOptions,
         ILoggingService logService,
         bool synchronous,
         Action<Action>? enqueueOverride = null)
     {
         _playbackService = playbackService;
         _lyricsService = lyricsService;
+        _orchestrationOptions = orchestrationOptions.Value;
         _log = logService.GetLogger(nameof(NowPlayingViewModel));
         _vmDispatcher = null;
         _synchronous = synchronous;
@@ -82,6 +102,9 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     {
         _vmActive = true;
         _playbackService.TrackChanged += OnTrackChanged;
+        _playbackService.PositionChanged += OnPositionChanged;
+        _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
+        SyncPlaybackProxies();
         HandleTrackChange();
     }
 
@@ -89,6 +112,8 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     {
         _vmActive = false;
         _playbackService.TrackChanged -= OnTrackChanged;
+        _playbackService.PositionChanged -= OnPositionChanged;
+        _playbackService.PlaybackStateChanged -= OnPlaybackStateChanged;
         Interlocked.Increment(ref _lyricsGeneration);
     }
 
@@ -109,6 +134,37 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         }
     }
 
+    private void SyncPlaybackProxies()
+    {
+        PositionMs = _playbackService.Position * 1000.0;
+        IsPlaying = _playbackService.IsPlaying;
+        TrackDurationMs = _playbackService.Duration > 0 ? _playbackService.Duration * 1000.0 : null;
+    }
+
+    private void OnPositionChanged(object? sender, EventArgs e)
+    {
+        if (_synchronous)
+        {
+            if (_vmActive) SyncPlaybackProxies();
+        }
+        else
+        {
+            _enqueue(() => { if (_vmActive) SyncPlaybackProxies(); });
+        }
+    }
+
+    private void OnPlaybackStateChanged(object? sender, EventArgs e)
+    {
+        if (_synchronous)
+        {
+            if (_vmActive) SyncPlaybackProxies();
+        }
+        else
+        {
+            _enqueue(() => { if (_vmActive) SyncPlaybackProxies(); });
+        }
+    }
+
     private void HandleTrackChange()
     {
         var track = _playbackService.NowPlaying;
@@ -117,7 +173,6 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         if (track == null)
         {
             TechnicalDetail = null;
-            LyricsText = null;
             CurrentLyrics = null;
             LyricsLoadState = LyricsLoadState.NoTrack;
             return;
@@ -126,7 +181,6 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         TechnicalDetail = TechnicalDetailFormatter.Format(
             track.Suffix, track.BitDepth, track.SamplingRate, track.BitRate);
 
-        LyricsText = null;
         CurrentLyrics = null;
         LyricsLoadState = LyricsLoadState.Loading;
         PendingLyricsFetch = LoadLyricsAsync(track, generation);
@@ -138,41 +192,68 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         {
             var query = new LyricsQuery(track.Id, track.Artist, track.Title, track.Album, track.Duration);
             var document = await _lyricsService.GetLyricsAsync(query, cancellationToken: CancellationToken.None);
-
-            if (!_vmActive || Volatile.Read(ref _lyricsGeneration) != generation)
-            {
-                return;
-            }
-
-            // null (no usable lyrics this attempt) and SyncKind=None (definitively none) both present
-            // as NoLyrics — the cache-vs-not distinction is the service's concern, invisible here.
-            if (document is null || document.SyncKind == LyricsSyncKind.None)
-            {
-                CurrentLyrics = null;
-                LyricsText = null;
-                LyricsLoadState = LyricsLoadState.NoLyrics;
-            }
-            else
-            {
-                CurrentLyrics = document;
-                LyricsText = Flatten(document);
-                LyricsLoadState = LyricsLoadState.Loaded;
-            }
+            ApplyLyricsResult(document, generation);
         }
         catch (Exception ex)
         {
             _log.Warning("Lyrics fetch threw", new { TrackId = track.Id }, ex);
-            if (!_vmActive || Volatile.Read(ref _lyricsGeneration) != generation)
-            {
-                return;
-            }
-
-            CurrentLyrics = null;
-            LyricsText = null;
-            LyricsLoadState = LyricsLoadState.NoLyrics;
+            ApplyLyricsResult(null, generation);
         }
     }
 
-    private static string Flatten(LyricsDocument document)
-        => string.Join("\n", document.Lines.Select(line => line.Text));
+    /// <summary>
+    /// User-initiated force-refresh: bypasses the cache and re-fetches with the generous manual budget
+    /// to recover the best available lyrics. The current lyrics stay on screen the whole time — the
+    /// busy state lives in the button (CommunityToolkit's generated IsRunning) — and the result swaps in
+    /// through the shared <see cref="ApplyLyricsResult"/> path. Shares the generation guard so a track
+    /// change mid-refresh discards the stale result.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshLyricsAsync()
+    {
+        var track = _playbackService.NowPlaying;
+        if (track is null)
+        {
+            return;
+        }
+
+        var generation = Interlocked.Increment(ref _lyricsGeneration);
+        var budget = TimeSpan.FromMilliseconds(_orchestrationOptions.ManualRefreshBudgetMs);
+
+        try
+        {
+            var query = new LyricsQuery(track.Id, track.Artist, track.Title, track.Album, track.Duration);
+            var document = await _lyricsService.GetLyricsAsync(query, budget, forceRefresh: true, CancellationToken.None);
+            ApplyLyricsResult(document, generation);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning("Manual lyrics refresh threw", new { TrackId = track.Id }, ex);
+            ApplyLyricsResult(null, generation);
+        }
+    }
+
+    /// <summary>
+    /// Applies a resolved lyrics document (or a failure/none) to the surface state, guarded by the
+    /// generation token. Shared by the track-change fetch and the manual refresh command. A null or
+    /// <see cref="LyricsSyncKind.None"/> document presents as <see cref="LyricsLoadState.NoLyrics"/>.
+    /// </summary>
+    private void ApplyLyricsResult(LyricsDocument? document, long generation)
+    {
+        if (!_vmActive || Volatile.Read(ref _lyricsGeneration) != generation)
+        {
+            return;
+        }
+
+        if (document is null || document.SyncKind == LyricsSyncKind.None)
+        {
+            CurrentLyrics = null;
+            LyricsLoadState = LyricsLoadState.NoLyrics;
+        }
+        else
+        {
+            CurrentLyrics = document;
+            LyricsLoadState = LyricsLoadState.Loaded;
+        }
+    }
 }

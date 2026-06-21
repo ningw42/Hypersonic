@@ -10,6 +10,7 @@
     xmlns:converters="using:Hypersonic.Converters"
     xmlns:behaviors="using:Hypersonic.Behaviors"
     xmlns:controls="using:Hypersonic.Controls"
+    xmlns:lyrics="using:Hypersonic.Controls.Lyrics"
     xmlns:helpers="using:Hypersonic.Helpers"
     mc:Ignorable="d"
     behaviors:NavigationViewHeaderBehavior.HeaderMode="Never">
@@ -142,24 +143,45 @@
                               HorizontalAlignment="Center" VerticalAlignment="Center"
                               Visibility="{x:Bind ViewModel.LyricsLoadState, Mode=OneWay, Converter={StaticResource LyricsLoadStateToVisibilityConverter}, ConverterParameter=Loading}"/>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              Visibility="{x:Bind ViewModel.LyricsLoadState, Mode=OneWay, Converter={StaticResource LyricsLoadStateToVisibilityConverter}, ConverterParameter=Loaded}"
-                              Padding="0,0,16,0">
-                    <TextBlock Text="{x:Bind ViewModel.LyricsText, Mode=OneWay}"
-                               FontSize="14"
-                               TextWrapping="Wrap"
-                               HorizontalAlignment="Center"
-                               TextAlignment="Center"
-                               LineHeight="22"
-                               MaxWidth="600"
-                               Padding="0,8,0,16"/>
-                </ScrollViewer>
+                <lyrics:LyricsCanvasControl
+                    x:Name="LyricsCanvas"
+                    Lyrics="{x:Bind ViewModel.CurrentLyrics, Mode=OneWay}"
+                    PositionMs="{x:Bind ViewModel.PositionMs, Mode=OneWay}"
+                    IsPlaying="{x:Bind ViewModel.IsPlaying, Mode=OneWay}"
+                    TrackDurationMs="{x:Bind ViewModel.TrackDurationMs, Mode=OneWay}"
+                    Alignment="Center"
+                    EnableBloom="False"
+                    EnableNeighborBlur="True"
+                    EnableKaraokeWipe="{x:Bind ViewModel.EnableKaraokeWipe, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.LyricsLoadState, Mode=OneWay, Converter={StaticResource LyricsLoadStateToVisibilityConverter}, ConverterParameter=Loaded}"/>
 
                 <TextBlock Text="No lyrics available"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                            FontSize="13"
                            Visibility="{x:Bind ViewModel.LyricsLoadState, Mode=OneWay, Converter={StaticResource LyricsLoadStateToVisibilityConverter}, ConverterParameter=NoLyrics}"/>
+
+                <!-- Manual refresh: feedback lives in the button; the canvas keeps rendering. Enabled when
+                     there's a track, so it works in both Loaded and NoLyrics states. -->
+                <Button x:Name="RefreshLyricsButton"
+                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,4,4,0" Width="36" Height="36"
+                        Style="{StaticResource TransparentButtonStyle}"
+                        Command="{x:Bind ViewModel.RefreshLyricsCommand}"
+                        IsEnabled="{x:Bind Player.HasTrack, Mode=OneWay}"
+                        ToolTipService.ToolTip="Refresh lyrics">
+                    <!-- The button is the indicator (design §6): the static glyph swaps to a spinning ring
+                         while the force-refresh runs. The button also freezes (disabled → 0.4 opacity via
+                         TransparentButtonStyle) during the fetch, so the dimmed-but-spinning ring reads as
+                         "busy". Driven by CommunityToolkit's generated IAsyncRelayCommand.IsRunning. -->
+                    <Grid>
+                        <FontIcon Glyph="&#xE72C;" FontSize="16"
+                                  Visibility="{x:Bind ViewModel.RefreshLyricsCommand.IsRunning, Mode=OneWay, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                        <ProgressRing Width="16" Height="16"
+                                      IsActive="{x:Bind ViewModel.RefreshLyricsCommand.IsRunning, Mode=OneWay}"
+                                      Visibility="{x:Bind ViewModel.RefreshLyricsCommand.IsRunning, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    </Grid>
+                </Button>
             </Grid>
 
             <!-- Queue surface -->
@@ -252,5 +274,8 @@
         <TextBlock x:Name="PrimaryBrushProvider" Foreground="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="SecondaryBrushProvider" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="TertiaryBrushProvider" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="Collapsed"/>
+        <!-- Surface (page base) background — read in code-behind to match the canvas to the rest of the
+             page under the None backdrop (a transparent swap-chain clear renders white, not the theme bg). -->
+        <Border x:Name="SurfaceBrushProvider" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" Visibility="Collapsed"/>
     </Grid>
 </Page>

@@ -97,6 +97,9 @@ public sealed partial class NowPlayingPage : Page
     private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         EnsureCoverArtAnimator();
+        // ActualTheme is reliable once loaded; re-push the surface colour so the canvas matches the
+        // backdrop from the first frame (the constructor push can run before the theme is inherited).
+        ApplyLyricsSurfaceColor();
     }
 
     private void EnsureCoverArtAnimator()
@@ -401,7 +404,56 @@ public sealed partial class NowPlayingPage : Page
         {
             UpdateCoverArtFallback();
         }
+        ApplyLyricsColors();
     }
+
+    private void ApplyLyricsColors()
+    {
+        // The canvas takes Color, not Brush. Resolve from the same brush providers the metadata text uses,
+        // so the lyrics track Light/Dark in lockstep with the rest of the page (re-pushed on theme change).
+        if (PrimaryBrush is Microsoft.UI.Xaml.Media.SolidColorBrush played)
+        {
+            LyricsCanvas.PlayedColor = played.Color;
+        }
+        if (TertiaryBrush is Microsoft.UI.Xaml.Media.SolidColorBrush unplayed)
+        {
+            LyricsCanvas.UnplayedColor = unplayed.Color;
+        }
+
+        ApplyLyricsSurfaceColor();
+    }
+
+    // How far the canvas surface sits from the pure black/white root toward the theme base brush, under
+    // the None backdrop. The content area is the base brush *faintly* layered over the root colour that
+    // BackdropSelectorService paints, so the visible colour lands between the two — closer to the root.
+    // Pure root (0.0) read too dark; the full base brush (1.0) read too light. Tune if it still drifts.
+    private const double SurfaceBlendTowardBase = 0.5;
+
+    private void ApplyLyricsSurfaceColor()
+    {
+        // Under a Mica/Acrylic backdrop the content area is transparent and the material shows through,
+        // so the canvas clears transparent too. Under None the content area is an opaque theme colour and
+        // a transparent swap-chain clear renders white over the opaque window — so the canvas must clear
+        // to the page's colour to disappear into it. That colour is the theme base brush faintly layered
+        // over the pure black/white root, so we blend the two (the exact framework layer isn't nameable
+        // here, and Application.Current.Resources ignores the element theme — hence the brush provider).
+        var backdrop = App.GetService<IBackdropSelectorService>().Backdrop;
+        if (backdrop != BackdropType.None || SurfaceBrushProvider.Background is not Microsoft.UI.Xaml.Media.SolidColorBrush baseBrush)
+        {
+            LyricsCanvas.SurfaceColor = Microsoft.UI.Colors.Transparent;
+            return;
+        }
+
+        var root = ActualTheme == ElementTheme.Dark ? Microsoft.UI.Colors.Black : Microsoft.UI.Colors.White;
+        LyricsCanvas.SurfaceColor = BlendColors(baseBrush.Color, root, SurfaceBlendTowardBase);
+    }
+
+    private static Windows.UI.Color BlendColors(Windows.UI.Color toward, Windows.UI.Color from, double t)
+        => Windows.UI.Color.FromArgb(
+            255,
+            (byte)Math.Round(toward.R * t + from.R * (1 - t)),
+            (byte)Math.Round(toward.G * t + from.G * (1 - t)),
+            (byte)Math.Round(toward.B * t + from.B * (1 - t)));
 
     private async void UpdateCoverArtFallback()
     {

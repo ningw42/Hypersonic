@@ -17,3 +17,6 @@ AppPackages/
 
 # Agents
 .claude
+
+# Brainstorming visual-companion scratch files
+.superpowers/

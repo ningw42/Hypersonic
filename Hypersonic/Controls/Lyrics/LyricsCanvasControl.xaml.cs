@@ -138,6 +138,32 @@ public sealed partial class LyricsCanvasControl : UserControl
         set => SetValue(UnplayedColorProperty, value);
     }
 
+    public static readonly DependencyProperty SurfaceColorProperty = DependencyProperty.Register(
+        nameof(SurfaceColor), typeof(Color), typeof(LyricsCanvasControl),
+        new PropertyMetadata(Microsoft.UI.Colors.Transparent, OnSurfaceColorChanged));
+
+    /// <summary>
+    /// The canvas clear (background) colour. The driver pushes the page's effective surface colour so the
+    /// canvas matches the rest of the page: a solid theme colour when there is no window backdrop (a
+    /// transparent swap-chain clear renders white over an opaque window, not the theme background), and
+    /// <see cref="Microsoft.UI.Colors.Transparent"/> under a Mica/Acrylic backdrop so the material shows through.
+    /// </summary>
+    public Color SurfaceColor
+    {
+        get => (Color)GetValue(SurfaceColorProperty);
+        set => SetValue(SurfaceColorProperty, value);
+    }
+
+    private static void OnSurfaceColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var control = (LyricsCanvasControl)d;
+        if (control.Canvas is not null)
+        {
+            // ClearColor is a UI-thread Win2D property; the animated control picks it up on the next frame.
+            control.Canvas.ClearColor = (Color)e.NewValue;
+        }
+    }
+
     public static readonly DependencyProperty FontFamilyNameProperty = DependencyProperty.Register(
         nameof(FontFamilyName), typeof(string), typeof(LyricsCanvasControl),
         new PropertyMetadata("Segoe UI", OnFontChanged));

@@ -178,8 +178,6 @@ public partial class App : Application
             services.AddTransient<PlaylistDetailPage>();
             services.AddTransient<NowPlayingViewModel>();
             services.AddTransient<NowPlayingPage>();
-            services.AddTransient<LyricsLabViewModel>(); // Phase 2 throwaway dev harness
-            services.AddTransient<LyricsLabPage>();
             services.AddTransient<ConnectViewModel>();
             services.AddTransient<ConnectPage>();
             services.AddTransient<ShellPage>();

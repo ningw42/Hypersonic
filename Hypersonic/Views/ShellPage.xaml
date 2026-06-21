@@ -269,12 +269,6 @@
                             <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8FD;"/>
                         </NavigationViewItem.Icon>
                     </NavigationViewItem>
-                    <!-- Phase 2 throwaway dev harness for the Win2D lyrics control (removed in Phase 3). -->
-                    <NavigationViewItem Content="Lyrics Lab" helpers:NavigationHelper.NavigateTo="Hypersonic.ViewModels.LyricsLabViewModel">
-                        <NavigationViewItem.Icon>
-                            <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8D6;"/>
-                        </NavigationViewItem.Icon>
-                    </NavigationViewItem>
                 </NavigationView.MenuItems>
                 <NavigationView.HeaderTemplate>
                     <DataTemplate>
