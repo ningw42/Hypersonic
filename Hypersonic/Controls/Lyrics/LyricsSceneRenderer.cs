@@ -21,6 +21,10 @@ internal sealed class LyricsSceneRenderer
     /// <summary>Width of the leading soft edge of the wipe, as a fraction of the row.</summary>
     public double WipeSoftness { get; set; } = 0.08;
 
+    // Reused across frames: the wipe's 4 gradient stops are rebuilt in place each call (positions/colours
+    // only) instead of allocating a fresh array per row per frame.
+    private readonly CanvasGradientStop[] _wipeStops = new CanvasGradientStop[4];
+
     /// <summary>Per-word pop/float/glow on the active line. The headline effect; active line only.</summary>
     public bool EnableBloom { get; set; } = true;
 
@@ -81,21 +85,23 @@ internal sealed class LyricsSceneRenderer
 
             var previous = ds.Transform;
             ds.Transform = emphasis;
-            using (ds.CreateLayer((float)opacity))
+            // Fold the line opacity (emphasis falloff × edge fade) into each draw colour's alpha rather than
+            // pushing an offscreen CreateLayer(opacity) per visible line — the single biggest per-frame win.
+            // Equivalent for a line's non-overlapping glyphs; for the blur path the pre-blur alpha scales the
+            // blurred output identically (blur is linear in alpha).
+            if (isActive && EnableKaraokeWipe)
             {
-                if (isActive && EnableKaraokeWipe)
-                {
-                    DrawWipe(ds, line, estimatedMs, marginX, screenTop, playedColor, unplayedColor);
-                }
-                else if (isActive)
-                {
-                    // Discrete highlight: the whole active line in the played colour, no sweep.
-                    ds.DrawTextLayout(line.Layout, (float)marginX, (float)screenTop, playedColor);
-                }
-                else
-                {
-                    DrawSolid(ds, line, marginX, screenTop, unplayedColor);
-                }
+                DrawWipe(ds, line, estimatedMs, marginX, screenTop,
+                    WithOpacity(playedColor, opacity), WithOpacity(unplayedColor, opacity));
+            }
+            else if (isActive)
+            {
+                // Discrete highlight: the whole active line in the played colour, no sweep.
+                ds.DrawTextLayout(line.Layout, (float)marginX, (float)screenTop, WithOpacity(playedColor, opacity));
+            }
+            else
+            {
+                DrawSolid(ds, line, marginX, screenTop, WithOpacity(unplayedColor, opacity));
             }
             ds.Transform = previous;
 
@@ -137,20 +143,25 @@ internal sealed class LyricsSceneRenderer
     private CanvasLinearGradientBrush BuildWipeBrush(CanvasDrawingSession ds, LyricsVisualRow row, double marginX, double screenTop, double pRow, Color played, Color unplayed)
     {
         var edge = Math.Min(pRow + WipeSoftness, 1.0);
-        var stops = new[]
-        {
-            new CanvasGradientStop { Position = 0f, Color = played },
-            new CanvasGradientStop { Position = (float)pRow, Color = played },
-            new CanvasGradientStop { Position = (float)edge, Color = unplayed },
-            new CanvasGradientStop { Position = 1f, Color = unplayed },
-        };
+        _wipeStops[0] = new CanvasGradientStop { Position = 0f, Color = played };
+        _wipeStops[1] = new CanvasGradientStop { Position = (float)pRow, Color = played };
+        _wipeStops[2] = new CanvasGradientStop { Position = (float)edge, Color = unplayed };
+        _wipeStops[3] = new CanvasGradientStop { Position = 1f, Color = unplayed };
 
         var midY = (float)(screenTop + row.Top + row.Height / 2);
-        return new CanvasLinearGradientBrush(ds, stops)
+        return new CanvasLinearGradientBrush(ds, _wipeStops)
         {
             StartPoint = new Vector2((float)(marginX + row.Left), midY),
             EndPoint = new Vector2((float)(marginX + row.Right), midY),
         };
+    }
+
+    /// <summary>Returns <paramref name="color"/> with its alpha scaled by <paramref name="opacity"/> — lets a
+    /// line's emphasis/edge-fade opacity be baked into the draw colour instead of an offscreen layer.</summary>
+    private static Color WithOpacity(Color color, double opacity)
+    {
+        var a = (byte)Math.Clamp(Math.Round(color.A * opacity), 0, 255);
+        return Color.FromArgb(a, color.R, color.G, color.B);
     }
 
     private static void DrawClippedText(CanvasDrawingSession ds, LyricsVisualLine line, double marginX, double screenTop, Rect clip, Color color)
