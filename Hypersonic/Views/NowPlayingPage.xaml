@@ -274,8 +274,13 @@
         <TextBlock x:Name="PrimaryBrushProvider" Foreground="{ThemeResource TextFillColorPrimaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="SecondaryBrushProvider" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed"/>
         <TextBlock x:Name="TertiaryBrushProvider" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="Collapsed"/>
-        <!-- Surface (page base) background — read in code-behind to match the canvas to the rest of the
-             page under the None backdrop (a transparent swap-chain clear renders white, not the theme bg). -->
-        <Border x:Name="SurfaceBrushProvider" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" Visibility="Collapsed"/>
+        <!-- Content-layer brush — the lyrics canvas is a Win2D swap chain that composites against the
+             window backdrop directly, bypassing the NavigationView's content-area background (the Fluent
+             "content layer"). The code-behind reads this brush and paints it into the swap-chain clear to
+             match the rest of the page: translucent over a material backdrop, composited over the opaque
+             root under None. Bound to NavigationViewContentBackground — the framework's own key for the
+             content-area background (aliased to LayerFillColorDefaultBrush) — rather than the brush
+             directly, so overriding that content background flows into the canvas with no code change. -->
+        <Border x:Name="LayerBrushProvider" Background="{ThemeResource NavigationViewContentBackground}" Visibility="Collapsed"/>
     </Grid>
 </Page>

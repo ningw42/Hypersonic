@@ -423,37 +423,48 @@ public sealed partial class NowPlayingPage : Page
         ApplyLyricsSurfaceColor();
     }
 
-    // How far the canvas surface sits from the pure black/white root toward the theme base brush, under
-    // the None backdrop. The content area is the base brush *faintly* layered over the root colour that
-    // BackdropSelectorService paints, so the visible colour lands between the two — closer to the root.
-    // Pure root (0.0) read too dark; the full base brush (1.0) read too light. Tune if it still drifts.
-    private const double SurfaceBlendTowardBase = 0.5;
-
     private void ApplyLyricsSurfaceColor()
     {
-        // Under a Mica/Acrylic backdrop the content area is transparent and the material shows through,
-        // so the canvas clears transparent too. Under None the content area is an opaque theme colour and
-        // a transparent swap-chain clear renders white over the opaque window — so the canvas must clear
-        // to the page's colour to disappear into it. That colour is the theme base brush faintly layered
-        // over the pure black/white root, so we blend the two (the exact framework layer isn't nameable
-        // here, and Application.Current.Resources ignores the element theme — hence the brush provider).
-        var backdrop = App.GetService<IBackdropSelectorService>().Backdrop;
-        if (backdrop != BackdropType.None || SurfaceBrushProvider.Background is not Microsoft.UI.Xaml.Media.SolidColorBrush baseBrush)
+        // The lyrics surface lives in the NavigationView content region, whose background is the Fluent
+        // "content layer" — LayerFillColorDefaultBrush, a low-opacity solid painted over the window
+        // backdrop. The canvas is a Win2D swap chain that composites against the backdrop directly,
+        // bypassing that XAML layer — so a XAML element placed *behind* the canvas would not be picked up
+        // either (its transparent pixels blend against the backdrop, not the XAML behind it). The content
+        // layer has to be painted into the swap-chain clear itself, which we do to match the rest of the page:
+        //   - Material backdrop (Mica/MicaAlt/Acrylic): clear to the translucent layer colour; the swap
+        //     chain blends it over the live material exactly as the content region does.
+        //   - None: the layer sits over the opaque black/white root the window paints, so composite the
+        //     layer over that root to an opaque colour.
+        // The colour comes from a hidden brush-provider element (not Application.Current.Resources, which
+        // ignores the element theme), the same channel the metadata foreground brushes use.
+        if (LayerBrushProvider.Background is not Microsoft.UI.Xaml.Media.SolidColorBrush layerBrush)
         {
             LyricsCanvas.SurfaceColor = Microsoft.UI.Colors.Transparent;
             return;
         }
 
+        var backdrop = App.GetService<IBackdropSelectorService>().Backdrop;
+        if (backdrop != BackdropType.None)
+        {
+            LyricsCanvas.SurfaceColor = layerBrush.Color;
+            return;
+        }
+
         var root = ActualTheme == ElementTheme.Dark ? Microsoft.UI.Colors.Black : Microsoft.UI.Colors.White;
-        LyricsCanvas.SurfaceColor = BlendColors(baseBrush.Color, root, SurfaceBlendTowardBase);
+        LyricsCanvas.SurfaceColor = CompositeOver(layerBrush.Color, root);
     }
 
-    private static Windows.UI.Color BlendColors(Windows.UI.Color toward, Windows.UI.Color from, double t)
-        => Windows.UI.Color.FromArgb(
+    // Source-over composite of a translucent colour onto an opaque backdrop, yielding an opaque colour:
+    // result = src·a + dst·(1 - a). Models the content layer sitting over the page's solid root under None.
+    private static Windows.UI.Color CompositeOver(Windows.UI.Color src, Windows.UI.Color dst)
+    {
+        var a = src.A / 255.0;
+        return Windows.UI.Color.FromArgb(
             255,
-            (byte)Math.Round(toward.R * t + from.R * (1 - t)),
-            (byte)Math.Round(toward.G * t + from.G * (1 - t)),
-            (byte)Math.Round(toward.B * t + from.B * (1 - t)));
+            (byte)Math.Round(src.R * a + dst.R * (1 - a)),
+            (byte)Math.Round(src.G * a + dst.G * (1 - a)),
+            (byte)Math.Round(src.B * a + dst.B * (1 - a)));
+    }
 
     private async void UpdateCoverArtFallback()
     {

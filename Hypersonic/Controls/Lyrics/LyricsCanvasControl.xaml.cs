@@ -144,9 +144,11 @@ public sealed partial class LyricsCanvasControl : UserControl
 
     /// <summary>
     /// The canvas clear (background) colour. The driver pushes the page's effective surface colour so the
-    /// canvas matches the rest of the page: a solid theme colour when there is no window backdrop (a
-    /// transparent swap-chain clear renders white over an opaque window, not the theme background), and
-    /// <see cref="Microsoft.UI.Colors.Transparent"/> under a Mica/Acrylic backdrop so the material shows through.
+    /// canvas matches the rest of the page. The lyrics surface sits in the Fluent "content layer", so the
+    /// driver supplies that layer's colour: a <i>translucent</i> layer colour under a Mica/Acrylic backdrop
+    /// (the swap chain blends it over the live material), and an opaque colour (the layer composited over
+    /// the black/white root) when there is no backdrop, where a transparent swap-chain clear would
+    /// otherwise render white over the opaque window.
     /// </summary>
     public Color SurfaceColor
     {
