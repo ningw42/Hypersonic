@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Hypersonic is a WinUI 3 desktop music streaming client for Subsonic/OpenSubsonic-compatible servers (e.g., Navidrome). Built with .NET 10, Windows App SDK 1.8, and MSIX packaging.
+Hypersonic is a WinUI 3 desktop music streaming client for Subsonic/OpenSubsonic-compatible servers (e.g., Navidrome). Built with .NET 10, Windows App SDK 2.2.0, and MSIX packaging.
 
 ## Build & Test Commands
 
@@ -212,12 +212,12 @@ Feature specs and implementation guides live in `docs/`:
 
 | Package | Version | Purpose |
 |---|---|---|
-| CommunityToolkit.Mvvm | 8.4.1 | MVVM source generators (`[ObservableProperty]`, `[RelayCommand]`) |
-| Microsoft.Extensions.Hosting | 10.0.5 | Dependency injection container |
-| Microsoft.WindowsAppSDK | 1.8 | WinUI 3 framework |
+| CommunityToolkit.Mvvm | 8.4.2 | MVVM source generators (`[ObservableProperty]`, `[RelayCommand]`) |
+| Microsoft.Extensions.Hosting | 10.0.9 | Dependency injection container |
+| Microsoft.WindowsAppSDK | 2.2.0 | WinUI 3 framework |
 | Microsoft.Xaml.Behaviors.WinUI.Managed | 3.0.1 | XAML Behaviors |
-| System.Drawing.Common | 10.0.5 | GDI+ for taskbar icon rendering |
-| WinUIEx | 2.9.0 | Extended WinUI utilities (`WindowEx` base class) |
+| System.Drawing.Common | 10.0.9 | GDI+ for taskbar icon rendering |
+| WinUIEx | 2.9.1 | Extended WinUI utilities (`WindowEx` base class) |
 
 JSON serialization uses `System.Text.Json` (built into .NET 10) via the `Hypersonic.Core.Helpers.Json` wrapper. `JsonStringEnumConverter` is configured globally for human-readable enum serialization.
 
