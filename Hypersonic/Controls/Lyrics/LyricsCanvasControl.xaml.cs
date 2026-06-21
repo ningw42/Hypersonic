@@ -1,8 +1,11 @@
+using System.Threading;
+
 using Hypersonic.Core.Models.Lyrics;
 
 using Microsoft.Graphics.Canvas.Text;
 using Microsoft.Graphics.Canvas.UI;
 using Microsoft.Graphics.Canvas.UI.Xaml;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -45,6 +48,17 @@ public sealed partial class LyricsCanvasControl : UserControl
     private bool _visualDirty = true;
     private double _frameNowMs;
 
+    // --- pause controller: stop the CanvasAnimatedControl game loop instead of redrawing 60×/s when the
+    // surface is hidden (off-tab / minimised / no lyrics) or idle (paused playback + scene settled). The
+    // UI thread drives the "visible/active" gate directly; the render thread requests an idle pause once
+    // the non-playing scene is fully at rest, guarded by a wake generation so a request that races a fresh
+    // UI-thread wake is ignored. See LyricsRenderActivity. ---
+    private readonly DispatcherQueue _dispatcher;
+    private bool _isRenderActive = true;     // UI thread: mirrors IsRenderActive (tab + window visibility, set by the driver)
+    private long _wakeGeneration;            // bumped on every UI-thread wake; the render thread snapshots it to guard its pause request
+    private long _renderSeenGeneration;      // render thread only: detects a wake since the last frame to re-arm the request
+    private bool _idlePauseRequested;        // render thread only: dedupes TryEnqueue while the pause is in flight
+
     // --- mirrors written on the UI thread, read under _gate on the render thread ---
     private LyricsTimingModel? _pendingTimingModel;
     private bool _timingDirty;
@@ -62,6 +76,7 @@ public sealed partial class LyricsCanvasControl : UserControl
     {
         InitializeComponent();
 
+        _dispatcher = DispatcherQueue.GetForCurrentThread();
         _clock = new PlaybackClock(() => _frameNowMs);
         _renderer.BloomDuration = _choreographer.BloomDurationMs;
 
@@ -70,7 +85,13 @@ public sealed partial class LyricsCanvasControl : UserControl
         _mirrorFontFamily = FontFamilyName;
         _mirrorFontSize = LyricsFontSize;
         _mirrorAlignment = Alignment;
+        _isRenderActive = IsRenderActive;
 
+        // Pause the loop when this control is hidden by its own Visibility (the LyricsLoadState binding
+        // collapses it when there are no lyrics) or resized while idle-paused; evaluate once on load.
+        RegisterPropertyChangedCallback(VisibilityProperty, OnSelfVisibilityChanged);
+        Loaded += OnLoaded;
+        SizeChanged += OnControlSizeChanged;
         Unloaded += OnUnloaded;
     }
 
@@ -245,6 +266,29 @@ public sealed partial class LyricsCanvasControl : UserControl
             control._mirrorAlignment = (LyricsTextAlignment)e.NewValue;
             control._formatDirty = true; // alignment lives on the text format → re-lay-out
         }
+        control.Wake();
+    }
+
+    /// <summary>
+    /// Whether the surface is actually on screen — the driver sets this to <c>false</c> when the lyrics
+    /// surface is not the selected tab or the window is minimised/hidden, so the canvas pauses its game
+    /// loop instead of rendering pixels nobody sees. Combined with the control's own
+    /// <see cref="UIElement.Visibility"/> (collapsed when there are no lyrics). Default <c>true</c>.
+    /// </summary>
+    public static readonly DependencyProperty IsRenderActiveProperty = DependencyProperty.Register(
+        nameof(IsRenderActive), typeof(bool), typeof(LyricsCanvasControl), new PropertyMetadata(true, OnIsRenderActiveChanged));
+
+    public bool IsRenderActive
+    {
+        get => (bool)GetValue(IsRenderActiveProperty);
+        set => SetValue(IsRenderActiveProperty, value);
+    }
+
+    private static void OnIsRenderActiveChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var control = (LyricsCanvasControl)d;
+        control._isRenderActive = (bool)e.NewValue;
+        control.UpdateRenderActivity();
     }
 
     #endregion
@@ -260,6 +304,7 @@ public sealed partial class LyricsCanvasControl : UserControl
             control._mirrorPositionMs = (double)e.NewValue;
             control._positionDirty = true;
         }
+        control.Wake();
     }
 
     private static void OnIsPlayingChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -269,6 +314,7 @@ public sealed partial class LyricsCanvasControl : UserControl
         {
             control._mirrorIsPlaying = (bool)e.NewValue;
         }
+        control.Wake();
     }
 
     private static void OnColorChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -279,6 +325,7 @@ public sealed partial class LyricsCanvasControl : UserControl
             control._mirrorPlayed = control.PlayedColor;
             control._mirrorUnplayed = control.UnplayedColor;
         }
+        control.Wake();
     }
 
     private static void OnFontChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -290,6 +337,7 @@ public sealed partial class LyricsCanvasControl : UserControl
             control._mirrorFontSize = control.LyricsFontSize;
             control._formatDirty = true;
         }
+        control.Wake();
     }
 
     private void RebuildTimingModel()
@@ -301,6 +349,7 @@ public sealed partial class LyricsCanvasControl : UserControl
             _pendingTimingModel = model;
             _timingDirty = true;
         }
+        Wake();
     }
 
     private void OnCreateResources(CanvasAnimatedControl sender, CanvasCreateResourcesEventArgs args)
@@ -406,7 +455,107 @@ public sealed partial class LyricsCanvasControl : UserControl
         _choreographer.Update(model, active, estimated, height, args.Timing.ElapsedTime.TotalSeconds);
 
         _renderer.Draw(ds, model, active, estimated, _choreographer.ScrollY, width, height, HorizontalMargin, alignment, played, unplayed);
+
+        RequestIdlePauseIfSettled(isPlaying, model);
     }
+
+    #region Pause controller
+
+    private void OnLoaded(object sender, RoutedEventArgs e) => UpdateRenderActivity();
+
+    private void OnControlSizeChanged(object sender, SizeChangedEventArgs e) => Wake();
+
+    private void OnSelfVisibilityChanged(DependencyObject sender, DependencyProperty dp) => UpdateRenderActivity();
+
+    /// <summary>Whether the surface is allowed to render at all — the driver-supplied gate AND not hidden
+    /// by the control's own collapsed Visibility (the no-lyrics state).</summary>
+    private bool IsActiveAndVisible => _isRenderActive && Visibility == Visibility.Visible;
+
+    /// <summary>
+    /// Re-evaluates the visible/active gate (UI thread). When the surface can't be seen the loop is paused
+    /// outright; when it can, it is resumed — the render thread re-pauses it once a non-playing scene settles.
+    /// </summary>
+    private void UpdateRenderActivity()
+    {
+        if (_renderGate.IsTornDown || Canvas is null)
+        {
+            return;
+        }
+
+        if (IsActiveAndVisible)
+        {
+            Wake();
+        }
+        else
+        {
+            Canvas.Paused = true;
+        }
+    }
+
+    /// <summary>
+    /// Resumes the loop (UI thread) and bumps the wake generation so any idle-pause request the render
+    /// thread has in flight is discarded. A no-op when the surface is not visible/active (e.g. a position
+    /// tick arriving while off-tab), and harmless when already running.
+    /// </summary>
+    private void Wake()
+    {
+        Interlocked.Increment(ref _wakeGeneration);
+        if (_renderGate.IsTornDown || Canvas is null)
+        {
+            return;
+        }
+
+        if (IsActiveAndVisible)
+        {
+            Canvas.Paused = false;
+        }
+    }
+
+    /// <summary>
+    /// Render thread: once playback is stopped and the scene is fully at rest, ask the UI thread to pause
+    /// the loop. The request carries the wake generation it was made under; the UI-thread handler honours it
+    /// only if no wake has happened since, so a seek/play/resize that lands first always wins.
+    /// </summary>
+    private void RequestIdlePauseIfSettled(bool isPlaying, LyricsVisualModel model)
+    {
+        var generation = Interlocked.Read(ref _wakeGeneration);
+        if (generation != _renderSeenGeneration)
+        {
+            _renderSeenGeneration = generation; // a wake happened → re-arm so a fresh settle re-requests
+            _idlePauseRequested = false;
+        }
+
+        // We are active here (the loop only runs when active), so "should not render" means the scene is a
+        // static, non-playing image — safe to pause until the next wake.
+        var sceneAnimating = !_choreographer.IsAtRest(model);
+        var canIdle = !LyricsRenderActivity.ShouldRender(renderActive: true, isPlaying, sceneAnimating);
+        if (!canIdle)
+        {
+            _idlePauseRequested = false;
+            return;
+        }
+
+        if (_idlePauseRequested)
+        {
+            return; // already asked; waiting for the UI thread to land the pause
+        }
+
+        _idlePauseRequested = true;
+        _dispatcher.TryEnqueue(() =>
+        {
+            if (Interlocked.Read(ref _wakeGeneration) != generation || _renderGate.IsTornDown || Canvas is null)
+            {
+                return; // a wake superseded this request, or we tore down — leave the loop running/stopped as is
+            }
+
+            if (IsActiveAndVisible)
+            {
+                Canvas.Paused = true;
+            }
+        });
+    }
+
+    #endregion
 
     /// <summary>
     /// Copies per-line emphasis (opacity / scale / blur) and per-word bloom onsets from a prior visual

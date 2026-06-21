@@ -21,6 +21,31 @@ internal sealed class LyricsChoreographer
 
     public double ScrollY => _scroll.Value;
 
+    /// <summary>
+    /// True when the scroll spring and every line's emphasis tween have reached rest, so a non-playing
+    /// scene is fully static and the render loop can pause (see <see cref="LyricsRenderActivity"/>). Read on
+    /// the render thread each frame from the same state <see cref="Update"/> drives.
+    /// </summary>
+    public bool IsAtRest(LyricsVisualModel model)
+    {
+        if (!LyricsRenderActivity.IsScrollSettled(_scroll.Value, _scroll.Target, _scroll.Velocity))
+        {
+            return false;
+        }
+
+        foreach (var line in model.Lines)
+        {
+            if (!LyricsRenderActivity.IsEmphasisSettled(line.Opacity.Value, line.Opacity.Target)
+                || !LyricsRenderActivity.IsEmphasisSettled(line.Scale.Value, line.Scale.Target)
+                || !LyricsRenderActivity.IsEmphasisSettled(line.Blur.Value, line.Blur.Target))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>Forget scroll state so the next frame jumps (no slide) — call on a model rebuild.</summary>
     public void Reset()
     {

@@ -7,6 +7,7 @@ using Hypersonic.Models;
 using Hypersonic.ViewModels;
 
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
@@ -76,6 +77,12 @@ public sealed partial class NowPlayingPage : Page
         Player.PropertyChanged += OnPlayerPropertyChanged;
         ActualThemeChanged += OnActualThemeChanged;
         Loaded += OnPageLoaded;
+        // Pause the lyrics canvas's render loop when the window is minimised/hidden (it keeps rendering
+        // otherwise). Minimise/restore is observed via the AppWindow's change notifications plus the
+        // window's Activated event — restoring a minimised window re-activates it, and (unlike the change
+        // flags) that fires reliably once the presenter state has settled back to Normal.
+        App.MainWindow.AppWindow.Changed += OnAppWindowChangedForLyrics;
+        App.MainWindow.Activated += OnMainWindowActivatedForLyrics;
         RenderNowPlaying();
 
         // Now that all subscriptions and helpers are wired, allow the
@@ -85,6 +92,8 @@ public sealed partial class NowPlayingPage : Page
         Unloaded += (_, _) =>
         {
             _pageActive = false;
+            App.MainWindow.AppWindow.Changed -= OnAppWindowChangedForLyrics;
+            App.MainWindow.Activated -= OnMainWindowActivatedForLyrics;
             _queueTabGate.Detach();
             _scrollCoordinator.OnTabSelected(NowPlayingTab.Lyrics, -1);
             Player.NowPlayingMetadataChanged -= OnPlayerMetadataChanged;
@@ -100,6 +109,7 @@ public sealed partial class NowPlayingPage : Page
         // ActualTheme is reliable once loaded; re-push the surface colour so the canvas matches the
         // backdrop from the first frame (the constructor push can run before the theme is inherited).
         ApplyLyricsSurfaceColor();
+        UpdateLyricsRenderActive();
     }
 
     private void EnsureCoverArtAnimator()
@@ -565,6 +575,9 @@ public sealed partial class NowPlayingPage : Page
         ViewModel.SelectedTab = isQueue ? NowPlayingTab.Queue : NowPlayingTab.Lyrics;
         LyricsSurface.Visibility = isQueue ? Visibility.Collapsed : Visibility.Visible;
         QueueSurface.Visibility = isQueue ? Visibility.Visible : Visibility.Collapsed;
+        // Collapsing LyricsSurface does NOT stop the canvas's game loop (it keeps rendering an invisible
+        // surface), so pause it explicitly while the Queue tab is showing.
+        UpdateLyricsRenderActive();
 
         if (isQueue)
         {
@@ -576,6 +589,56 @@ public sealed partial class NowPlayingPage : Page
             _queueTabGate.Detach();
             _scrollCoordinator.OnTabSelected(NowPlayingTab.Lyrics, -1);
         }
+    }
+
+    private void OnAppWindowChangedForLyrics(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        // Recompute on any change rather than filtering on specific flags: minimise and restore are reported
+        // inconsistently across DidVisibilityChange/DidPresenterChange (restore can omit both, or fire while
+        // the presenter still reads Minimized). The gate is a cheap idempotent bool, so over-evaluating is fine.
+        if (_pageActive)
+        {
+            UpdateLyricsRenderActive();
+        }
+    }
+
+    private void OnMainWindowActivatedForLyrics(object sender, WindowActivatedEventArgs args)
+    {
+        // Restoring a minimised window always re-activates it — the reliable resume trigger, fired once the
+        // presenter has settled back to Normal. We re-evaluate visibility, not focus: an unfocused but
+        // visible window keeps rendering, so a Deactivated activation here intentionally does not pause.
+        if (_pageActive)
+        {
+            UpdateLyricsRenderActive();
+        }
+    }
+
+    /// <summary>
+    /// Gates the lyrics canvas's render loop: it should only run while the Lyrics tab is selected AND the
+    /// window is actually on screen. Deliberately does NOT pause on mere deactivation/occlusion — an
+    /// unfocused-but-visible window keeps rendering so the wipe never freezes while it can be seen.
+    /// </summary>
+    private void UpdateLyricsRenderActive()
+    {
+        var onLyricsTab = ViewModel.SelectedTab != NowPlayingTab.Queue;
+        LyricsCanvas.IsRenderActive = onLyricsTab && IsWindowVisibleForLyrics();
+    }
+
+    private static bool IsWindowVisibleForLyrics()
+    {
+        var appWindow = App.MainWindow.AppWindow;
+        if (appWindow is null)
+        {
+            return true; // be permissive if the window state is unknown
+        }
+
+        if (!appWindow.IsVisible)
+        {
+            return false; // hidden (e.g. minimised-to-tray)
+        }
+
+        // A minimised window still reports IsVisible == true but presents nothing.
+        return appWindow.Presenter is not OverlappedPresenter op || op.State != OverlappedPresenterState.Minimized;
     }
 
     private void MarshalAndScroll(int effectiveIndex)
