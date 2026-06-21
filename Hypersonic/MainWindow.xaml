@@ -8,6 +8,9 @@
     xmlns:windowex="using:WinUIEx"
     MinWidth="500"
     MinHeight="500"
-    PersistenceId="MainWindow"
     mc:Ignorable="d">
+    <!--  Window size/position/maximized persistence is owned by AppStateService (AppState.json
+          WindowState) + ActivationService.RestoreWindowState(). WinUIEx's PersistenceId is
+          intentionally NOT set: it would restore its own WINDOWPLACEMENT on the first WM_SHOWWINDOW
+          (during Activate, after our manual restore) and silently override it.  -->
 </windowex:WindowEx>
