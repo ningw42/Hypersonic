@@ -25,6 +25,7 @@
 | 4.3 Playback Signal Pipeline | M | 🔲 Not started |
 | 4.4 Position-Aware Navigation History | S | 🔲 Not started |
 | 4.5 Time-Synced Lyrics | M | 🔲 Not started |
+| 4.6 Lyrics Renderer GPU Optimization (deep pass) | M | 🔲 Not started |
 | **Phase 5 — Data Layer (Stretch)** | | |
 | 5.1 SQLite Metadata Cache | XL | 🔲 Not started |
 | 5.2 Image Cache | L | ✅ Complete |
@@ -164,6 +165,17 @@ Scope:
 - The legacy `getLyrics` fallback path stays unsynced (legacy `Lyrics` has no per-line timestamps).
 
 **Depends on**: 2.2
+
+### 4.6 Lyrics Renderer GPU Optimization — deep pass `[M]`
+
+The Win2D lyrics renderer (`LyricsCanvasControl` / `LyricsSceneRenderer`) shipped with two GPU-cost fixes already landed: a **pause controller** that stops the `CanvasAnimatedControl` game loop when the surface is hidden (Queue tab / minimised / no lyrics) or idle (paused playback, scene settled), and a **per-frame cost reduction** (folding line opacity into glyph-colour alpha to drop the per-line `CreateLayer`, plus reusing the wipe's gradient-stop array). Together these took active-render GPU from ~10–20% down to ~2% on an RTX 4090 — already below the BetterLyrics reference (~3.5%).
+
+This item is the **remaining, deeper pass**, only worth doing if profiling on lower-end hardware shows the active-playback frame is still too heavy:
+
+- **Cache the neighbour gaussian blur.** Inactive lines currently allocate a `CanvasCommandList` + `GaussianBlurEffect` and run a multi-pass blur every frame. Bake each line's blurred text into a line-local `CanvasRenderTarget`, rebuilt only when the blur amount/colour changes, and draw it per frame with a translate offset + opacity (`DrawImage`'s opacity overload). Requires plumbing the control DPI into the renderer and careful render-target sizing/positioning — validate visually.
+- **Glyph-mask wipe (BetterLyrics-grade).** Render each line's glyphs to a cached `CanvasCommandList` mask once at layout time, then composite colour per frame via an `AlphaMaskEffect` fed by a per-row gradient rectangle — instead of re-running `DrawTextLayout` and pushing a clip layer per row on the active line. Removes the last per-frame text rasterisation and the active-line row layers.
+
+Reference techniques live in `../BetterLyrics` (GPL — techniques only, no source). Context: the original perf risk was flagged in `LYRICS.md` §3 and `docs/design/ui/2026-06-13-lyrics-canvas-control.md` §7.
 
 ---
 
