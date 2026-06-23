@@ -127,6 +127,7 @@ A song's starred state is one shared fact across every surface. `FavoritesServic
 - **Queue logic**: `PlaybackQueue` (in `Hypersonic.Core.Services`) — pure logic class (no WinUI dependencies, fully unit-testable). Manages shuffle (Fisher-Yates), repeat (`Off`/`One`/`All`), navigation history (ID-based stack), play history (ring buffer, max 100), and queue mutations (`AddNext`, `AddToEnd`, `RemoveAt`, `MoveTrack`, `ClearUpcoming`).
 - **Position tracking**: `DispatcherQueueTimer` fires every 500ms to update the `Position` property.
 - **Event-driven**: PlaybackService raises events (`PlaybackStateChanged`, `TrackChanged`, `PositionChanged`); `PlayerViewModel` and `TaskbarService` subscribe.
+- **Read-only observation**: `IReadOnlyPlaybackState` (Core) is the observe half of a command/query split with `IPlaybackService`, which extends it. The same `PlaybackService` singleton is mapped to both interfaces in DI; pure observers (e.g. `NowPlayingViewModel`) depend on the read interface. `PlaybackClock` (`Hypersonic.Core.Services`) is a shared, ms-based position estimator: each surface (lyrics canvas on the render thread, player bar on the UI thread) owns its own instance fed by its own "now" source, interpolating the coarse 500 ms `Position` anchor into smooth motion. See `docs/design/service/2026-06-21-playback-progress-clock.md`.
 
 ### Pages
 

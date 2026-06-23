@@ -9,7 +9,7 @@ public class TrackEndedEventArgs : EventArgs
 }
 
 /// <summary>
-/// Event payload for <see cref="IPlaybackService.TrackChanged"/>. Carries the
+/// Event payload for <see cref="IReadOnlyPlaybackState.TrackChanged"/>. Carries the
 /// direction of the change so consumers (e.g. cover-art animations) can pick
 /// the right transition without having to read mutable state on the source.
 /// </summary>
@@ -23,15 +23,11 @@ public sealed class TrackChangedEventArgs : EventArgs
     }
 }
 
-public interface IPlaybackService
+public interface IPlaybackService : IReadOnlyPlaybackState
 {
-    PlaybackTrack? NowPlaying { get; }
     IReadOnlyList<PlaybackTrack> Queue { get; }
     int QueueIndex { get; }
     int EffectiveQueueIndex { get; }
-    bool IsPlaying { get; }
-    double Position { get; }
-    double Duration { get; }
     double Volume { get; set; }
     bool IsMuted { get; set; }
     bool HasNext { get; }
@@ -41,10 +37,7 @@ public interface IPlaybackService
     RepeatMode RepeatMode { get; set; }
     IReadOnlyList<PlaybackTrack> History { get; }
 
-    event EventHandler? PlaybackStateChanged;
-    event EventHandler<TrackChangedEventArgs>? TrackChanged;
     event EventHandler<TrackEndedEventArgs>? TrackEnded;
-    event EventHandler? PositionChanged;
     event EventHandler? QueueChanged;
 
     void PlayQueue(IList<PlaybackTrack> tracks, int startIndex = 0, QueueSource? source = null);

@@ -23,7 +23,7 @@ namespace Hypersonic.ViewModels;
 /// </summary>
 public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
 {
-    private readonly IPlaybackService _playbackService;
+    private readonly IReadOnlyPlaybackState _playbackService;
     private readonly ILyricsService _lyricsService;
     private readonly LyricsOrchestrationOptions _orchestrationOptions;
     private readonly ILogger _log;
@@ -67,7 +67,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     internal Task? PendingLyricsFetch { get; private set; }
 
     public NowPlayingViewModel(
-        IPlaybackService playbackService,
+        IReadOnlyPlaybackState playbackService,
         ILyricsService lyricsService,
         IOptions<LyricsOrchestrationOptions> orchestrationOptions,
         ILoggingService logService)
@@ -82,7 +82,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     }
 
     internal NowPlayingViewModel(
-        IPlaybackService playbackService,
+        IReadOnlyPlaybackState playbackService,
         ILyricsService lyricsService,
         IOptions<LyricsOrchestrationOptions> orchestrationOptions,
         ILoggingService logService,

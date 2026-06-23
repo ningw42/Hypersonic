@@ -1,6 +1,6 @@
-using Hypersonic.Controls.Lyrics;
+using Hypersonic.Core.Services;
 
-namespace Hypersonic.Tests.Controls.Lyrics;
+namespace Hypersonic.Core.Tests.Services;
 
 [TestClass]
 public class PlaybackClockTests
@@ -60,7 +60,6 @@ public class PlaybackClockTests
 
         clock.SetPosition(1480); // delta -20, within threshold → smooth converge
 
-        // No instantaneous jump: the estimate right now still equals what we were showing.
         Assert.AreEqual(predicted, clock.Estimate(), 1e-6, "a small correction must not jump the displayed position");
     }
 
@@ -97,5 +96,21 @@ public class PlaybackClockTests
         clock.SetPlaying(true);
         _now = 3200; // 200ms after resume
         Assert.AreEqual(1700, clock.Estimate(), 1e-6, "resumes from where it paused, no jump");
+    }
+
+    [TestMethod]
+    public void HardSnap_IgnoresConvergeBand_JumpsImmediately()
+    {
+        _now = 0;
+        var clock = NewClock();
+        clock.SetPlaying(true);
+        clock.SetPosition(1000);
+        _now = 500;
+        var predicted = clock.Estimate(); // ~1500
+
+        clock.SetPosition(1480, hardSnap: true); // delta -20 is inside the converge band, but snap anyway
+
+        Assert.AreEqual(1480, clock.Estimate(), 1e-6, "hard snap lands exactly, ignoring the converge band");
+        Assert.AreNotEqual(predicted, clock.Estimate(), "a hard snap is not a smooth converge");
     }
 }

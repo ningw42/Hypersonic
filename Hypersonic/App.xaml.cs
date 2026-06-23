@@ -141,7 +141,9 @@ public partial class App : Application
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
 
-            services.AddSingleton<IPlaybackService, PlaybackService>();
+            services.AddSingleton<PlaybackService>();
+            services.AddSingleton<IPlaybackService>(sp => sp.GetRequiredService<PlaybackService>());
+            services.AddSingleton<IReadOnlyPlaybackState>(sp => sp.GetRequiredService<PlaybackService>());
             services.AddSingleton<ITaskbarService, TaskbarService>();
             services.AddSingleton<ITrayIconService, TrayIconService>();
             services.AddSingleton<ICredentialService, CredentialService>();

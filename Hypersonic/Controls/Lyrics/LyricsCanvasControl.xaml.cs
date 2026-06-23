@@ -1,6 +1,7 @@
 using System.Threading;
 
 using Hypersonic.Core.Models.Lyrics;
+using Hypersonic.Core.Services;
 
 using Microsoft.Graphics.Canvas.Text;
 using Microsoft.Graphics.Canvas.UI;

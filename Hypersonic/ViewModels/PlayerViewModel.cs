@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -5,6 +7,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
+using Hypersonic.Core.Services;
 using Hypersonic.Messages;
 using Hypersonic.Models;
 
@@ -22,6 +25,11 @@ public partial class PlayerViewModel : ObservableRecipient, IRecipient<Favorites
     private bool _isExternalUpdate;
     private bool _isSavingFromExternal;
     private readonly DispatcherQueueTimer? _volumeSaveTimer;
+    private readonly PlaybackClock _clock;
+    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+    private readonly DispatcherQueueTimer? _positionTimer;
+    private bool _isScrubbing;
+    private int _lastWholeSecond = -1;
 
     /// <summary>
     /// Direction of the most recent track change. Mirrors
@@ -152,13 +160,15 @@ public partial class PlayerViewModel : ObservableRecipient, IRecipient<Favorites
         IFavoritesService favoritesService,
         IMessenger messenger,
         ILoggingService logService,
-        bool createTimer)
+        bool createTimer,
+        Func<double>? nowMs = null)
         : base(messenger)
     {
         _playbackService = playbackService;
         _appStateService = appStateService;
         _favorites = favoritesService;
         _log = logService.GetLogger(nameof(PlayerViewModel));
+        _clock = new PlaybackClock(nowMs ?? (() => _stopwatch.Elapsed.TotalMilliseconds));
         _playbackService.PlaybackStateChanged += OnPlaybackStateChanged;
         _playbackService.TrackChanged += OnTrackChanged;
         _playbackService.PositionChanged += OnPositionChanged;
@@ -175,6 +185,11 @@ public partial class PlayerViewModel : ObservableRecipient, IRecipient<Favorites
                 _appStateService.State.Playback.Volume = VolumePercent;
                 _ = _appStateService.SavePlaybackAsync();
             };
+
+            _positionTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+            _positionTimer.Interval = TimeSpan.FromMilliseconds(33); // ~30 fps
+            _positionTimer.IsRepeating = true;
+            _positionTimer.Tick += OnPositionTick;
         }
 
         // Hydrate from current service state (already restored from AppState in PlaybackService).
@@ -435,6 +450,7 @@ public partial class PlayerViewModel : ObservableRecipient, IRecipient<Favorites
     {
         if (!_isExternalUpdate)
         {
+            _clock.SetPosition(value * 1000.0, hardSnap: true);
             _playbackService.Seek(value);
         }
     }
@@ -480,6 +496,8 @@ public partial class PlayerViewModel : ObservableRecipient, IRecipient<Favorites
         DurationText = FormatTime(_playbackService.Duration);
         ShuffleEnabled = _playbackService.ShuffleEnabled;
         RepeatMode = _playbackService.RepeatMode;
+        _clock.SetPlaying(_playbackService.IsPlaying);
+        UpdatePositionTimer();
         _isSavingFromExternal = false;
     }
 
@@ -502,10 +520,14 @@ public partial class PlayerViewModel : ObservableRecipient, IRecipient<Favorites
         CoverImage = track?.CoverImage;
         Duration = track?.Duration ?? 0;
         DurationText = FormatTime(track?.Duration ?? 0);
+        _isScrubbing = false;                  // self-heal: a track change ends any orphaned drag
+        _clock.SetPosition(0, hardSnap: true); // semantic reset → snap, never converge from the old timeline
+        _lastWholeSecond = 0;
         _isExternalUpdate = true;
         Position = 0;
         _isExternalUpdate = false;
         PositionText = "0:00";
+        UpdatePositionTimer();                 // resume the tick if it was suspended by the orphaned scrub
         HasNext = _playbackService.HasNext;
         HasPrevious = _playbackService.HasPrevious;
         RefreshQueue();
@@ -529,10 +551,122 @@ public partial class PlayerViewModel : ObservableRecipient, IRecipient<Favorites
 
     private void OnPositionChanged(object? sender, EventArgs e)
     {
+        var playing = _playbackService.IsPlaying;
+        // Keep the clock's play-state in lockstep with the service on every anchor. Stop() fires
+        // PositionChanged (IsPlaying already false) BEFORE PlaybackStateChanged, so without this the
+        // clock would still think it's playing and creep a few ms past the zero snap until the later
+        // state event freezes it.
+        _clock.SetPlaying(playing);
+        // Routine 500ms position ticks fire only WHILE PLAYING → smooth converge. A not-playing anchor
+        // is a semantic jump (stop-to-0, paused seek, clear) → hard snap, so the thumb lands exactly
+        // even when the delta sits inside the converge band.
+        _clock.SetPosition(_playbackService.Position * 1000.0, hardSnap: !playing);
+        if (!_isScrubbing)
+        {
+            WriteEstimatedPosition();
+        }
+    }
+
+    // Fired ~30x/s while playing (and once per anchor). Writes the interpolated position into the
+    // bound Position; the _isExternalUpdate guard stops the OnPositionChanged(double) setter from
+    // treating our own write as a user Seek.
+    private void OnPositionTick(DispatcherQueueTimer sender, object args)
+    {
+        if (_isScrubbing)
+        {
+            return;
+        }
+        WriteEstimatedPosition();
+    }
+
+    private void WriteEstimatedPosition()
+    {
+        var seconds = _clock.Estimate() / 1000.0;
+        if (seconds < 0)
+        {
+            seconds = 0;
+        }
+        if (Duration > 0 && seconds > Duration)
+        {
+            seconds = Duration; // don't overshoot the end before the next track anchors
+        }
+
         _isExternalUpdate = true;
-        Position = _playbackService.Position;
+        Position = seconds;
         _isExternalUpdate = false;
-        PositionText = FormatTime(_playbackService.Position);
+
+        var whole = (int)seconds;
+        if (whole != _lastWholeSecond)
+        {
+            _lastWholeSecond = whole;
+            PositionText = FormatTime(seconds);
+        }
+    }
+
+    // Runs the tick only while it is useful: playing and not being dragged.
+    private void UpdatePositionTimer()
+    {
+        if (_positionTimer is null)
+        {
+            return;
+        }
+        if (_playbackService.IsPlaying && !_isScrubbing)
+        {
+            _positionTimer.Start();
+        }
+        else
+        {
+            _positionTimer.Stop();
+        }
+    }
+
+    // Test seam: pump one tick deterministically (the real DispatcherQueueTimer isn't created in tests).
+    internal void PumpPositionTickForTest()
+    {
+        if (!_isScrubbing)
+        {
+            WriteEstimatedPosition();
+        }
+    }
+
+    /// <summary>
+    /// The user started interacting with the seek bar (pointer drag). Suspends the estimator's
+    /// per-frame push so the thumb follows the pointer exactly. Paired with <see cref="EndScrub"/>;
+    /// the pairing is fail-safe — any end (release / capture-lost / cancel) resumes the push.
+    /// </summary>
+    public void BeginScrub()
+    {
+        _isScrubbing = true;
+        UpdatePositionTimer(); // stop the tick while dragging
+    }
+
+    /// <summary>
+    /// The user finished interacting with the seek bar. Re-anchors the clock to the current playback
+    /// position and resumes the push. Idempotent: a stray or duplicate end while not actually scrubbing
+    /// is a no-op (the view routes several end signals into this).
+    /// </summary>
+    public void EndScrub()
+    {
+        if (!_isScrubbing)
+        {
+            return; // idempotent fail-safe: an end while not scrubbing must not re-anchor anything
+        }
+        _isScrubbing = false;
+        // Resume at the live playback position WITHOUT rewinding the thumb. Both candidates can be stale,
+        // but in OPPOSITE cases — and a stale value is always BEHIND real playback, so the larger is the
+        // fresher one and the thumb never moves backward:
+        //   - quick press/release with no 500ms tick → Position (live interpolated thumb) is fresh,
+        //     _playbackService.Position (coarse 500ms anchor) lags it;
+        //   - motionless press-hold while playback advances → the push is suspended so Position freezes
+        //     at the press point, while the 500ms ticks carry _playbackService.Position forward.
+        // Seek updates _playbackService.Position synchronously, so a real drag's drop point matches on
+        // both sides. NOTE: a motionless press-hold can still resume up to one ~500ms tick behind real
+        // playback and self-heal on the next anchor — an accepted, display-only, audio-safe limitation
+        // (see docs/design/service/2026-06-21-playback-progress-clock.md).
+        var resumeSeconds = Math.Max(Position, _playbackService.Position);
+        _clock.SetPosition(resumeSeconds * 1000.0, hardSnap: true);
+        WriteEstimatedPosition(); // land the display immediately (covers a paused release with no tick)
+        UpdatePositionTimer();    // resume the push if still playing
     }
 
     private static string FormatTime(double totalSeconds)

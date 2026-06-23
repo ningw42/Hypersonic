@@ -123,6 +123,15 @@ public sealed partial class ShellPage : Page
         RenderNowPlaying();
         PlayPauseIcon.Glyph = Player.IsPlaying ? "\uE769" : "\uE768";
         UpdatePlayerCoverArtFallback();
+
+        SeekSlider.AddHandler(PointerPressedEvent,
+            new PointerEventHandler(SeekSlider_PointerPressed), handledEventsToo: true);
+        SeekSlider.AddHandler(PointerReleasedEvent,
+            new PointerEventHandler(SeekSlider_EndScrub), handledEventsToo: true);
+        SeekSlider.AddHandler(PointerCanceledEvent,
+            new PointerEventHandler(SeekSlider_EndScrub), handledEventsToo: true);
+        SeekSlider.AddHandler(PointerCaptureLostEvent,
+            new PointerEventHandler(SeekSlider_EndScrub), handledEventsToo: true);
     }
 
     private Brush SecondaryBrush => SecondaryBrushProvider.Foreground;
@@ -359,6 +368,15 @@ public sealed partial class ShellPage : Page
     {
         App.AppTitlebar = AppTitleBarText as UIElement;
     }
+
+    // Begin suspending the interpolation push when the user starts interacting with the seek bar.
+    private void SeekSlider_PointerPressed(object sender, PointerRoutedEventArgs e) => Player.BeginScrub();
+
+    // Resume on ANY end of the interaction. The Slider captures the pointer on press, so a captured drag
+    // ends with PointerCaptureLost (release / cancel / steal / disable / window-deactivation); a press that
+    // never captures still ends with PointerReleased / PointerCanceled. EndScrub is idempotent, so
+    // overlapping ends are harmless. (WinUI has no GotPointerCapture event, hence this multi-signal bracket.)
+    private void SeekSlider_EndScrub(object sender, PointerRoutedEventArgs e) => Player.EndScrub();
 
     private void NavigationViewControl_DisplayModeChanged(NavigationView sender, NavigationViewDisplayModeChangedEventArgs args)
     {

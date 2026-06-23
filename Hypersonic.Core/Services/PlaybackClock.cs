@@ -1,18 +1,20 @@
-namespace Hypersonic.Controls.Lyrics;
+namespace Hypersonic.Core.Services;
 
 /// <summary>
-/// An anchored, self-interpolating playback-position estimator. <see cref="IPlaybackService.Position"/>
-/// only refreshes every ~500 ms, so forwarding it raw makes the lyric wipe step in coarse jumps. This
-/// clock free-runs against a monotonic wall clock between updates so the wipe stays fluid, and folds
-/// each authoritative update back in either as a hard <i>seek</i> (large delta → snap) or a smooth
-/// <i>converge</i> (small delta → absorb the residual over the next frames, no visible jump). Paused →
-/// frozen. See the Phase 2 design doc §3.2.
+/// An anchored, self-interpolating playback-position estimator. The authoritative position
+/// (e.g. <see cref="Contracts.Services.IReadOnlyPlaybackState.Position"/>) only refreshes every
+/// ~500 ms, so forwarding it raw makes a progress UI step in coarse jumps. This clock free-runs
+/// against a monotonic wall clock between updates so motion stays fluid, and folds each
+/// authoritative update back in either as a hard <i>seek</i> (large delta → snap) or a smooth
+/// <i>converge</i> (small delta → absorb the residual over the next frames, no visible jump).
+/// Paused → frozen. Operates in <b>milliseconds</b> end to end; consumers convert at the boundary.
 /// </summary>
 /// <remarks>
-/// "Now" is injected as a millisecond source (production: a monotonic <see cref="System.Diagnostics.Stopwatch"/>
-/// timestamp; tests: a controllable lambda) so the estimator is deterministic under test.
+/// "Now" is injected as a millisecond source (production: a monotonic timestamp such as a
+/// <see cref="System.Diagnostics.Stopwatch"/>, or a render-loop frame clock; tests: a controllable
+/// lambda) so the estimator is deterministic under test.
 /// </remarks>
-internal sealed class PlaybackClock
+public sealed class PlaybackClock
 {
     private readonly Func<double> _nowMs;
 
@@ -50,8 +52,11 @@ internal sealed class PlaybackClock
     /// <summary>
     /// Folds in an authoritative position. A delta beyond <see cref="SeekThresholdMs"/> snaps (seek);
     /// otherwise the difference becomes a decaying correction so the displayed value does not jump.
+    /// Pass <paramref name="hardSnap"/> = true to force an immediate jump regardless of the delta —
+    /// for semantic discontinuities (track change, user seek, stop) where converging would briefly
+    /// show the old value or drift back toward it.
     /// </summary>
-    public void SetPosition(double authoritativeMs)
+    public void SetPosition(double authoritativeMs, bool hardSnap = false)
     {
         var now = _nowMs();
         var predicted = Estimate(); // advances decay up to `now`
@@ -61,8 +66,8 @@ internal sealed class PlaybackClock
         _lastWallMs = now;
 
         var jump = authoritativeMs - predicted;
-        _correctionMs = Math.Abs(jump) > SeekThresholdMs
-            ? 0                          // seek: snap, no smoothing
+        _correctionMs = (hardSnap || Math.Abs(jump) > SeekThresholdMs)
+            ? 0                          // seek / hard snap: no smoothing
             : predicted - authoritativeMs; // converge: keep showing `predicted`, then decay to authoritative
     }
 

@@ -99,6 +99,17 @@ The `Slider` binds `Value="{x:Bind Player.Position, Mode=TwoWay}"` and has **no 
 
 External seeks from other sources (taskbar buttons, SMTC, Next/Previous) arrive as `PositionChanged`; the clock's seek threshold snaps the estimate to the new anchor, so every position source flows through one path.
 
+### Accepted limitation: a sub-500 ms, self-healing visual blip on a no-seek scrub end
+
+On release, the clock resumes at `max(displayedPosition, servicePosition)`. Both inputs can be stale — but in *opposite* situations, and a stale value is always *behind* real playback, so the larger is the fresher one and the thumb is guaranteed never to move **backward**:
+
+- **Quick press/release without moving** (no 500 ms tick in between): the *displayed* thumb is the fresh interpolated value; the service `Position` is the stale coarse anchor (up to ~500 ms behind). `max` keeps the live thumb.
+- **Motionless press-and-hold while playback advances**: the per-frame push is suspended, so the *displayed* value freezes at the press point while the 500 ms ticks carry the service `Position` forward to real playback. `max` follows the service position forward.
+
+The residual we accept lives in the **motionless press-and-hold** case: the release lands on the coarse service anchor, which is **up to one ~500 ms tick behind real playback**, then **self-heals on the very next anchor** (≤500 ms). Concretely — *press at 10.3 s, hold while playback runs, release at 25.3 s*: the thumb resumes at ≈25.0 s (~0.3 s behind; worst case ~499 ms) and snaps to 25.3 s on the next tick. It is **purely a thumb-position artifact**: a no-move interaction never calls `Seek`, so **audio is untouched** — playback streams straight through.
+
+This is intrinsic to the position being published at only ~2 Hz; the only ways to erase the ≤500 ms residual are a finer publish cadence or freezing the clock for the scrub's duration and reconciling on release. Both are out of scope here. Because the artifact is small, self-correcting, and audio-safe, it is **accepted for now** and may be revisited.
+
 ### Lyrics wiring — pure observer, zero behavior change
 
 `NowPlayingViewModel` only *reads* playback (it maps `NowPlaying`/`Position`/`IsPlaying`/`Duration` and the `TrackChanged`/`PositionChanged`/`PlaybackStateChanged` events into the lyrics-canvas anchors). It therefore injects **`IReadOnlyPlaybackState`** instead of `IPlaybackService`. The values handed to the canvas are byte-for-byte the same, at the same cadence; the canvas keeps doing all smoothing on its own render-thread clock. This is the demonstrating first consumer that earns the new interface its place in v1 — and it proves the observe-only contract on the cleanest surface.

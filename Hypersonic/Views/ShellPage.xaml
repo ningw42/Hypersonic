@@ -571,7 +571,7 @@
                                FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                VerticalAlignment="Center" Width="36" TextAlignment="Right" Margin="0,0,8,0"/>
 
-                    <Slider Grid.Column="6" Minimum="0"
+                    <Slider x:Name="SeekSlider" Grid.Column="6" Minimum="0"
                             Maximum="{x:Bind Player.Duration, Mode=OneWay}"
                             Value="{x:Bind Player.Position, Mode=TwoWay}"
                             ThumbToolTipValueConverter="{StaticResource SecondsToTimeConverter}"
