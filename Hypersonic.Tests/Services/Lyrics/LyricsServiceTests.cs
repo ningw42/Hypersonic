@@ -493,6 +493,47 @@ public class LyricsServiceTests
         Assert.AreEqual(2, _store.WritePositiveCount, "forceRefresh overwrites the cache entry");
     }
 
+    private static LyricsProviderResult WordContent(string marker)
+    {
+        var payload = Encoding.UTF8.GetBytes(marker);
+        var doc = new LyricsDocument
+        {
+            SyncKind = LyricsSyncKind.Word,
+            SourceProvider = marker,
+            Lines =
+            [
+                new LyricsLine
+                {
+                    StartMs = 0, EndMs = 1000, Text = marker,
+                    Words = [new LyricsWord { StartMs = 0, EndMs = 1000, Text = marker }],
+                },
+            ],
+        };
+        return LyricsProviderResult.Content(doc, payload, TtmlLyricsConstants.Format, definitive: true);
+    }
+
+    [TestMethod]
+    public async Task TwoWordProviders_RegistrationOrderWins_NotArrivalOrder()
+    {
+        // The later-registered provider returns its Word result first; the earlier one is gated (slower).
+        // With the Word early-exit removed, the fan-out waits for all providers and the policy picks the
+        // earliest-registered on the tie — "first", not the faster "second".
+        var gate = new TaskCompletionSource<bool>();
+        var first = new FakeLyricsProvider(_ => WordContent("first")) { Id = "amll-a", Gate = gate };
+        var second = new FakeLyricsProvider(_ => WordContent("second")) { Id = "amll-b" };
+        var service = CreateService(null, first, second);
+
+        var task = service.GetLyricsAsync(Query);
+        gate.SetResult(true); // release the slower first provider so all-complete is reached
+        var doc = await task;
+
+        Assert.AreEqual("first", doc!.SourceProvider);
+    }
+
+    [TestMethod]
+    public void ExtensionForFormat_Ttml_MapsToTtml()
+        => Assert.AreEqual(".ttml", LyricsService.ExtensionForFormat("ttml"));
+
     // ---- Local override source (Phase 2) ----
 
     [TestMethod]

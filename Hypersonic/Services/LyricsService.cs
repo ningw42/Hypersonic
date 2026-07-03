@@ -231,8 +231,8 @@ public sealed class LyricsService : ILyricsService, IDisposable
 
     /// <summary>
     /// Fires all providers concurrently under one linked CTS, bounded by <paramref name="budget"/>.
-    /// Decides early the moment all providers complete OR a top-tier (Word) result arrives; if the
-    /// budget elapses first, cancels the stragglers and decides on what completed. The returned list is
+    /// Decides the moment all providers complete; if the budget elapses first, cancels the stragglers
+    /// and decides on what completed. The returned list is
     /// ordered by provider precedence (registration order), NOT completion order — load-bearing for the
     /// policy's equal-tier tiebreak. <c>anyTruncated</c> is "any provider slot unfilled at decision time".
     /// </summary>
@@ -316,10 +316,6 @@ public sealed class LyricsService : ILyricsService, IDisposable
             if (result is not null)
             {
                 Volatile.Write(ref slots[idx], result);
-                if (result.Kind == LyricsOutcomeKind.Content && result.Document!.SyncKind == LyricsSyncKind.Word)
-                {
-                    earlyExit.TrySetResult(); // top tier — nothing can beat it
-                }
             }
 
             if (Interlocked.Decrement(ref remaining) == 0)
@@ -476,12 +472,13 @@ public sealed class LyricsService : ILyricsService, IDisposable
     }
 
     /// <summary>Maps a payload format tag to the file extension its cached payload uses.</summary>
-    private static string ExtensionForFormat(string formatTag) => formatTag switch
+    internal static string ExtensionForFormat(string formatTag) => formatTag switch
     {
         SubsonicLyricsConstants.StructuredFormat => ".json",
         SubsonicLyricsConstants.LegacyFormat => ".txt",
         LrcLibLyricsConstants.SyncedFormat => ".lrc",
         LrcLibLyricsConstants.PlainFormat => ".txt",
+        TtmlLyricsConstants.Format => ".ttml",
         _ => ".txt",
     };
 

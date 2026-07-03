@@ -126,6 +126,9 @@ public partial class App : Application
             services.AddSingleton<ILyricsPayloadParser, TtmlLyricsParser>();
             services.AddSingleton<ILyricsProvider, SubsonicLyricsProvider>();
             services.AddSingleton<ILyricsProvider, LrcLibLyricsProvider>(); // AFTER Subsonic → Subsonic wins an equal-tier tie
+            services.AddSingleton<ILyricsProvider, AmllTtmlLyricsProvider>(); // LAST: word-tier, wins only on strictly-higher tier
+            services.AddSingleton<IAmllLyricsIndex, AmllLyricsIndex>();
+            services.Configure<AmllLyricsOptions>(_ => { }); // defaults (Enabled=true, 7-day refresh); seam for the future toggle
             // Local override source (NOT a fan-out provider): LyricsService consults it ahead of the cache.
             services.AddSingleton<ILocalLyricsOverrideSource, LocalFileLyricsSource>();
             services.AddSingleton<ILyricsService, LyricsService>();
@@ -137,6 +140,13 @@ public partial class App : Application
             services.AddHttpClient("lrclib", client =>
             {
                 client.BaseAddress = new Uri("https://lrclib.net");
+                client.DefaultRequestHeaders.UserAgent.ParseAdd($"Hypersonic v{lrclibVersion} (https://github.com/ningw42/Hypersonic)");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
+            services.AddHttpClient(AmllLyricsConstants.HttpClientName, client =>
+            {
+                client.BaseAddress = new Uri(AmllLyricsConstants.CdnBase);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd($"Hypersonic v{lrclibVersion} (https://github.com/ningw42/Hypersonic)");
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
@@ -242,6 +252,20 @@ public partial class App : Application
             App.GetService<ILoggingService>()
                 .GetLogger(nameof(App))
                 .Warning("Lyrics cache reconciliation failed", exception: ex);
+        }
+
+        try
+        {
+            await App.GetService<IAmllLyricsIndex>().WarmAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            App.GetService<ILoggingService>()
+                .GetLogger(nameof(App))
+                .Warning("AMLL index warm failed", exception: ex);
         }
     }
 }
