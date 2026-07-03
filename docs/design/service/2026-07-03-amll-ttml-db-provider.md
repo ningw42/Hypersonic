@@ -188,6 +188,7 @@ Thin, and mirroring the outcome discipline of `LrcLibLyricsProvider`:
 
 | Situation | Result | Why |
 |---|---|---|
+| Provider disabled (`Enabled = false`) | `DefinitiveEmpty` | Inert but non-blocking — a permanent `Transient` would suppress every negative-cache write; no index/network work either |
 | Title blank | `Transient` | Nothing queryable; do not negative-cache |
 | Index not ready (warming) | `Transient` | Retried on the next track; cannot poison negative cache |
 | No index match | `DefinitiveEmpty` | This source honestly has no entry — contributes to the negative cache only if *every* provider is also empty |

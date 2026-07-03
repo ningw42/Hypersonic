@@ -116,6 +116,16 @@ public class AmllLyricsIndexDataTests
     }
 
     [TestMethod]
+    public void Parse_SkipsWrongShapeMetadata_DoesNotThrow()
+    {
+        // Structurally valid JSON but musicName is a scalar (not an array): must be skipped, never throw
+        // (guards against JsonElement accessors raising InvalidOperationException and losing the whole index).
+        var bad = """{"metadata":[["musicName","Idol"],["artists",["A"]]],"rawLyricFile":"x.ttml"}""";
+        var data = AmllLyricsIndexData.Parse(Encoding.UTF8.GetBytes(bad + "\n" + Jsonl.Split('\n')[0]));
+        Assert.AreEqual(1, data.Count); // wrong-shape line dropped; the good line kept
+    }
+
+    [TestMethod]
     public void SplitQueryArtists_SplitsSeparators()
     {
         var set = AmllLyricsIndexData.SplitQueryArtists("A, B & C feat. D");
@@ -267,17 +277,17 @@ public sealed class AmllLyricsIndexData
                         continue;
                     }
 
-                    var key = pair[0].GetString();
+                    var key = pair[0].ValueKind == JsonValueKind.String ? pair[0].GetString() : null;
                     var values = pair[1];
                     switch (key)
                     {
-                        case "musicName" when values.GetArrayLength() > 0:
+                        case "musicName" when values.ValueKind == JsonValueKind.Array && values.GetArrayLength() > 0:
                             title = values[0].GetString();
                             break;
-                        case "album" when values.GetArrayLength() > 0:
+                        case "album" when values.ValueKind == JsonValueKind.Array && values.GetArrayLength() > 0:
                             album = values[0].GetString();
                             break;
-                        case "artists":
+                        case "artists" when values.ValueKind == JsonValueKind.Array:
                             foreach (var a in values.EnumerateArray())
                             {
                                 if (a.GetString() is { } name)
@@ -303,9 +313,9 @@ public sealed class AmllLyricsIndexData
             entry = new Entry(file, artists, string.IsNullOrWhiteSpace(album) ? null : Normalize(album));
             return true;
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
-            return false; // skip malformed lines
+            return false; // skip malformed or wrong-shape lines (bad JSON, or unexpected JSON value kinds)
         }
     }
 
@@ -343,7 +353,7 @@ public sealed class AmllLyricsIndexData
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `dotnet test Hypersonic.Core.Tests/Hypersonic.Core.Tests.csproj --filter "FullyQualifiedName~AmllLyricsIndexDataTests"`
-Expected: PASS (all 10 tests).
+Expected: PASS (all 11 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -451,6 +461,7 @@ using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Core.Services;
 using Hypersonic.Models;
 using Hypersonic.Services.Lyrics;
+using Hypersonic.Tests.Fakes;
 
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -804,6 +815,8 @@ private void WriteIndexAtomic(byte[] body)
 
 private void WriteMeta(AmllIndexMeta meta)
 {
+    // Bare JsonSerializer (not the project Json helper) is deliberate and self-consistent here: the
+    // sidecar is PascalCase, round-trips write↔read cleanly, and has no enums needing a custom converter.
     var sub = Path.Combine(_folderLocator.GetCacheFolder(), AmllLyricsConstants.CacheSubfolder);
     Directory.CreateDirectory(sub);
     File.WriteAllBytes(Path.Combine(sub, AmllLyricsConstants.MetaFileName), JsonSerializer.SerializeToUtf8Bytes(meta));
@@ -1212,7 +1225,7 @@ In the same file, change the signature from `private static string ExtensionForF
     };
 ```
 
-Ensure `using Hypersonic.Core.Services.Lyrics;` is present in `LyricsService.cs` (it already references `LyricsSyncKindRank` from that namespace, so it is).
+`TtmlLyricsConstants` lives in `Hypersonic.Core.Services.Lyrics` — the same namespace as `LrcLibLyricsConstants`, which `ExtensionForFormat` already uses — so `using Hypersonic.Core.Services.Lyrics;` is already present at the top of `LyricsService.cs` (around `LyricsService.cs:7`) and no new using is needed.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
