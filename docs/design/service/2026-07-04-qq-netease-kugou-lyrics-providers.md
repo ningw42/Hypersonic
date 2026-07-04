@@ -73,13 +73,13 @@ Search‑based sources can return a confident‑looking result for the **wrong s
 - **Title** — `sim(queryTitle, candidateTitle)`. Always present (a blank query title is rejected upstream, before scoring).
 - **Album** — `sim(queryAlbum, candidateAlbum)`, **low weight** (albums legitimately differ: single vs album vs compilation).
 - **Duration** — `1 − min(|candSec − querySec| / Tolerance, 1)`, `Tolerance` a constant (~12 s). Exact → 1; a full tolerance off or more → 0.
-- **Artist** — multi‑artist aware:
+- **Artist** — multi‑artist aware. Compares the query's artist string against **one candidate's** artist string, splitting *both* into artist tokens. (Choosing *which* candidate song is a level up — selection, below; this factor scores a single candidate.)
   1. Normalize both artist strings.
-  2. **Split** each into a token list on any of `/  ,  ;  &  、  ，` and the collaboration words `feat` / `feat.` / `ft` / `ft.` / `featuring` / `vs` / `vs.` (case‑insensitive, treated as delimiters). Trim tokens; drop empties. (`x` / `×` are deliberately **not** split on — too many false positives, e.g. "Charli XCX".)
-  3. **Match, query‑driven and asymmetric:** for **each token in the query** artist list, take its best similarity against **any** candidate token — `best(q) = maxₖ sim(q, candTokenₖ)`.
-  4. **Artist score** = mean of `best(q)` over the query tokens.
+  2. **Split** each into artist tokens on any of `/  ,  ;  &  、  ，` and the collaboration words `feat` / `feat.` / `ft` / `ft.` / `featuring` / `vs` / `vs.` (case‑insensitive delimiters). Trim; drop empties. (`x` / `×` are deliberately **not** split on — too many false positives, e.g. "Charli XCX".) Say this yields `X` query tokens and `M` candidate‑artist tokens.
+  3. **Match, query‑driven and asymmetric:** for **each of the `X` query tokens**, take its best similarity against **any of the `M` candidate‑artist tokens** — `best(q) = maxₖ sim(q, candArtistTokenₖ)`.
+  4. **Artist factor** = mean of the `X` `best(q)` values → one similarity in `[0, 1]`, which then enters the weighted blend below.
 
-  This rewards every *queried* artist appearing in the candidate and **ignores extra** artists the candidate lists — because tags routinely under‑ or over‑list collaborators, and we only care that the artists we searched for are present. Examples: query `宇多田ヒカル` vs candidate `宇多田ヒカル/Skrillex` → the query token matches exactly, the extra `Skrillex` is ignored → **1.0**. Query `A/B` vs candidate `A` → `A`→1.0, `B`→~0 (absent) → mean ≈ **0.5** (a missing collaborator is penalized proportionally, not fatally).
+  This rewards every *queried* artist appearing in the candidate and **ignores extra** artists the candidate lists — because tags routinely under‑ or over‑list collaborators, and we only care that the artists we searched for are present. Examples: query `A/B` (X=2) vs candidate `A` (M=1) → `best(A)=1.0`, `best(B)≈0` (absent) → mean ≈ **0.5** (a missing collaborator is penalized proportionally, not fatally); query `宇多田ヒカル` (X=1) vs candidate `宇多田ヒカル/Skrillex` (M=2) → exact match, extra `Skrillex` ignored → **1.0**.
 
 **Missing data = neutral.** A factor whose data is absent on **either** side (no album tag, no duration, no artist tokens) is **dropped** and the remaining weights are renormalized, so it neither helps nor hurts: `score = 100 × ( Σ_present wᵢ·factorᵢ ⁄ Σ_present wᵢ )`.
 
