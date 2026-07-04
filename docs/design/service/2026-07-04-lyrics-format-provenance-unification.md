@@ -75,17 +75,25 @@ After dedup, the generic text parsers (LRC, PlainText, TTML) live in `Hypersonic
 
 ### 1.3 Ownership shift
 
-The rule becomes: **parsers own `Format` + `SyncKind`; providers own `SourceProvider`.**
+The rule becomes: **the parser owns `SyncKind` + lines (content-derived); provenance — `SourceProvider` and `Format` — is stamped from the *recorded* values, never re-derived from bytes.**
 
-- Every parser **stops stamping `SourceProvider`** and **starts stamping `Format`** (its own `Format` value) on the document it builds — mirroring how it already stamps `SyncKind`.
-- Every provider **stamps `SourceProvider = Id`** on the document it returns (a small copy helper on `LyricsDocument` supports the init-only rebuild). Providers: `SubsonicLyricsProvider`, `LrcLibLyricsProvider`, `AmllTtmlLyricsProvider`, and the three via `LyricifyLyricsProviderBase`.
-- On **cache read**, `LyricsService.OverlayRowMetadata` already restores `SourceProvider` from the index row (`Hypersonic/Services/LyricsService.cs:453`); it becomes the sole source of `SourceProvider` on that path (the re-parse leaves it null), which the existing overlay handles. `Format` on read comes from the re-parse (the parser stamps it), selected by the row's stored `Format`.
+- `SyncKind` stays parser-authoritative: it depends on the actual content (e.g. `SubsonicStructured` downgrades `Line`→`Plain` when timestamps are missing), so the parser computes it and re-derives it on every read.
+- `SourceProvider` and `Format` are provenance metadata, not content, and are **not** stamped by the parser:
+  - On **fresh fetch**, the provider stamps both onto the document it returns — it knows its `Id` and the `Format` it dispatched with (a small `LyricsDocument` copy helper supports the init-only rebuild). Providers: `SubsonicLyricsProvider`, `LrcLibLyricsProvider`, `AmllTtmlLyricsProvider`, and the three via `LyricifyLyricsProviderBase`.
+  - On **cache read**, `LyricsService.OverlayRowMetadata` (`Hypersonic/Services/LyricsService.cs:453`) restores both from the index row — it already does this for `SourceProvider`, and `Format` rides the same seam. The re-parse leaves them untouched.
+- The parser's `Format` property is retained purely as its **registry/dispatch key** (the row's `Format` selects the parser on read); it is never stamped onto the document.
 
-This is what fixes AMLL: the shared TTML parser stamps `Format = Ttml` and leaves identity alone; `AmllTtmlLyricsProvider` stamps `SourceProvider = "amll-ttml-db"`. The dev-only local override (`LocalFileLyricsSource`, not a provider) yields `SourceProvider == null` → naturally attributed to nothing.
+Why `Format` is provenance, not parser-derived: `Format` is known *a priori* — it is the dispatch key used to pick the parser — so re-stamping it from the parser is redundant with the value already recorded in the row. Treating it as row-authoritative (symmetric with `SourceProvider`) gives a single authority, keeps the parser content-focused, and is future-proof — a content-sniffing or multi-format parser could never mis-stamp it. Today, with one parser per format, parser-`Format` and row-`Format` are equal by construction, so this is a clean-model/robustness choice at ~zero cost.
 
-### 1.4 Cache migration
+This is what fixes AMLL: `AmllTtmlLyricsProvider` stamps `SourceProvider = "amll-ttml-db"` (identity) while the shared TTML parser only produces `Ttml`-shaped content — the format string never lands in the identity slot again. The dev-only local override (`LocalFileLyricsSource`, not a provider) yields `SourceProvider == null` → naturally attributed to nothing.
 
-The cache row's format column changes meaning (parser tag string → `LyricsFormat`). Rather than a hand-written data migration, bump `SqliteLyricsCacheStore.CurrentSchemaVersion` `1 → 2` (`Hypersonic/Services/SqliteLyricsCacheStore.cs:36`). The base store's `user_version` mechanism rebuilds the table; pre-merge rows are dropped and re-fetched on next play. Clean cut, no stale rows.
+### 1.4 Cache persistence & migration
+
+Both provenance fields are persisted in the SQLite index row and must survive the change: `SourceProvider` (identity — the sole source of provider on a cache read) and `Format` (the parser-dispatch key, needed before a document exists). `SyncKind`, `LanguageCode`, `OffsetMs` remain stored for service decisions as today. The `LyricsCacheEntry.PayloadFormat` property → `Format` (`LyricsFormat`), and the SQLite column is renamed `PayloadFormat` → `Format` to match.
+
+Migration mechanism (verified against `SqliteCacheSchemaDriver.EnsureSchemaAsync`, `Hypersonic/Services/Cache/SqliteCacheSchemaDriver.cs:25`): on an *upgrade* (stored `v1` < current), the driver runs the `MigrationSteps` whose `TargetVersion` is in `(1, current]` — it does **not** auto-rebuild (the drop-and-recreate branch fires only when the DB is at a *future* version). So bumping the version with an empty `MigrationSteps` would leave the old `v1` table in place — a latent bug, not a rebuild. We must author an explicit step.
+
+Plan — **discard**: bump `SqliteLyricsCacheStore.CurrentSchemaVersion` `1 → 2` (`Hypersonic/Services/SqliteLyricsCacheStore.cs:36`) **and** add a `v2` `MigrationStep` that drops and recreates the table (`DROP TABLE Entries;` + the store's current `CreateCurrentSchemaSql`, referenced not duplicated). Existing rows carry retired string tags (`netease-lrc`, `subsonic-legacy`, …) and the pre-fix AMLL `"ttml"` identity — none map cleanly forward — so a clean discard is both simplest and correct: every previously-cached song becomes a lazy cache miss and re-fetches on next play (lyrics are a disposable, cheap-to-rebuild convenience), shedding the old mis-attribution for free. Orphaned payload files are pruned by the store's reconcile/self-heal. (A data-preserving alternative — rename the column, value-remap old tags, `UPDATE` the AMLL rows — is possible but adds a mapping to maintain for no user-visible benefit.)
 
 ### 1.5 Pivotal spots
 
@@ -97,7 +105,7 @@ The cache row's format column changes meaning (parser tag string → `LyricsForm
 
 ### 1.6 Test implications
 
-Notable churn: parser tests that assert `SourceProvider` now assert `Format` on the parser and move the `SourceProvider` assertion to the provider layer. Specifically — `LrcSyncedLyricsParserTests`/`LrcPlainLyricsParserTests`/`SubsonicLyricsParsersTests` (`SourceProvider` → `Format`); `TtmlLyricsParserTests.SourceProvider_IsTtml` → replaced by a `Format == Ttml` assertion; `NeteaseLrcLyricsParserTests` and the Subsonic-legacy-specific tests deleted with their parsers; `LyricsServiceTests` and `SqliteLyricsCacheStoreTests` updated for the typed `Format` round-trip and the schema-version rebuild; `LyricsProviderRegistrationTests` gains provider `DisplayName` / `Format` coverage.
+Notable churn: with provenance moving off the parser, parser tests assert only `SyncKind` + lines — `SourceProvider` assertions move to the provider/service layer, `Format` assertions to the round-trip/registry tests. Specifically — `LrcSyncedLyricsParserTests`/`LrcPlainLyricsParserTests`/`SubsonicLyricsParsersTests` drop their `SourceProvider` assertions; `TtmlLyricsParserTests.SourceProvider_IsTtml` is deleted (identity is no longer the parser's concern); `NeteaseLrcLyricsParserTests` and the Subsonic-legacy-specific tests are deleted with their parsers; provider tests gain `SourceProvider`/`Format` stamping coverage (especially AMLL → `amll-ttml-db`); `LyricsServiceTests` and `SqliteLyricsCacheStoreTests` cover the typed `Format` round-trip, the `OverlayRowMetadata` restore of `SourceProvider` + `Format` on read, and the `v2` discard migration; `LyricsProviderRegistrationTests` gains provider `DisplayName` coverage.
 
 ---
 
