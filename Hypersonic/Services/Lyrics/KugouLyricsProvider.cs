@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace Hypersonic.Services.Lyrics;
 
 /// <summary>The Kugou lyrics source (KRC, word-tier; the library decrypts the payload).</summary>
-internal sealed class KugouLyricsProvider : CnLyricsProviderBase
+internal sealed class KugouLyricsProvider : LyricifyLyricsProviderBase
 {
     private readonly KugouLyricsOptions _options;
 

@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace Hypersonic.Services.Lyrics;
 
 /// <summary>The Netease Cloud Music lyrics source (YRC word when present, else LRC line).</summary>
-internal sealed class NeteaseLyricsProvider : CnLyricsProviderBase
+internal sealed class NeteaseLyricsProvider : LyricifyLyricsProviderBase
 {
     private readonly NeteaseLyricsOptions _options;
 

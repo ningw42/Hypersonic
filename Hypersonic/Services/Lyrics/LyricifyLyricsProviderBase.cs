@@ -12,13 +12,13 @@ namespace Hypersonic.Services.Lyrics;
 /// calls the facade, gates the candidate on <see cref="LyricsMatchScorer"/>, and parses the raw payload
 /// through the shared registry. Subclasses supply only the platform, id, and options.
 /// </summary>
-internal abstract class CnLyricsProviderBase : ILyricsProvider
+internal abstract class LyricifyLyricsProviderBase : ILyricsProvider
 {
     private readonly ILyricifyLyricsClient _client;
     private readonly ILyricsParserRegistry _parserRegistry;
     private readonly ILogger _log;
 
-    protected CnLyricsProviderBase(ILyricifyLyricsClient client, ILyricsParserRegistry parserRegistry, ILoggingService logService)
+    protected LyricifyLyricsProviderBase(ILyricifyLyricsClient client, ILyricsParserRegistry parserRegistry, ILoggingService logService)
     {
         _client = client;
         _parserRegistry = parserRegistry;

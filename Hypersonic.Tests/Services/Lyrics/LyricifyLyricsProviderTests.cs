@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 namespace Hypersonic.Tests.Services.Lyrics;
 
 [TestClass]
-public class CnLyricsProviderTests
+public class LyricifyLyricsProviderTests
 {
     private sealed class FakeClient : ILyricifyLyricsClient
     {

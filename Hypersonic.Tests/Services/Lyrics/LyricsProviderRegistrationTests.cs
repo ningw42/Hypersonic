@@ -44,7 +44,7 @@ public class LyricsProviderRegistrationTests
     // and resolves in qq → netease → kugou order. It does NOT prove the cross-provider position
     // (Subsonic → lrclib → AMLL → CN) — that lives in App.xaml.cs and is verified by inspection in Step 4.
     [TestMethod]
-    public void CnProviders_ResolveInQqNeteaseKugouOrder()
+    public void LyricifyProvider_ResolveInQQNeteaseKugouOrder()
     {
         using var sp = BuildLyricsSubset();
         var ids = sp.GetServices<ILyricsProvider>().Select(p => p.Id).ToArray();

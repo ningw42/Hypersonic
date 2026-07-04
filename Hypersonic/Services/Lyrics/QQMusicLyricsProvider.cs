@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace Hypersonic.Services.Lyrics;
 
 /// <summary>The QQ Music lyrics source (QRC, word-tier).</summary>
-internal sealed class QQMusicLyricsProvider : CnLyricsProviderBase
+internal sealed class QQMusicLyricsProvider : LyricifyLyricsProviderBase
 {
     private readonly QQLyricsOptions _options;
 
