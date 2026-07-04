@@ -90,6 +90,8 @@ The score serves two uses that are the same operation read two ways:
 - **Selection** — `candidates.MaxBy(score)` (best of N).
 - **Gating** — `score ≥ MatchThreshold ? accept : reject`.
 
+For the **CN providers**, selection is the library's job — `SearchHelper.Search` returns a single best candidate — so the scorer runs **gate-only** there. Only lrclib's `/api/search`, which gets a raw candidate array, uses the scorer for N-way selection.
+
 This **unifies** lrclib's existing `SelectBest` onto the shared scorer. `SelectBest` today is a *ranker only* (a lexicographic `OrderBy…ThenBy` comparator that never rejects); it shares only the underlying similarity primitives with what the CN providers need, and it lacks a gate. Under this design:
 
 - **lrclib `/api/search`** adopts the scorer for selection (lexicographic → weighted) **and** gains the gate. This is a behavior change to a shipped provider — selection can pick a different candidate in conflict cases, and a below‑threshold best match now returns `DefinitiveEmpty` instead of being shown. To bound regression, lrclib's default `MatchThreshold` is set **conservatively (loose)**; CN providers default **moderate**. The `LrcLibLyricsProviderTests` selection assertions are re‑baselined (the existing duration‑proximity case still holds under the blend).

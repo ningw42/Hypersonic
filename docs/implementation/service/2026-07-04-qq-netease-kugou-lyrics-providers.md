@@ -416,7 +416,7 @@ git commit -m "feat(lyrics): add QQ/Netease/Kugou source constants"
   - `internal static LyricsDocument? LyricifySyllableMapper.ToWordDocument(IReadOnlyList<Lyricify.Lyrics.Models.ILineInfo> lines, string sourceId)`.
   - `internal sealed class LyricifyWordLyricsParser : ILyricsPayloadParser` with ctor `(string formatTag, string sourceId, Lyricify.Lyrics.Models.LyricsRawTypes rawType, ILoggingService logService)`.
 
-> **Library note:** BetterLyrics accesses syllables as `(line as SyllableLineInfo)?.Syllables` and reads `syllable.StartTime` / `syllable.EndTime` / `syllable.Text`. If IntelliSense shows these as `double`, wrap the assignments with `(int)Math.Round(...)`. Confirm the exact member types when the code first compiles.
+> **Library note:** syllables are `(line as SyllableLineInfo)?.Syllables`, each a `SyllableInfo` with **`int`** `StartTime` / `EndTime` (milliseconds) and a `string Text` — verified in the library source, so no cast is needed. `ILineInfo.StartTime` is `int?`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -467,6 +467,17 @@ public class LyricifyWordLyricsParserTests
     [TestMethod]
     public void Garbage_ReturnsNull()
         => Assert.IsNull(QrcParser().Parse(Encoding.UTF8.GetBytes("not a lyric at all")));
+
+    [TestMethod]
+    public void SourceId_FlowsThroughRegardlessOfFormat()
+    {
+        // Proves the sourceId parameter is stamped onto the document, so the Netease/Kugou instances
+        // (registered in Task 9) will stamp "netease"/"kugou" — without needing per-format sample text here.
+        var parser = new LyricifyWordLyricsParser(
+            QQLyricsConstants.QrcFormat, NeteaseLyricsConstants.ProviderId, LyricsRawTypes.Qrc, new LoggingService());
+        var doc = parser.Parse(Encoding.UTF8.GetBytes(QrcSample));
+        Assert.AreEqual("netease", doc!.SourceProvider);
+    }
 }
 ```
 
@@ -511,9 +522,8 @@ internal static class LyricifySyllableMapper
             {
                 foreach (var s in syllables)
                 {
-                    var start = (int)s.StartTime;
-                    var end = (int)s.EndTime;
-                    words.Add(new LyricsWord { StartMs = start, EndMs = Math.Max(end, start), Text = s.Text ?? string.Empty });
+                    // SyllableInfo.StartTime/EndTime are int ms in the library — no cast needed.
+                    words.Add(new LyricsWord { StartMs = s.StartTime, EndMs = Math.Max(s.EndTime, s.StartTime), Text = s.Text ?? string.Empty });
                 }
             }
             else
@@ -808,7 +818,7 @@ git commit -m "feat(lyrics): add Netease LRC (line) parser"
 - Create: `Hypersonic/Services/Lyrics/LyricifyLyricsClient.cs`
 
 **Interfaces:**
-- Consumes: `Lyricify.Lyrics.Helpers.SearchHelper.Search(TrackMultiArtistMetadata, Searchers, CompareHelper.MatchType)`; `Lyricify.Lyrics.Helpers.ProviderHelper.{QQMusicApi.GetLyricsAsync(id), NeteaseApi.GetLyric(id), KugouApi.GetSearchLyrics(hash:)}`; `Lyricify.Lyrics.Decrypter.Krc.Helper.GetLyricsAsync(id, accessKey)`; search-result subtypes `QQMusicSearchResult(.Id)`, `NeteaseSearchResult(.Id)`, `KugouSearchResult(.Hash)`; Task 3 constants; `LyricsQuery`, `LyricsCandidate` (Core); `ILoggingService`.
+- Consumes: `Lyricify.Lyrics.Helpers.SearchHelper.Search(TrackMultiArtistMetadata, Searchers, CompareHelper.MatchType)`; `Lyricify.Lyrics.Helpers.ProviderHelper.{QQMusicApi.GetLyricsAsync(id), NeteaseApi.GetLyricNew(id), KugouApi.GetSearchLyrics(hash:)}` (use `GetLyricNew`, the v1/YRC-capable endpoint — **not** `GetLyric`, which is LRC-only); `Lyricify.Lyrics.Decrypter.Krc.Helper.GetLyricsAsync(id, accessKey)`; search-result subtypes `QQMusicSearchResult(.Id)`, `NeteaseSearchResult(.Id)`, `KugouSearchResult(.Hash)`; Task 3 constants; `LyricsQuery`, `LyricsCandidate` (Core); `ILoggingService`.
 - Produces:
   - `enum LyricifyPlatform { QQMusic, Netease, Kugou }`
   - `sealed record LyricifyLyricsResult(string RawText, string FormatTag, LyricsCandidate Candidate)`
@@ -929,7 +939,10 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
             }
             case LyricifyPlatform.Netease when result is NeteaseSearchResult ne:
             {
-                var response = await ProviderHelper.NeteaseApi.GetLyric(ne.Id).ConfigureAwait(false);
+                // GetLyricNew hits the eapi/song/lyric/v1 endpoint, which returns word-level YRC (yv/ytv/yrv).
+                // The older GetLyric hits weapi/song/lyric and returns LRC only — it never yields YRC, so it
+                // must NOT be used here or Netease silently degrades to line-tier.
+                var response = await ProviderHelper.NeteaseApi.GetLyricNew(ne.Id).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 var yrc = response?.Yrc?.Lyric;
                 return !string.IsNullOrWhiteSpace(yrc)
@@ -1467,8 +1480,11 @@ public class LyricsProviderRegistrationTests
         return services.BuildServiceProvider();
     }
 
+    // NOTE: this exercises only the CN subset this feature adds, so it verifies the CN trio wires up
+    // and resolves in qq → netease → kugou order. It does NOT prove the cross-provider position
+    // (Subsonic → lrclib → AMLL → CN) — that lives in App.xaml.cs and is verified by inspection in Step 4.
     [TestMethod]
-    public void Providers_ResolveInQqNeteaseKugouOrder()
+    public void CnProviders_ResolveInQqNeteaseKugouOrder()
     {
         using var sp = BuildLyricsSubset();
         var ids = sp.GetServices<ILyricsProvider>().Select(p => p.Id).ToArray();
@@ -1530,12 +1546,14 @@ In `Hypersonic/App.xaml.cs`, extend the lyrics DI block. After the `TtmlLyricsPa
 
 > Note: the existing `SubsonicLyricsProvider` / `LrcLibLyricsProvider` / `AmllTtmlLyricsProvider` lines are already present (lines 127-129) — move the three CN provider registrations to sit immediately after `AmllTtmlLyricsProvider`, keeping Subsonic → lrclib → AMLL → QQ → Netease → Kugou order. Do NOT add the `ILyricProvider_placeholder` line (it is only a marker in this plan). Add `using Hypersonic.Core.Services.Lyrics;` if not already imported for the constants.
 
-- [ ] **Step 4: Build the app + run the registration test**
+- [ ] **Step 4: Build the app, run the registration test, and verify order by inspection**
 
 Run: `dotnet build Hypersonic/Hypersonic.csproj -p:Platform=x64`
 Expected: PASS.
 Run: `dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~LyricsProviderRegistrationTests"`
 Expected: PASS (both).
+
+Then read the lyrics block in `App.xaml.cs` and confirm the six `AddSingleton<ILyricsProvider, ...>` lines are in this exact order (the unit test only covers the CN subset, so this cross-provider order must be eyeballed): `SubsonicLyricsProvider` → `LrcLibLyricsProvider` → `AmllTtmlLyricsProvider` → `QQMusicLyricsProvider` → `NeteaseLyricsProvider` → `KugouLyricsProvider`.
 
 - [ ] **Step 5: Commit**
 
@@ -1595,15 +1613,16 @@ In `Hypersonic/Services/Lyrics/LrcLibLyricsProvider.cs`:
 
 ```csharp
             var best = records
-                .OrderByDescending(r => LyricsMatchScorer.Score(query, ToCandidate(r)))
+                .Select(r => (Record: r, Score: LyricsMatchScorer.Score(query, ToCandidate(r))))
+                .OrderByDescending(x => x.Score)
                 .First();
 
-            if (LyricsMatchScorer.Score(query, ToCandidate(best)) < SearchMatchThreshold)
+            if (best.Score < SearchMatchThreshold)
             {
                 return LyricsProviderResult.DefinitiveEmpty; // no confident search match
             }
 
-            return MapRecord(best);
+            return MapRecord(best.Record);
 ```
 
 3. Add the candidate mapper and delete the now-unused `SelectBest`, `NameDistance`, and `DurationDelta` methods:
