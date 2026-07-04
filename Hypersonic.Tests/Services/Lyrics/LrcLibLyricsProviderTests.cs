@@ -61,7 +61,7 @@ public class LrcLibLyricsProviderTests
     }
 
     [TestMethod]
-    public async Task Get_404_FallsThroughToSearch_RanksByDurationProximity()
+    public async Task Get_404_FallsThroughToSearch_SelectsBestScoringCandidate()
     {
         var searchArray = """
             [
@@ -81,6 +81,9 @@ public class LrcLibLyricsProviderTests
         var r = await p.FetchAsync(Query, CancellationToken.None);
         Assert.AreEqual(LyricsOutcomeKind.Content, r.Kind);
         Assert.AreEqual(LyricsSyncKind.Line, r.Document!.SyncKind);
+        // Candidate 2 wins the weighted blend (closer duration, album match, and has synced lyrics),
+        // so the produced document is its synced lyric — pin the winner, not just "some Line content".
+        Assert.AreEqual("near", r.Document!.Lines[0].Text);
     }
 
     [TestMethod]

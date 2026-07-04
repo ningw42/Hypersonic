@@ -63,4 +63,25 @@ public class LyricsMatchScorerTests
             new LyricsCandidate("ＢＬＩＮＤＩＮＧ　ＬＩＧＨＴＳ", "The Weeknd", "After Hours", 200));
         Assert.IsTrue(score >= 95, $"full-width + case should normalize, got {score}");
     }
+
+    [TestMethod]
+    public void QualifierSuffix_IsStripped()
+    {
+        // A trailing parenthetical/bracket qualifier on the candidate title must not lower the score.
+        var score = LyricsMatchScorer.Score(Query(title: "Blinding Lights"),
+            new LyricsCandidate("Blinding Lights (Remastered 2021)", "The Weeknd", "After Hours", 200));
+        Assert.IsTrue(score >= 95, $"trailing qualifier should be stripped, got {score}");
+    }
+
+    [TestMethod]
+    public void ArtistConnector_AmpersandAndWord_TokenizeIdentically()
+    {
+        // "A & B", "A and B", and "A/B" must all tokenize to [a, b], so an "&" query matches an "and" candidate.
+        var amp   = LyricsMatchScorer.Score(Query(artist: "A & B"), new LyricsCandidate("Blinding Lights", "A & B",   "After Hours", 200));
+        var word  = LyricsMatchScorer.Score(Query(artist: "A & B"), new LyricsCandidate("Blinding Lights", "A and B", "After Hours", 200));
+        var slash = LyricsMatchScorer.Score(Query(artist: "A & B"), new LyricsCandidate("Blinding Lights", "A/B",     "After Hours", 200));
+        Assert.AreEqual(amp, word, "'and' must canonicalize to the same tokens as '&'");
+        Assert.AreEqual(amp, slash, "'/' must canonicalize to the same tokens as '&'");
+        Assert.IsTrue(word >= 95, $"'&' query vs 'and' candidate should score high, got {word}");
+    }
 }

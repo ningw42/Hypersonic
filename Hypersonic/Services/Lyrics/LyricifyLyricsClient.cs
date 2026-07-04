@@ -30,7 +30,13 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
             _ => Searchers.QQMusic,
         };
 
-        _log.Debug($"Searching {platform} lyrics", new { query.Title, query.Artist, query.Album, query.DurationSeconds });
+        _log.Debug($"Searching {platform} lyrics", new
+        {
+            HasTitle = !string.IsNullOrWhiteSpace(query.Title),
+            HasArtist = !string.IsNullOrWhiteSpace(query.Artist),
+            HasAlbum = !string.IsNullOrWhiteSpace(query.Album),
+            query.DurationSeconds,
+        });
 
         var metadata = new TrackMultiArtistMetadata
         {
@@ -40,8 +46,11 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
             DurationMs = (query.DurationSeconds ?? 0) * 1000,
         };
 
+        // WaitAsync releases the await once the token trips; the underlying request still runs
+        // to completion (the library takes no CancellationToken) but its result is abandoned.
         var result = await SearchHelper.Search(metadata, searcher,
-            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.NoMatch).ConfigureAwait(false);
+            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.NoMatch)
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (result is null)
@@ -62,14 +71,15 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
         return new LyricifyLyricsResult(rawText!, formatTag, candidate);
     }
 
-    private static async Task<(string? Raw, string FormatTag)> FetchRawAsync(
+    private async Task<(string? Raw, string FormatTag)> FetchRawAsync(
         LyricifyPlatform platform, ISearchResult result, CancellationToken cancellationToken)
     {
         switch (platform)
         {
             case LyricifyPlatform.QQMusic when result is QQMusicSearchResult qq:
             {
-                var response = await ProviderHelper.QQMusicApi.GetLyricsAsync(qq.Id).ConfigureAwait(false);
+                var response = await ProviderHelper.QQMusicApi.GetLyricsAsync(qq.Id)
+                    .WaitAsync(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 return (response?.Lyrics, QQLyricsConstants.QrcFormat);
             }
@@ -78,7 +88,8 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
                 // GetLyricNew hits the eapi/song/lyric/v1 endpoint, which returns word-level YRC (yv/ytv/yrv).
                 // The older GetLyric hits weapi/song/lyric and returns LRC only — it never yields YRC, so it
                 // must NOT be used here or Netease silently degrades to line-tier.
-                var response = await ProviderHelper.NeteaseApi.GetLyricNew(ne.Id).ConfigureAwait(false);
+                var response = await ProviderHelper.NeteaseApi.GetLyricNew(ne.Id)
+                    .WaitAsync(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 var yrc = response?.Yrc?.Lyric;
                 return !string.IsNullOrWhiteSpace(yrc)
@@ -87,21 +98,31 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
             }
             case LyricifyPlatform.Kugou when result is KugouSearchResult kg:
             {
-                var response = await ProviderHelper.KugouApi.GetSearchLyrics(hash: kg.Hash).ConfigureAwait(false);
+                var response = await ProviderHelper.KugouApi.GetSearchLyrics(hash: kg.Hash)
+                    .WaitAsync(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 var candidate = response?.Candidates?.FirstOrDefault();
                 if (candidate is null)
                 {
+                    // Legitimate "no lyrics for this hash" — a search hit with no lyric candidates.
+                    _log.Debug("Kugou search hit had no lyric candidates");
                     return (null, KugouLyricsConstants.KrcFormat);
                 }
 
                 var krc = await Lyricify.Lyrics.Decrypter.Krc.Helper
-                    .GetLyricsAsync(candidate.Id, candidate.AccessKey).ConfigureAwait(false);
+                    .GetLyricsAsync(candidate.Id, candidate.AccessKey)
+                    .WaitAsync(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 return (krc, KugouLyricsConstants.KrcFormat);
             }
             default:
-                return (null, string.Empty);
+                // The search result subtype doesn't match the requested platform — a shape the library
+                // is not expected to produce. Treat as library rot: throw so the provider maps it to
+                // Transient (retryable) rather than silently negative-caching the track as "no lyrics".
+                _log.Warning("Unexpected search-result shape for platform",
+                    new { Platform = platform.ToString(), ResultType = result.GetType().Name });
+                throw new InvalidOperationException(
+                    $"Unexpected search-result shape '{result.GetType().Name}' for platform '{platform}'.");
         }
     }
 }

@@ -11,7 +11,7 @@ namespace Hypersonic.Core.Services.Lyrics;
 /// absent on either side is dropped and the remaining weights renormalized (missing = neutral). Used
 /// for both candidate selection (max score) and confidence gating (score ≥ threshold).
 /// </summary>
-public static class LyricsMatchScorer
+public static partial class LyricsMatchScorer
 {
     private const double TitleWeight = 0.35;
     private const double ArtistWeight = 0.30;
@@ -21,7 +21,13 @@ public static class LyricsMatchScorer
 
     private static readonly char[] ArtistSeparators = ['/', ',', ';', '&', '、', '，'];
     private static readonly string[] ArtistWordDelimiters =
-        [" feat.", " feat ", " ft.", " ft ", " featuring ", " vs.", " vs "];
+        [" feat.", " feat ", " ft.", " ft ", " featuring ", " vs.", " vs ", " and "];
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRegex();
+
+    [GeneratedRegex(@"\s*[\(\[].*?[\)\]]\s*$")]
+    private static partial Regex QualifierSuffixRegex();
 
     public static int Score(LyricsQuery query, LyricsCandidate candidate)
     {
@@ -104,7 +110,7 @@ public static class LyricsMatchScorer
     {
         if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 
-        var collapsed = Regex.Replace(value.Trim().ToLowerInvariant(), @"\s+", " ");
+        var collapsed = WhitespaceRegex().Replace(value.Trim().ToLowerInvariant(), " ");
         var sb = new StringBuilder(collapsed.Length);
         foreach (var ch in collapsed)
         {
@@ -116,7 +122,7 @@ public static class LyricsMatchScorer
     }
 
     private static string StripQualifier(string normalized)
-        => Regex.Replace(normalized, @"\s*[\(\[].*?[\)\]]\s*$", string.Empty).Trim();
+        => QualifierSuffixRegex().Replace(normalized, string.Empty).Trim();
 
     internal static List<string> ArtistTokens(string? artist)
     {
