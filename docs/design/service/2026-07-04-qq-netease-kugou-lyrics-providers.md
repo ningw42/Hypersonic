@@ -38,7 +38,7 @@ The lyrics stack already separates pure logic (`Hypersonic.Core`) from app plumb
 - **`LyricifyLyricsClient`** — the single facade over `Lyricify.Lyrics.Helper`. Given a platform + `LyricsQuery`, it runs the library's search, picks the library's best candidate (no library‑side pre‑filter, mirroring BetterLyrics' `MatchType.NoMatch`), fetches + decrypts, and returns the decrypted raw lyric text, its format tag, and the candidate's metadata — or signals "no hit" vs "transient failure" distinctly. This is the **only** type that touches the library's network/decrypt surface.
 - **`QQMusicLyricsProvider` / `NeteaseLyricsProvider` / `KugouLyricsProvider`** — thin `ILyricsProvider`s (note the double‑capital `QQ`). Each: honor `Enabled`, guard blank title, call the facade, apply the scorer gate, parse via the registry, return `Content` / `DefinitiveEmpty` / `Transient`.
 - **`QrcLyricsParser` / `KrcLyricsParser` / `YrcLyricsParser`** — `ILyricsPayloadParser`s (format tags `"qrc"` / `"krc"` / `"yrc"`) that delegate to the library's format parsers and map through one shared **`LyricifySyllableMapper`** → a word‑tier `LyricsDocument`. They live in `Hypersonic` because they depend on the NuGet — the same placement exception the Subsonic parsers use for depending on Client DTOs (a parser's assembly is irrelevant to registry resolution). Netease's line‑only LRC fallback reuses the existing pure `LrcLineParser` behind a netease‑tagged parser.
-- **`{Qq,Netease,Kugou}LyricsOptions`** (each `Enabled = true` + `MatchThreshold`) and per‑platform `*LyricsConstants` (provider id, format tags), mirroring `AmllLyricsOptions` / `AmllLyricsConstants`.
+- **`QQLyricsOptions` / `NeteaseLyricsOptions` / `KugouLyricsOptions`** (each `Enabled = true` + `MatchThreshold`) and per‑platform `*LyricsConstants` (provider id, format tags), mirroring `AmllLyricsOptions` / `AmllLyricsConstants`. The `QQ` brand stays double‑capital in every type and display name.
 
 **DI** (`App.xaml.cs`, beside the existing registrations): the three parsers as `ILyricsPayloadParser`; the facade + scorer as singletons; the three providers as `ILyricsProvider` in priority order (see §DI & ordering); a `Configure<…Options>` per provider. No `IHttpClientFactory` named client is required — the library owns its own HTTP; the existing lrclib/AMLL named clients are untouched.
 
@@ -48,7 +48,7 @@ The lyrics stack already separates pure logic (`Hypersonic.Core`) from app plumb
 
 ### One provider per source, over one library facade
 
-Each platform is its own `ILyricsProvider` with its own stable id (`"qq"` / `"netease"` / `"kugou"`), its own `Enabled` toggle, and its own cache lineage. All three route through the single `LyricifyLyricsClient` facade, which is the one seam that knows the NuGet exists. This keeps the "provider is one real source" rule, gives per‑platform toggles and distinct `SourceProvider` cache ids, and — as a bonus — confines the library's blast radius to the facade + the three format parsers, so a future swap to a hand‑rolled client (should the library rot) touches only that adapter layer, never the providers or the service.
+Each platform is its own `ILyricsProvider` with its own stable id (`"qq"` / `"netease"` / `"kugou"` — persisted cache tokens follow the all‑lowercase convention of `"lrclib"` / `"amll-ttml-db"`; the `QQ` brand stays double‑capital in every type and display name), its own `Enabled` toggle, and its own cache lineage. All three route through the single `LyricifyLyricsClient` facade, which is the one seam that knows the NuGet exists. This keeps the "provider is one real source" rule, gives per‑platform toggles and distinct `SourceProvider` cache ids, and — as a bonus — confines the library's blast radius to the facade + the three format parsers, so a future swap to a hand‑rolled client (should the library rot) touches only that adapter layer, never the providers or the service.
 
 Rejected alternatives: one parameterized provider registered thrice (awkward keyed/factory DI, muddier ids/toggles); one combined "CN" provider racing all three internally (violates one‑provider‑per‑source, collapses the toggles, hides three sources under one cache id).
 
@@ -64,17 +64,31 @@ The mapper must satisfy the `LyricsValidator` word‑tier invariants: every line
 
 Search‑based sources can return a confident‑looking result for the **wrong song**. Because `LyricsFallbackPolicy` ranks purely by sync tier (`Word > Line > Plain`, registration order as tiebreak) with **no notion of match confidence**, an unguarded word‑tier wrong‑song result would strictly out‑rank a correct Subsonic/lrclib line result. So every search‑based provider computes a match score against its candidate's metadata and **rejects below a threshold**, returning `DefinitiveEmpty` ("no confident match from this source") rather than handing wrong‑song lyrics to the policy.
 
-`LyricsMatchScorer` (Core, pure) computes one **weighted absolute score** (0–100) from:
+`LyricsMatchScorer` (Core, pure) computes one **weighted absolute score in `[0, 100]`** from up to four factors, each a similarity in `[0, 1]`.
 
-- **Title** — normalized Levenshtein similarity.
-- **Artist** — normalized Levenshtein, multi‑artist aware (split on `/ , & 、 feat. ft.`, best token pairing).
-- **Album** — normalized Levenshtein, **low weight** (albums legitimately differ: single vs album vs compilation).
-- **Duration** — proximity within a tolerance (~10–15 s); a missing duration on either side is **neutral**, never a penalty.
+**Shared normalization** (applied to every string before comparison): lowercase (invariant), trim, collapse internal whitespace to a single space, fold full‑width → half‑width. Title and album additionally strip a trailing parenthetical/bracketed qualifier (`(Live)`, `(Remastered 2011)`, `[Deluxe]`, …).
 
-Weights are documented, tunable constants. The score serves two uses that are really the same operation read two ways:
+**`sim(a, b)`** is normalized Levenshtein: `1 − editDistance(a, b) / max(len a, len b)` (defined as `1` when both are empty). Levenshtein itself is standard and omitted here.
 
-- **Selection** — `candidates.MaxBy(score)` (picks the best of N).
-- **Gating** — `score ≥ threshold ? accept : reject`.
+- **Title** — `sim(queryTitle, candidateTitle)`. Always present (a blank query title is rejected upstream, before scoring).
+- **Album** — `sim(queryAlbum, candidateAlbum)`, **low weight** (albums legitimately differ: single vs album vs compilation).
+- **Duration** — `1 − min(|candSec − querySec| / Tolerance, 1)`, `Tolerance` a constant (~12 s). Exact → 1; a full tolerance off or more → 0.
+- **Artist** — multi‑artist aware:
+  1. Normalize both artist strings.
+  2. **Split** each into a token list on any of `/  ,  ;  &  、  ，` and the collaboration words `feat` / `feat.` / `ft` / `ft.` / `featuring` / `vs` / `vs.` (case‑insensitive, treated as delimiters). Trim tokens; drop empties. (`x` / `×` are deliberately **not** split on — too many false positives, e.g. "Charli XCX".)
+  3. **Match, query‑driven and asymmetric:** for **each token in the query** artist list, take its best similarity against **any** candidate token — `best(q) = maxₖ sim(q, candTokenₖ)`.
+  4. **Artist score** = mean of `best(q)` over the query tokens.
+
+  This rewards every *queried* artist appearing in the candidate and **ignores extra** artists the candidate lists — because tags routinely under‑ or over‑list collaborators, and we only care that the artists we searched for are present. Examples: query `宇多田ヒカル` vs candidate `宇多田ヒカル/Skrillex` → the query token matches exactly, the extra `Skrillex` is ignored → **1.0**. Query `A/B` vs candidate `A` → `A`→1.0, `B`→~0 (absent) → mean ≈ **0.5** (a missing collaborator is penalized proportionally, not fatally).
+
+**Missing data = neutral.** A factor whose data is absent on **either** side (no album tag, no duration, no artist tokens) is **dropped** and the remaining weights are renormalized, so it neither helps nor hurts: `score = 100 × ( Σ_present wᵢ·factorᵢ ⁄ Σ_present wᵢ )`.
+
+**Default weights** — illustrative, tunable constants, renormalized when a factor drops: title `0.35`, artist `0.30`, duration `0.30`, album `0.05`.
+
+The score serves two uses that are the same operation read two ways:
+
+- **Selection** — `candidates.MaxBy(score)` (best of N).
+- **Gating** — `score ≥ MatchThreshold ? accept : reject`.
 
 This **unifies** lrclib's existing `SelectBest` onto the shared scorer. `SelectBest` today is a *ranker only* (a lexicographic `OrderBy…ThenBy` comparator that never rejects); it shares only the underlying similarity primitives with what the CN providers need, and it lacks a gate. Under this design:
 
