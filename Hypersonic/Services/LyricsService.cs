@@ -479,6 +479,10 @@ public sealed class LyricsService : ILyricsService, IDisposable
         LrcLibLyricsConstants.SyncedFormat => ".lrc",
         LrcLibLyricsConstants.PlainFormat => ".txt",
         TtmlLyricsConstants.Format => ".ttml",
+        QQLyricsConstants.QrcFormat => ".qrc",
+        KugouLyricsConstants.KrcFormat => ".krc",
+        NeteaseLyricsConstants.YrcFormat => ".yrc",
+        NeteaseLyricsConstants.LrcFormat => ".lrc",
         _ => ".txt",
     };
 

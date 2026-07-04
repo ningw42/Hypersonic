@@ -124,11 +124,28 @@ public partial class App : Application
             services.AddSingleton<ILyricsPayloadParser, LrcSyncedLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, LrcPlainLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, TtmlLyricsParser>();
+            services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
+                QQLyricsConstants.QrcFormat, QQLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Qrc,
+                sp.GetRequiredService<ILoggingService>()));
+            services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
+                KugouLyricsConstants.KrcFormat, KugouLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Krc,
+                sp.GetRequiredService<ILoggingService>()));
+            services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
+                NeteaseLyricsConstants.YrcFormat, NeteaseLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Yrc,
+                sp.GetRequiredService<ILoggingService>()));
+            services.AddSingleton<ILyricsPayloadParser, NeteaseLrcLyricsParser>();
             services.AddSingleton<ILyricsProvider, SubsonicLyricsProvider>();
             services.AddSingleton<ILyricsProvider, LrcLibLyricsProvider>(); // AFTER Subsonic → Subsonic wins an equal-tier tie
-            services.AddSingleton<ILyricsProvider, AmllTtmlLyricsProvider>(); // LAST: word-tier, wins only on strictly-higher tier
+            services.AddSingleton<ILyricsProvider, AmllTtmlLyricsProvider>(); // word-tier, wins only on strictly-higher tier
+            services.AddSingleton<ILyricsProvider, QQMusicLyricsProvider>();  // CN word-tier, gated by confidence
+            services.AddSingleton<ILyricsProvider, NeteaseLyricsProvider>();
+            services.AddSingleton<ILyricsProvider, KugouLyricsProvider>();
             services.AddSingleton<IAmllLyricsIndex, AmllLyricsIndex>();
+            services.AddSingleton<ILyricifyLyricsClient, LyricifyLyricsClient>();
             services.Configure<AmllLyricsOptions>(_ => { }); // defaults (Enabled=true, 7-day refresh); seam for the future toggle
+            services.Configure<QQLyricsOptions>(_ => { });     // defaults: Enabled=true, MatchThreshold=55
+            services.Configure<NeteaseLyricsOptions>(_ => { });
+            services.Configure<KugouLyricsOptions>(_ => { });
             // Local override source (NOT a fan-out provider): LyricsService consults it ahead of the cache.
             services.AddSingleton<ILocalLyricsOverrideSource, LocalFileLyricsSource>();
             services.AddSingleton<ILyricsService, LyricsService>();

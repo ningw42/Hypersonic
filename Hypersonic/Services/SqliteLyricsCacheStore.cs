@@ -21,7 +21,7 @@ namespace Hypersonic.Services;
 public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEntry>, ILyricsCacheStore
 {
     private static readonly string[] CachedLyricsExtensions =
-        [".json", ".txt", ".lrc", ".ttml", ".yrc"];
+        [".json", ".txt", ".lrc", ".ttml", ".yrc", ".qrc", ".krc"];
 
     public SqliteLyricsCacheStore(
         IOptions<LyricsCacheOptions> options,
@@ -61,8 +61,8 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
     protected override string PayloadSubfolderName => "Lyrics";
 
     /// <summary>
-    /// True for a 64-hex basename plus a known lyrics extension (<c>.json</c>/<c>.txt</c> now;
-    /// <c>.lrc</c>/<c>.ttml</c>/<c>.yrc</c> reserved). Excludes <c>cache.db</c> and unrelated files.
+    /// True for a 64-hex basename plus a known lyrics extension (<c>.json</c>/<c>.txt</c>/<c>.lrc</c>/
+    /// <c>.ttml</c>/<c>.yrc</c>/<c>.qrc</c>/<c>.krc</c>). Excludes <c>cache.db</c> and unrelated files.
     /// </summary>
     internal static bool IsKnownLyricsFileName(string fileName)
     {

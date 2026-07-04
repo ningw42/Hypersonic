@@ -21,6 +21,10 @@ internal sealed class LrcLibLyricsProvider : ILyricsProvider
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    // Conservative (loose) gate for lrclib's fuzzy search path — bounds regression while suppressing
+    // clearly-wrong search matches. /api/get (exact server match) stays ungated. Tunable.
+    private const int SearchMatchThreshold = 30;
+
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILyricsParserRegistry _parserRegistry;
     private readonly ILogger _log;
@@ -124,7 +128,17 @@ internal sealed class LrcLibLyricsProvider : ILyricsProvider
                 return LyricsProviderResult.DefinitiveEmpty;
             }
 
-            return MapRecord(SelectBest(records, query));
+            var best = records
+                .Select(r => (Record: r, Score: LyricsMatchScorer.Score(query, ToCandidate(r))))
+                .OrderByDescending(x => x.Score)
+                .First();
+
+            if (best.Score < SearchMatchThreshold)
+            {
+                return LyricsProviderResult.DefinitiveEmpty; // no confident search match
+            }
+
+            return MapRecord(best.Record);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -174,38 +188,11 @@ internal sealed class LrcLibLyricsProvider : ILyricsProvider
     }
 
     /// <summary>
-    /// Client-side disambiguation of search candidates: closest duration first, then title/artist
-    /// closeness, then album similarity, then preferring a candidate that carries synced lyrics.
-    /// Search has no server-side duration filter, so this is where duration matching happens.
+    /// Projects an lrclib search record into a <see cref="LyricsCandidate"/> for the shared
+    /// <see cref="LyricsMatchScorer"/>. Duration is rounded to whole seconds (lrclib reports it as a double).
     /// </summary>
-    private static LrcLibRecord SelectBest(LrcLibRecord[] records, LyricsQuery query)
-        => records
-            .OrderBy(r => DurationDelta(r, query))
-            .ThenBy(r => NameDistance(r.TrackName, query.Title) + NameDistance(r.ArtistName, query.Artist))
-            .ThenBy(r => NameDistance(r.AlbumName, query.Album))
-            .ThenByDescending(r => !string.IsNullOrWhiteSpace(r.SyncedLyrics))
-            .First();
-
-    private static double DurationDelta(LrcLibRecord r, LyricsQuery query)
-        => query.DurationSeconds is { } d && r.Duration is { } rd ? Math.Abs(rd - d) : double.MaxValue;
-
-    // 0 = equal (case/space-insensitive), 1 = one contains the other, 2 = otherwise. Null/blank target → 0.
-    private static int NameDistance(string? candidate, string? target)
-    {
-        if (string.IsNullOrWhiteSpace(target))
-        {
-            return 0;
-        }
-
-        var a = (candidate ?? string.Empty).Trim().ToLowerInvariant();
-        var b = target.Trim().ToLowerInvariant();
-        if (a == b)
-        {
-            return 0;
-        }
-
-        return a.Length > 0 && (a.Contains(b) || b.Contains(a)) ? 1 : 2;
-    }
+    private static LyricsCandidate ToCandidate(LrcLibRecord r)
+        => new(r.TrackName, r.ArtistName, r.AlbumName, r.Duration is { } d ? (int)Math.Round(d) : null);
 
     private sealed class LrcLibRecord
     {

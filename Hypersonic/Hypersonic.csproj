@@ -42,6 +42,8 @@
 
     <PackageReference Include="H.NotifyIcon.WinUI" />
 
+    <PackageReference Include="Lyricify.Lyrics.Helper" />
+
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Http" />
 

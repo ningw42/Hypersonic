@@ -92,6 +92,16 @@ public class LrcLibLyricsProviderTests
     }
 
     [TestMethod]
+    public async Task Search_AllCandidatesWrong_DefinitiveEmpty()
+    {
+        // Search fallback (no /api/get artist) returns a single unrelated song → below threshold → empty.
+        var wrong = """[{"trackName":"Unrelated","artistName":"Nobody","albumName":"X","duration":10,"instrumental":false,"plainLyrics":"x","syncedLyrics":"[00:01.00] x"}]""";
+        var p = Provider(new StubHandler { SearchResponse = Ok(wrong) });
+        var r = await p.FetchAsync(new LyricsQuery("s", Artist: "The Weeknd", Title: "Blinding Lights", Album: "After Hours", DurationSeconds: 200), CancellationToken.None);
+        Assert.AreEqual(LyricsOutcomeKind.DefinitiveEmpty, r.Kind);
+    }
+
+    [TestMethod]
     public async Task Get_5xx_Transient_DoesNotSearch()
     {
         var handler = new StubHandler
