@@ -75,17 +75,19 @@ After dedup, the generic text parsers (LRC, PlainText, TTML) live in `Hypersonic
 
 ### 1.3 Ownership shift
 
-The rule becomes: **the parser owns `SyncKind` + lines (content-derived); provenance — `SourceProvider` and `Format` — is stamped from the *recorded* values, never re-derived from bytes.**
+The rule becomes: **the parser owns `Format` + `SyncKind` + lines (everything derivable from the payload); the provider owns `SourceProvider` (identity).**
 
-- `SyncKind` stays parser-authoritative: it depends on the actual content (e.g. `SubsonicStructured` downgrades `Line`→`Plain` when timestamps are missing), so the parser computes it and re-derives it on every read.
-- `SourceProvider` and `Format` are provenance metadata, not content, and are **not** stamped by the parser:
-  - On **fresh fetch**, the provider stamps both onto the document it returns — it knows its `Id` and the `Format` it dispatched with (a small `LyricsDocument` copy helper supports the init-only rebuild). Providers: `SubsonicLyricsProvider`, `LrcLibLyricsProvider`, `AmllTtmlLyricsProvider`, and the three via `LyricifyLyricsProviderBase`.
-  - On **cache read**, `LyricsService.OverlayRowMetadata` (`Hypersonic/Services/LyricsService.cs:453`) restores both from the index row — it already does this for `SourceProvider`, and `Format` rides the same seam. The re-parse leaves them untouched.
-- The parser's `Format` property is retained purely as its **registry/dispatch key** (the row's `Format` selects the parser on read); it is never stamped onto the document.
+- Every parser **stops stamping `SourceProvider`** and stamps `Format` (its own value) alongside `SyncKind` on the document it builds.
+- Every provider stamps `SourceProvider = Id` on the document it returns — a small `LyricsDocument` copy helper carries the parser's `Format`/`SyncKind`/lines through the init-only rebuild. Providers: `SubsonicLyricsProvider`, `LrcLibLyricsProvider`, `AmllTtmlLyricsProvider`, and the three via `LyricifyLyricsProviderBase`.
+- On **cache read**: the re-parse restores `Format` + `SyncKind` + lines; `LyricsService.OverlayRowMetadata` (`Hypersonic/Services/LyricsService.cs:453`) restores `SourceProvider` from the index row (it already does this) — the sole source of identity on that path, since the re-parse leaves it null. The row's stored `Format` is used **only to select the parser** (dispatch); it is *not* overlaid, because the parser re-derives the same value by construction (the registry maps a `Format` to the parser whose `.Format` is that value, so they cannot diverge).
 
-Why `Format` is provenance, not parser-derived: `Format` is known *a priori* — it is the dispatch key used to pick the parser — so re-stamping it from the parser is redundant with the value already recorded in the row. Treating it as row-authoritative (symmetric with `SourceProvider`) gives a single authority, keeps the parser content-focused, and is future-proof — a content-sniffing or multi-format parser could never mis-stamp it. Today, with one parser per format, parser-`Format` and row-`Format` are equal by construction, so this is a clean-model/robustness choice at ~zero cost.
+Why the split falls this way — `Format` with the parser, `SourceProvider` with the provider — comes down to what each layer can know:
+- **`Format` is knowable by the parser**: it *is* the parser's identity / registry key, so the parser can always stamp it correctly, on both fetch and re-parse.
+- **`SourceProvider` is NOT knowable by the parser**: after the dedup a parser is shared across providers (the one LRC parser serves both lrclib and netease), so it cannot know who fetched the bytes. Only the provider knows its own identity.
 
-This is what fixes AMLL: `AmllTtmlLyricsProvider` stamps `SourceProvider = "amll-ttml-db"` (identity) while the shared TTML parser only produces `Ttml`-shaped content — the format string never lands in the identity slot again. The dev-only local override (`LocalFileLyricsSource`, not a provider) yields `SourceProvider == null` → naturally attributed to nothing.
+They are therefore *not* symmetric — one is derivable from the payload, the other is not — which is exactly why they land in different layers.
+
+This is what fixes AMLL: the TTML parser stamps `Format = Ttml` (never identity); `AmllTtmlLyricsProvider` stamps `SourceProvider = "amll-ttml-db"`. The dev-only local override (`LocalFileLyricsSource`, not a provider) yields `SourceProvider == null` → attributed to nothing.
 
 ### 1.4 Cache persistence & migration
 
@@ -105,7 +107,7 @@ Plan — **discard**: bump `SqliteLyricsCacheStore.CurrentSchemaVersion` `1 → 
 
 ### 1.6 Test implications
 
-Notable churn: with provenance moving off the parser, parser tests assert only `SyncKind` + lines — `SourceProvider` assertions move to the provider/service layer, `Format` assertions to the round-trip/registry tests. Specifically — `LrcSyncedLyricsParserTests`/`LrcPlainLyricsParserTests`/`SubsonicLyricsParsersTests` drop their `SourceProvider` assertions; `TtmlLyricsParserTests.SourceProvider_IsTtml` is deleted (identity is no longer the parser's concern); `NeteaseLrcLyricsParserTests` and the Subsonic-legacy-specific tests are deleted with their parsers; provider tests gain `SourceProvider`/`Format` stamping coverage (especially AMLL → `amll-ttml-db`); `LyricsServiceTests` and `SqliteLyricsCacheStoreTests` cover the typed `Format` round-trip, the `OverlayRowMetadata` restore of `SourceProvider` + `Format` on read, and the `v2` discard migration; `LyricsProviderRegistrationTests` gains provider `DisplayName` coverage.
+Notable churn: `SourceProvider` moves off the parser, so parser tests assert `Format` + `SyncKind` + lines and drop `SourceProvider`. Specifically — `LrcSyncedLyricsParserTests`/`LrcPlainLyricsParserTests`/`SubsonicLyricsParsersTests` assert `Format` (e.g. `Lrc` / `PlainText`) instead of `SourceProvider`; `TtmlLyricsParserTests.SourceProvider_IsTtml` becomes a `Format == Ttml` assertion; `NeteaseLrcLyricsParserTests` and the Subsonic-legacy-specific tests are deleted with their parsers; provider tests gain `SourceProvider` stamping coverage (especially AMLL → `amll-ttml-db`); `LyricsServiceTests` and `SqliteLyricsCacheStoreTests` cover the typed `Format` round-trip, `OverlayRowMetadata`'s restore of `SourceProvider` on read, and the `v2` discard migration; `LyricsProviderRegistrationTests` gains provider `DisplayName` coverage.
 
 ---
 
