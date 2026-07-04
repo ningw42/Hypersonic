@@ -110,4 +110,31 @@ public class LyricsDocumentTests
         Assert.AreEqual(1, back.Lines.Count);
         Assert.AreEqual(1, back.Lines[0].Words.Count);
     }
+
+    [TestMethod]
+    public void Format_DefaultsToUnknown()
+        => Assert.AreEqual(LyricsFormat.Unknown, new LyricsDocument().Format);
+
+    [TestMethod]
+    public void WithSourceProvider_SetsProvider_PreservesEverythingElse()
+    {
+        var original = new LyricsDocument
+        {
+            SyncKind = LyricsSyncKind.Line,
+            Format = LyricsFormat.Lrc,
+            LanguageCode = "en",
+            OffsetMs = -200,
+            Lines = new[] { new LyricsLine { StartMs = 0, Text = "hi" } },
+        };
+
+        var stamped = original.WithSourceProvider("lrclib");
+
+        Assert.AreEqual("lrclib", stamped.SourceProvider);
+        Assert.AreEqual(LyricsFormat.Lrc, stamped.Format);
+        Assert.AreEqual(LyricsSyncKind.Line, stamped.SyncKind);
+        Assert.AreEqual("en", stamped.LanguageCode);
+        Assert.AreEqual(-200, stamped.OffsetMs);
+        Assert.AreEqual(1, stamped.Lines.Count);
+        Assert.IsNull(original.SourceProvider); // original is untouched
+    }
 }

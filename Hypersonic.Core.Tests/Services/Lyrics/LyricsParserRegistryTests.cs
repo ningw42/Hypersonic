@@ -12,13 +12,13 @@ public class LyricsParserRegistryTests
     {
         private readonly Func<ReadOnlyMemory<byte>, LyricsDocument?> _parse;
 
-        public FakeParser(string formatTag, Func<ReadOnlyMemory<byte>, LyricsDocument?> parse)
+        public FakeParser(LyricsFormat format, Func<ReadOnlyMemory<byte>, LyricsDocument?> parse)
         {
-            FormatTag = formatTag;
+            Format = format;
             _parse = parse;
         }
 
-        public string FormatTag { get; }
+        public LyricsFormat Format { get; }
 
         public LyricsDocument? Parse(ReadOnlyMemory<byte> payload) => _parse(payload);
     }
@@ -35,10 +35,10 @@ public class LyricsParserRegistryTests
             Lines = new[] { new LyricsLine { Text = "hi" } },
         };
         var registry = Create(
-            new FakeParser("a", _ => throw new InvalidOperationException("wrong parser selected")),
-            new FakeParser("b", _ => doc));
+            new FakeParser(LyricsFormat.Lrc, _ => throw new InvalidOperationException("wrong parser selected")),
+            new FakeParser(LyricsFormat.PlainText, _ => doc));
 
-        var result = registry.Parse("b", new byte[] { 1, 2, 3 });
+        var result = registry.Parse(LyricsFormat.PlainText, new byte[] { 1, 2, 3 });
 
         Assert.AreSame(doc, result);
     }
@@ -46,30 +46,30 @@ public class LyricsParserRegistryTests
     [TestMethod]
     public void Parse_UnknownFormatTag_ReturnsNull()
     {
-        var registry = Create(new FakeParser("a", _ => new LyricsDocument()));
+        var registry = Create(new FakeParser(LyricsFormat.Lrc, _ => new LyricsDocument()));
 
-        Assert.IsNull(registry.Parse("missing", new byte[] { 1 }));
+        Assert.IsNull(registry.Parse(LyricsFormat.PlainText, new byte[] { 1 }));
     }
 
     [TestMethod]
-    public void Parse_EmptyFormatTag_ReturnsNull()
+    public void Parse_UnregisteredFormat_ReturnsNull()
     {
-        var registry = Create(new FakeParser("a", _ => new LyricsDocument()));
+        var registry = Create(new FakeParser(LyricsFormat.Lrc, _ => new LyricsDocument()));
 
-        Assert.IsNull(registry.Parse(string.Empty, new byte[] { 1 }));
+        Assert.IsNull(registry.Parse(LyricsFormat.Ttml, new byte[] { 1 }));
     }
 
     [TestMethod]
     public void Parse_PassesPayloadBytesThroughToParser()
     {
         byte[]? captured = null;
-        var registry = Create(new FakeParser("a", bytes =>
+        var registry = Create(new FakeParser(LyricsFormat.Lrc, bytes =>
         {
             captured = bytes.ToArray();
             return null;
         }));
 
-        registry.Parse("a", new byte[] { 9, 8, 7 });
+        registry.Parse(LyricsFormat.Lrc, new byte[] { 9, 8, 7 });
 
         CollectionAssert.AreEqual(new byte[] { 9, 8, 7 }, captured);
     }

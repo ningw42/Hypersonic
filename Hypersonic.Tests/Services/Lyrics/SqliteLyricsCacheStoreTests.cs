@@ -65,7 +65,7 @@ public class SqliteLyricsCacheStoreTests
             FileName = key + ".json",
             Length = 321,
             SourceProvider = "subsonic",
-            PayloadFormat = "subsonic-structured",
+            Format = LyricsFormat.SubsonicStructured,
             SyncKind = LyricsSyncKind.Line,
             LanguageCode = "en",
             OffsetMs = -250,
@@ -80,7 +80,7 @@ public class SqliteLyricsCacheStoreTests
         Assert.AreEqual(key + ".json", read!.FileName);
         Assert.AreEqual(321, read.Length);
         Assert.AreEqual("subsonic", read.SourceProvider);
-        Assert.AreEqual("subsonic-structured", read.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.SubsonicStructured, read.Format);
         Assert.AreEqual(LyricsSyncKind.Line, read.SyncKind);
         Assert.AreEqual("en", read.LanguageCode);
         Assert.AreEqual(-250, read.OffsetMs);
@@ -100,7 +100,7 @@ public class SqliteLyricsCacheStoreTests
             FileName = key + ".txt",
             Length = 10,
             SourceProvider = "subsonic",
-            PayloadFormat = "subsonic-legacy",
+            Format = LyricsFormat.PlainText,
             SyncKind = LyricsSyncKind.Plain,
             LanguageCode = null,
             OffsetMs = null,
@@ -154,7 +154,7 @@ public class SqliteLyricsCacheStoreTests
 
         Assert.IsNotNull(payload);
         CollectionAssert.AreEqual(bytes, payload!.Bytes.ToArray());
-        Assert.AreEqual("subsonic-structured", payload.Entry.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.SubsonicStructured, payload.Entry.Format);
         Assert.AreEqual(LyricsSyncKind.Line, payload.Entry.SyncKind);
     }
 
@@ -170,7 +170,7 @@ public class SqliteLyricsCacheStoreTests
             FileName = string.Empty,
             Length = 0,
             SourceProvider = "subsonic",
-            PayloadFormat = string.Empty,
+            Format = LyricsFormat.Unknown,
             SyncKind = LyricsSyncKind.None,
             CreatedAtUtc = now,
             LastAccessUtc = now,
@@ -239,7 +239,7 @@ public class SqliteLyricsCacheStoreTests
         using var second = CreateStore();
         var read = await second.GetEntryAsync(key);
         Assert.IsNotNull(read);
-        Assert.AreEqual("subsonic-structured", read!.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.SubsonicStructured, read!.Format);
     }
 
     [TestMethod]
@@ -271,7 +271,7 @@ public class SqliteLyricsCacheStoreTests
             FileName = string.Empty,
             Length = 0,
             SourceProvider = "subsonic",
-            PayloadFormat = string.Empty,
+            Format = LyricsFormat.Unknown,
             SyncKind = LyricsSyncKind.None,
             CreatedAtUtc = now,
             LastAccessUtc = now,
@@ -282,6 +282,34 @@ public class SqliteLyricsCacheStoreTests
         var entry = await store.GetEntryAsync(key);
         Assert.AreEqual(string.Empty, entry!.FileName);
         Assert.AreEqual(LyricsSyncKind.None, entry.SyncKind);
+    }
+
+    [TestMethod]
+    public async Task LegacyV1Row_IsDiscardedOnUpgrade()
+    {
+        // Hand-craft a v1 DB (old PayloadFormat column + a legacy-tag row) where the store will open it.
+        var dbPath = Path.Combine(_cacheRoot, "cache.db");
+        await using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            await connection.OpenAsync();
+            await using var create = connection.CreateCommand();
+            create.CommandText = """
+                CREATE TABLE Entries (
+                    KeyHash TEXT PRIMARY KEY NOT NULL, FileName TEXT NOT NULL, Length INTEGER NOT NULL,
+                    SourceProvider TEXT NOT NULL, PayloadFormat TEXT NOT NULL, SyncKind TEXT NOT NULL,
+                    LanguageCode TEXT, OffsetMs INTEGER, CreatedAtUtc INTEGER NOT NULL,
+                    LastAccessUtc INTEGER NOT NULL, ExpiresAtUtc INTEGER NOT NULL) WITHOUT ROWID;
+                INSERT INTO Entries VALUES ('deadbeef','x.lrc',3,'netease','netease-lrc','Line',NULL,NULL,0,0,999999999999);
+                PRAGMA user_version = 1;
+                """;
+            await create.ExecuteNonQueryAsync();
+        }
+        SqliteConnection.ClearAllPools(); // release the handle so the store can reopen the file
+
+        // Opening the store triggers the v1→v2 migration step (DROP + recreate).
+        var store = CreateStore();
+        var read = await store.GetEntryAsync("deadbeef", CancellationToken.None);
+        Assert.IsNull(read); // discarded — a later fetch repopulates under the v2 schema
     }
 
     private SqliteLyricsCacheStore CreateStore(LyricsCacheOptions? options = null)
@@ -298,7 +326,7 @@ public class SqliteLyricsCacheStoreTests
         FileName = key + ".json",
         Length = length,
         SourceProvider = "subsonic",
-        PayloadFormat = "subsonic-structured",
+        Format = LyricsFormat.SubsonicStructured,
         SyncKind = LyricsSyncKind.Line,
         LanguageCode = "en",
         OffsetMs = 0,

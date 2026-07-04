@@ -41,6 +41,8 @@ internal sealed class LrcLibLyricsProvider : ILyricsProvider
 
     public string Id => LrcLibLyricsConstants.ProviderId;
 
+    public string DisplayName => "LrcLib";
+
     public async Task<LyricsProviderResult> FetchAsync(LyricsQuery query, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -164,10 +166,10 @@ internal sealed class LrcLibLyricsProvider : ILyricsProvider
         {
             anyFieldPresent = true;
             var payload = Encoding.UTF8.GetBytes(record.SyncedLyrics);
-            var doc = _parserRegistry.Parse(LrcLibLyricsConstants.SyncedFormat, payload);
+            var doc = _parserRegistry.Parse(LyricsFormat.Lrc, payload);
             if (doc is not null)
             {
-                return LyricsProviderResult.Content(doc, payload, LrcLibLyricsConstants.SyncedFormat, definitive: true);
+                return LyricsProviderResult.Content(doc.WithSourceProvider(Id), payload, LyricsFormat.Lrc, definitive: true);
             }
         }
 
@@ -175,10 +177,10 @@ internal sealed class LrcLibLyricsProvider : ILyricsProvider
         {
             anyFieldPresent = true;
             var payload = Encoding.UTF8.GetBytes(record.PlainLyrics);
-            var doc = _parserRegistry.Parse(LrcLibLyricsConstants.PlainFormat, payload);
+            var doc = _parserRegistry.Parse(LyricsFormat.PlainText, payload);
             if (doc is not null)
             {
-                return LyricsProviderResult.Content(doc, payload, LrcLibLyricsConstants.PlainFormat, definitive: true);
+                return LyricsProviderResult.Content(doc.WithSourceProvider(Id), payload, LyricsFormat.PlainText, definitive: true);
             }
         }
 

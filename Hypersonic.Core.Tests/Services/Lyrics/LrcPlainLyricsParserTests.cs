@@ -14,7 +14,7 @@ public class LrcPlainLyricsParserTests
 
     [TestMethod]
     public void FormatTag_IsLrclibPlain()
-        => Assert.AreEqual("lrclib-plain", Parser().FormatTag);
+        => Assert.AreEqual(LyricsFormat.PlainText, Parser().Format);
 
     [TestMethod]
     public void Text_ProducesPlainDocument_OneLinePerTextLine()
@@ -22,7 +22,7 @@ public class LrcPlainLyricsParserTests
         var doc = Parse("line one\nline two\n");
         Assert.IsNotNull(doc);
         Assert.AreEqual(LyricsSyncKind.Plain, doc!.SyncKind);
-        Assert.AreEqual("lrclib", doc.SourceProvider);
+        Assert.AreEqual(LyricsFormat.PlainText, doc.Format);
         Assert.AreEqual(2, doc.Lines.Count);
         Assert.AreEqual(0, doc.Lines[0].StartMs);
         Assert.AreEqual("line one", doc.Lines[0].Text);

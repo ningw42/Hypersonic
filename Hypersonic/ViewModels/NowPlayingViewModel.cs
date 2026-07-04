@@ -27,6 +27,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     private readonly ILyricsService _lyricsService;
     private readonly LyricsOrchestrationOptions _orchestrationOptions;
     private readonly ILogger _log;
+    private readonly ILyricsSourceCatalog _sourceCatalog;
     private readonly DispatcherQueue? _vmDispatcher;
     private readonly bool _synchronous;
     private readonly Action<Action> _enqueue;
@@ -40,10 +41,22 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     /// <summary>The validated lyrics document for the current track, consumed by the lyrics canvas.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EnableKaraokeWipe))]
+    [NotifyPropertyChangedFor(nameof(LyricsSourceName))]
+    [NotifyPropertyChangedFor(nameof(HasLyricsSource))]
+    [NotifyPropertyChangedFor(nameof(LyricsSourceTooltip))]
     public partial LyricsDocument? CurrentLyrics { get; set; }
 
     /// <summary>Karaoke gradient wipe is enabled only for word-synced lyrics (§4); line/plain get a solid highlight.</summary>
     public bool EnableKaraokeWipe => CurrentLyrics?.SyncKind == LyricsSyncKind.Word;
+
+    /// <summary>Display name of the source that served the current lyrics, or null when unknown.</summary>
+    public string? LyricsSourceName => _sourceCatalog.DisplayNameFor(CurrentLyrics?.SourceProvider);
+
+    /// <summary>Whether to show the source info glyph — only for loaded lyrics from a known provider.</summary>
+    public bool HasLyricsSource => LyricsLoadState == LyricsLoadState.Loaded && LyricsSourceName is not null;
+
+    /// <summary>Tooltip text for the source glyph, e.g. "Lyrics from LrcLib".</summary>
+    public string? LyricsSourceTooltip => HasLyricsSource ? $"Lyrics from {LyricsSourceName}" : null;
 
     /// <summary>Playback position in milliseconds — the lyrics canvas's clock anchor (seconds → ms).</summary>
     [ObservableProperty]
@@ -58,6 +71,8 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     public partial double? TrackDurationMs { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLyricsSource))]
+    [NotifyPropertyChangedFor(nameof(LyricsSourceTooltip))]
     public partial LyricsLoadState LyricsLoadState { get; set; } = LyricsLoadState.NoTrack;
 
     [ObservableProperty]
@@ -70,12 +85,14 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         IReadOnlyPlaybackState playbackService,
         ILyricsService lyricsService,
         IOptions<LyricsOrchestrationOptions> orchestrationOptions,
-        ILoggingService logService)
+        ILoggingService logService,
+        ILyricsSourceCatalog sourceCatalog)
     {
         _playbackService = playbackService;
         _lyricsService = lyricsService;
         _orchestrationOptions = orchestrationOptions.Value;
         _log = logService.GetLogger(nameof(NowPlayingViewModel));
+        _sourceCatalog = sourceCatalog;
         _vmDispatcher = DispatcherQueue.GetForCurrentThread();
         _synchronous = false;
         _enqueue = action => _vmDispatcher!.TryEnqueue(() => action());
@@ -86,6 +103,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         ILyricsService lyricsService,
         IOptions<LyricsOrchestrationOptions> orchestrationOptions,
         ILoggingService logService,
+        ILyricsSourceCatalog sourceCatalog,
         bool synchronous,
         Action<Action>? enqueueOverride = null)
     {
@@ -93,6 +111,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         _lyricsService = lyricsService;
         _orchestrationOptions = orchestrationOptions.Value;
         _log = logService.GetLogger(nameof(NowPlayingViewModel));
+        _sourceCatalog = sourceCatalog;
         _vmDispatcher = null;
         _synchronous = synchronous;
         _enqueue = enqueueOverride ?? (action => action());

@@ -18,7 +18,7 @@ public sealed class LrcPlainLyricsParser : ILyricsPayloadParser
     public LrcPlainLyricsParser(ILoggingService logService)
         => _log = logService.GetLogger(nameof(LrcPlainLyricsParser));
 
-    public string FormatTag => LrcLibLyricsConstants.PlainFormat;
+    public LyricsFormat Format => LyricsFormat.PlainText;
 
     public LyricsDocument? Parse(ReadOnlyMemory<byte> payload)
     {
@@ -50,8 +50,8 @@ public sealed class LrcPlainLyricsParser : ILyricsPayloadParser
         var document = new LyricsDocument
         {
             SyncKind = LyricsSyncKind.Plain,
+            Format = LyricsFormat.PlainText,
             Lines = lines,
-            SourceProvider = LrcLibLyricsConstants.ProviderId,
         };
 
         var issues = LyricsValidator.Validate(document);

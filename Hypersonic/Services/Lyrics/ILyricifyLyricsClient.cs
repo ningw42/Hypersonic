@@ -10,9 +10,9 @@ public enum LyricifyPlatform
     Kugou,
 }
 
-/// <summary>The library's best raw answer for a query: decrypted lyric text, its payload format tag,
+/// <summary>The library's best raw answer for a query: decrypted lyric text, its payload format,
 /// and the matched candidate's metadata (for the provider's confidence gate).</summary>
-public sealed record LyricifyLyricsResult(string RawText, string FormatTag, LyricsCandidate Candidate);
+public sealed record LyricifyLyricsResult(string RawText, LyricsFormat Format, LyricsCandidate Candidate);
 
 /// <summary>
 /// The single seam over <c>Lyricify.Lyrics.Helper</c>: search + fetch + decrypt for one platform.

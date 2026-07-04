@@ -30,7 +30,7 @@ public sealed class TtmlLyricsParser : ILyricsPayloadParser
     public TtmlLyricsParser(ILoggingService logService)
         => _log = logService.GetLogger(nameof(TtmlLyricsParser));
 
-    public string FormatTag => TtmlLyricsConstants.Format;
+    public LyricsFormat Format => LyricsFormat.Ttml;
 
     public LyricsDocument? Parse(ReadOnlyMemory<byte> payload)
     {
@@ -73,8 +73,8 @@ public sealed class TtmlLyricsParser : ILyricsPayloadParser
         var document = new LyricsDocument
         {
             SyncKind = LyricsSyncKind.Word,
+            Format = LyricsFormat.Ttml,
             Lines = lines,
-            SourceProvider = TtmlLyricsConstants.Format,
         };
 
         var issues = LyricsValidator.Validate(document);

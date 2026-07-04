@@ -17,20 +17,18 @@ namespace Hypersonic.Services.Lyrics;
 /// </summary>
 internal sealed class LyricifyWordLyricsParser : ILyricsPayloadParser
 {
-    private readonly string _formatTag;
-    private readonly string _sourceId;
+    private readonly LyricsFormat _format;
     private readonly LyricsRawTypes _rawType;
     private readonly ILogger _log;
 
-    public LyricifyWordLyricsParser(string formatTag, string sourceId, LyricsRawTypes rawType, ILoggingService logService)
+    public LyricifyWordLyricsParser(LyricsFormat format, LyricsRawTypes rawType, ILoggingService logService)
     {
-        _formatTag = formatTag;
-        _sourceId = sourceId;
+        _format = format;
         _rawType = rawType;
         _log = logService.GetLogger(nameof(LyricifyWordLyricsParser));
     }
 
-    public string FormatTag => _formatTag;
+    public LyricsFormat Format => _format;
 
     public LyricsDocument? Parse(ReadOnlyMemory<byte> payload)
     {
@@ -46,7 +44,7 @@ internal sealed class LyricifyWordLyricsParser : ILyricsPayloadParser
         }
         catch (Exception ex)
         {
-            _log.Warning("Lyricify parse threw; discarding", new { _formatTag }, ex);
+            _log.Warning("Lyricify parse threw; discarding", new { Format = _format }, ex);
             return null;
         }
 
@@ -55,7 +53,7 @@ internal sealed class LyricifyWordLyricsParser : ILyricsPayloadParser
             return null;
         }
 
-        var document = LyricifySyllableMapper.ToWordDocument(lines, _sourceId);
+        var document = LyricifySyllableMapper.ToWordDocument(lines, _format);
         if (document is null)
         {
             return null;
@@ -64,7 +62,7 @@ internal sealed class LyricifyWordLyricsParser : ILyricsPayloadParser
         var issues = LyricsValidator.Validate(document);
         if (issues.Count > 0)
         {
-            _log.Warning($"{_formatTag} document failed validation; discarding",
+            _log.Warning($"{_format} document failed validation; discarding",
                 new { IssueCount = issues.Count, FirstIssue = issues[0] });
             return null;
         }

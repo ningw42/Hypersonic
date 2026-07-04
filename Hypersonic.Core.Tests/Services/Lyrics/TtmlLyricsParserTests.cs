@@ -33,7 +33,7 @@ public class TtmlLyricsParserTests
 
     [TestMethod]
     public void FormatTag_IsTtml()
-        => Assert.AreEqual("ttml", Parser().FormatTag);
+        => Assert.AreEqual(LyricsFormat.Ttml, Parser().Format);
 
     [TestMethod]
     public void WordSynced_ProducesWordDocument_WithLinesAndWords()
@@ -64,8 +64,8 @@ public class TtmlLyricsParserTests
     }
 
     [TestMethod]
-    public void SourceProvider_IsTtml()
-        => Assert.AreEqual("ttml", Parse(TwoLineWordSynced)!.SourceProvider);
+    public void Format_IsTtml()
+        => Assert.AreEqual(LyricsFormat.Ttml, Parse(TwoLineWordSynced)!.Format);
 
     [TestMethod]
     public void TimeFormat_HoursMinutesSeconds_Parsed()

@@ -27,7 +27,7 @@ internal sealed class SubsonicStructuredLyricsParser : ILyricsPayloadParser
         _log = logService.GetLogger(nameof(SubsonicStructuredLyricsParser));
     }
 
-    public string FormatTag => SubsonicLyricsConstants.StructuredFormat;
+    public LyricsFormat Format => LyricsFormat.SubsonicStructured;
 
     public LyricsDocument? Parse(ReadOnlyMemory<byte> payload)
     {
@@ -54,10 +54,10 @@ internal sealed class SubsonicStructuredLyricsParser : ILyricsPayloadParser
             document = new LyricsDocument
             {
                 SyncKind = LyricsSyncKind.Line,
+                Format = LyricsFormat.SubsonicStructured,
                 Lines = syncedLines,
                 LanguageCode = entry.Lang,
                 OffsetMs = ToInt(entry.Offset),
-                SourceProvider = SubsonicLyricsConstants.ProviderId,
             };
         }
         else
@@ -71,10 +71,10 @@ internal sealed class SubsonicStructuredLyricsParser : ILyricsPayloadParser
             document = new LyricsDocument
             {
                 SyncKind = LyricsSyncKind.Plain,
+                Format = LyricsFormat.SubsonicStructured,
                 Lines = plainLines,
                 LanguageCode = entry.Lang,
                 OffsetMs = ToInt(entry.Offset),
-                SourceProvider = SubsonicLyricsConstants.ProviderId,
             };
         }
 

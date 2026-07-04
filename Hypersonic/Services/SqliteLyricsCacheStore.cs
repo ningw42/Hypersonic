@@ -33,9 +33,14 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
 
     protected override string TableName => "Entries";
 
-    protected override int CurrentSchemaVersion => 1;
+    protected override int CurrentSchemaVersion => 2;
 
-    protected override IReadOnlyList<MigrationStep> MigrationSteps => Array.Empty<MigrationStep>();
+    protected override IReadOnlyList<MigrationStep> MigrationSteps =>
+    [
+        // v1→v2: the format column changed type/meaning (string tags → LyricsFormat) and old rows
+        // carry the pre-fix AMLL identity — none map cleanly forward, so discard and re-fetch lazily.
+        new MigrationStep(2, "DROP TABLE IF EXISTS Entries;\n" + CreateEntriesTableSql + "\n" + CreateLastAccessIndexSql),
+    ];
 
     protected override string CreateCurrentSchemaSql => CreateEntriesTableSql + "\n" + CreateLastAccessIndexSql;
 
@@ -45,7 +50,7 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
             FileName       TEXT    NOT NULL,
             Length         INTEGER NOT NULL,
             SourceProvider TEXT    NOT NULL,
-            PayloadFormat  TEXT    NOT NULL,
+            Format         TEXT    NOT NULL,
             SyncKind       TEXT    NOT NULL,
             LanguageCode   TEXT,
             OffsetMs       INTEGER,
@@ -110,7 +115,7 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
     {
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT FileName, Length, SourceProvider, PayloadFormat, SyncKind, LanguageCode, OffsetMs,
+            SELECT FileName, Length, SourceProvider, Format, SyncKind, LanguageCode, OffsetMs,
                    CreatedAtUtc, LastAccessUtc, ExpiresAtUtc
             FROM Entries
             WHERE KeyHash = $keyHash
@@ -149,16 +154,16 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
         await using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO Entries (
-                KeyHash, FileName, Length, SourceProvider, PayloadFormat, SyncKind, LanguageCode, OffsetMs,
+                KeyHash, FileName, Length, SourceProvider, Format, SyncKind, LanguageCode, OffsetMs,
                 CreatedAtUtc, LastAccessUtc, ExpiresAtUtc)
             VALUES (
-                $keyHash, $fileName, $length, $sourceProvider, $payloadFormat, $syncKind, $languageCode, $offsetMs,
+                $keyHash, $fileName, $length, $sourceProvider, $format, $syncKind, $languageCode, $offsetMs,
                 $createdAtUtc, $lastAccessUtc, $expiresAtUtc)
             ON CONFLICT(KeyHash) DO UPDATE SET
                 FileName       = excluded.FileName,
                 Length         = excluded.Length,
                 SourceProvider = excluded.SourceProvider,
-                PayloadFormat  = excluded.PayloadFormat,
+                Format         = excluded.Format,
                 SyncKind       = excluded.SyncKind,
                 LanguageCode   = excluded.LanguageCode,
                 OffsetMs       = excluded.OffsetMs,
@@ -170,7 +175,7 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
         command.Parameters.AddWithValue("$fileName", entry.FileName);
         command.Parameters.AddWithValue("$length", entry.Length);
         command.Parameters.AddWithValue("$sourceProvider", entry.SourceProvider);
-        command.Parameters.AddWithValue("$payloadFormat", entry.PayloadFormat);
+        command.Parameters.AddWithValue("$format", entry.Format.ToString());
         command.Parameters.AddWithValue("$syncKind", entry.SyncKind.ToString());
         command.Parameters.AddWithValue("$languageCode", (object?)entry.LanguageCode ?? DBNull.Value);
         command.Parameters.AddWithValue("$offsetMs", (object?)entry.OffsetMs ?? DBNull.Value);
@@ -199,7 +204,7 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
     {
         await using var command = connection.CreateCommand();
         var sql = """
-            SELECT KeyHash, FileName, Length, SourceProvider, PayloadFormat, SyncKind, LanguageCode, OffsetMs,
+            SELECT KeyHash, FileName, Length, SourceProvider, Format, SyncKind, LanguageCode, OffsetMs,
                    CreatedAtUtc, LastAccessUtc, ExpiresAtUtc
             FROM Entries
             WHERE FileName != ''
@@ -230,7 +235,7 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
     {
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT KeyHash, FileName, Length, SourceProvider, PayloadFormat, SyncKind, LanguageCode, OffsetMs,
+            SELECT KeyHash, FileName, Length, SourceProvider, Format, SyncKind, LanguageCode, OffsetMs,
                    CreatedAtUtc, LastAccessUtc, ExpiresAtUtc
             FROM Entries;
             """;
@@ -252,7 +257,7 @@ public sealed class SqliteLyricsCacheStore : SqliteCacheStoreBase<LyricsCacheEnt
             FileName = reader.GetString(offset + 0),
             Length = reader.GetInt64(offset + 1),
             SourceProvider = reader.GetString(offset + 2),
-            PayloadFormat = reader.GetString(offset + 3),
+            Format = Enum.TryParse<LyricsFormat>(reader.GetString(offset + 3), out var fmt) ? fmt : LyricsFormat.Unknown,
             SyncKind = Enum.TryParse<LyricsSyncKind>(reader.GetString(offset + 4), out var kind) ? kind : LyricsSyncKind.None,
             LanguageCode = reader.IsDBNull(offset + 5) ? null : reader.GetString(offset + 5),
             OffsetMs = reader.IsDBNull(offset + 6) ? null : reader.GetInt32(offset + 6),

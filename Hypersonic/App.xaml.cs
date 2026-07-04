@@ -3,6 +3,7 @@ using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Lyrics;
 using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
+using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Core.Services;
 using Hypersonic.Core.Services.Lyrics;
 using Hypersonic.Core.Services.Logging;
@@ -120,20 +121,18 @@ public partial class App : Application
             services.AddSingleton<ILyricsCacheStore, SqliteLyricsCacheStore>();
             services.AddSingleton<ILyricsParserRegistry, LyricsParserRegistry>();
             services.AddSingleton<ILyricsPayloadParser, SubsonicStructuredLyricsParser>();
-            services.AddSingleton<ILyricsPayloadParser, SubsonicLegacyLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, LrcSyncedLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, LrcPlainLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser, TtmlLyricsParser>();
             services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
-                QQLyricsConstants.QrcFormat, QQLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Qrc,
+                LyricsFormat.Qrc, Lyricify.Lyrics.Models.LyricsRawTypes.Qrc,
                 sp.GetRequiredService<ILoggingService>()));
             services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
-                KugouLyricsConstants.KrcFormat, KugouLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Krc,
+                LyricsFormat.Krc, Lyricify.Lyrics.Models.LyricsRawTypes.Krc,
                 sp.GetRequiredService<ILoggingService>()));
             services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
-                NeteaseLyricsConstants.YrcFormat, NeteaseLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Yrc,
+                LyricsFormat.Yrc, Lyricify.Lyrics.Models.LyricsRawTypes.Yrc,
                 sp.GetRequiredService<ILoggingService>()));
-            services.AddSingleton<ILyricsPayloadParser, NeteaseLrcLyricsParser>();
             services.AddSingleton<ILyricsProvider, SubsonicLyricsProvider>();
             services.AddSingleton<ILyricsProvider, LrcLibLyricsProvider>(); // AFTER Subsonic → Subsonic wins an equal-tier tie
             services.AddSingleton<ILyricsProvider, AmllTtmlLyricsProvider>(); // word-tier, wins only on strictly-higher tier
@@ -149,6 +148,7 @@ public partial class App : Application
             // Local override source (NOT a fan-out provider): LyricsService consults it ahead of the cache.
             services.AddSingleton<ILocalLyricsOverrideSource, LocalFileLyricsSource>();
             services.AddSingleton<ILyricsService, LyricsService>();
+            services.AddSingleton<ILyricsSourceCatalog, LyricsSourceCatalog>();
 
             // Named HTTP client for lrclib (the first outbound HTTP outside SubsonicClient). The
             // per-request bound is the fan-out budget via the linked CTS; Timeout is only a generous

@@ -18,6 +18,7 @@ internal sealed class NeteaseLyricsProvider : LyricifyLyricsProviderBase
         => _options = options.Value;
 
     public override string Id => NeteaseLyricsConstants.ProviderId;
+    public override string DisplayName => "Netease";
     protected override LyricifyPlatform Platform => LyricifyPlatform.Netease;
     protected override bool Enabled => _options.Enabled;
     protected override int MatchThreshold => _options.MatchThreshold;

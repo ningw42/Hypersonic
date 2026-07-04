@@ -19,11 +19,11 @@ public class LyricifyWordLyricsParserTests
         "[0,1000]Hello(0,500)World(500,500)\n[1000,1000]Second(1000,500)Line(1500,500)";
 
     private static LyricifyWordLyricsParser QrcParser()
-        => new(QQLyricsConstants.QrcFormat, QQLyricsConstants.ProviderId, LyricsRawTypes.Qrc, new LoggingService());
+        => new(LyricsFormat.Qrc, LyricsRawTypes.Qrc, new LoggingService());
 
     [TestMethod]
     public void FormatTag_IsQrc()
-        => Assert.AreEqual("qrc", QrcParser().FormatTag);
+        => Assert.AreEqual(LyricsFormat.Qrc, QrcParser().Format);
 
     [TestMethod]
     public void Qrc_ParsesToWordDocument()
@@ -32,7 +32,7 @@ public class LyricifyWordLyricsParserTests
 
         Assert.IsNotNull(doc);
         Assert.AreEqual(LyricsSyncKind.Word, doc!.SyncKind);
-        Assert.AreEqual("qq", doc.SourceProvider);
+        Assert.AreEqual(LyricsFormat.Qrc, doc.Format);
         Assert.AreEqual(2, doc.Lines.Count);
         Assert.IsTrue(doc.Lines[0].Words.Count >= 2, "first line should carry word timings");
         // Validator invariants hold (word bounds within line, monotonic) — a parsed doc is already validated.
@@ -42,15 +42,4 @@ public class LyricifyWordLyricsParserTests
     [TestMethod]
     public void Garbage_ReturnsNull()
         => Assert.IsNull(QrcParser().Parse(Encoding.UTF8.GetBytes("not a lyric at all")));
-
-    [TestMethod]
-    public void SourceId_FlowsThroughRegardlessOfFormat()
-    {
-        // Proves the sourceId parameter is stamped onto the document, so the Netease/Kugou instances
-        // (registered in Task 9) will stamp "netease"/"kugou" — without needing per-format sample text here.
-        var parser = new LyricifyWordLyricsParser(
-            QQLyricsConstants.QrcFormat, NeteaseLyricsConstants.ProviderId, LyricsRawTypes.Qrc, new LoggingService());
-        var doc = parser.Parse(Encoding.UTF8.GetBytes(QrcSample));
-        Assert.AreEqual("netease", doc!.SourceProvider);
-    }
 }

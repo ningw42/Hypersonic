@@ -5,7 +5,7 @@ namespace Hypersonic.Core.Models.Lyrics;
 /// <list type="bullet">
 ///   <item><see cref="LyricsOutcomeKind.Content"/> — carries the validated
 ///     <see cref="Document"/>, the byte-for-byte <see cref="RawPayload"/>, its
-///     <see cref="PayloadFormat"/> tag, and the <see cref="Definitive"/> bit.</item>
+///     <see cref="Format"/>, and the <see cref="Definitive"/> bit.</item>
 ///   <item><see cref="LyricsOutcomeKind.DefinitiveEmpty"/> / <see cref="LyricsOutcomeKind.DefinitiveUnsupported"/>
 ///     / <see cref="LyricsOutcomeKind.Transient"/> — no document or payload.</item>
 /// </list>
@@ -16,13 +16,13 @@ public sealed class LyricsProviderResult
         LyricsOutcomeKind kind,
         LyricsDocument? document,
         ReadOnlyMemory<byte> rawPayload,
-        string? payloadFormat,
+        LyricsFormat format,
         bool definitive)
     {
         Kind = kind;
         Document = document;
         RawPayload = rawPayload;
-        PayloadFormat = payloadFormat;
+        Format = format;
         Definitive = definitive;
     }
 
@@ -34,8 +34,8 @@ public sealed class LyricsProviderResult
     /// <summary>The raw provider payload to persist — only meaningful for <see cref="LyricsOutcomeKind.Content"/>.</summary>
     public ReadOnlyMemory<byte> RawPayload { get; }
 
-    /// <summary>Format tag selecting the read-time parser — only set for <see cref="LyricsOutcomeKind.Content"/>.</summary>
-    public string? PayloadFormat { get; }
+    /// <summary>Wire format of the payload — only meaningful for <see cref="LyricsOutcomeKind.Content"/>.</summary>
+    public LyricsFormat Format { get; }
 
     /// <summary>
     /// For a <see cref="LyricsOutcomeKind.Content"/> result, whether the answer is safe to
@@ -49,18 +49,15 @@ public sealed class LyricsProviderResult
     public bool IsDefinitive => Kind != LyricsOutcomeKind.Transient;
 
     public static LyricsProviderResult Content(
-        LyricsDocument document,
-        ReadOnlyMemory<byte> rawPayload,
-        string payloadFormat,
-        bool definitive)
-        => new(LyricsOutcomeKind.Content, document, rawPayload, payloadFormat, definitive);
+        LyricsDocument document, ReadOnlyMemory<byte> rawPayload, LyricsFormat format, bool definitive)
+        => new(LyricsOutcomeKind.Content, document, rawPayload, format, definitive);
 
     public static readonly LyricsProviderResult DefinitiveEmpty =
-        new(LyricsOutcomeKind.DefinitiveEmpty, null, default, null, definitive: true);
+        new(LyricsOutcomeKind.DefinitiveEmpty, null, default, LyricsFormat.Unknown, definitive: true);
 
     public static readonly LyricsProviderResult DefinitiveUnsupported =
-        new(LyricsOutcomeKind.DefinitiveUnsupported, null, default, null, definitive: true);
+        new(LyricsOutcomeKind.DefinitiveUnsupported, null, default, LyricsFormat.Unknown, definitive: true);
 
     public static readonly LyricsProviderResult Transient =
-        new(LyricsOutcomeKind.Transient, null, default, null, definitive: false);
+        new(LyricsOutcomeKind.Transient, null, default, LyricsFormat.Unknown, definitive: false);
 }

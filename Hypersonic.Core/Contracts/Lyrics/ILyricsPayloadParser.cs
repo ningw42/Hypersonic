@@ -11,8 +11,8 @@ namespace Hypersonic.Core.Contracts.Lyrics;
 /// </summary>
 public interface ILyricsPayloadParser
 {
-    /// <summary>The format tag this parser handles (e.g. <c>"subsonic-structured"</c>).</summary>
-    string FormatTag { get; }
+    /// <summary>The format this parser handles — also its dispatch key in the registry.</summary>
+    LyricsFormat Format { get; }
 
     /// <summary>Parses <paramref name="payload"/> into a validated document, or <c>null</c> when unusable.</summary>
     LyricsDocument? Parse(ReadOnlyMemory<byte> payload);

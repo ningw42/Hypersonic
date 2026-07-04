@@ -6,30 +6,30 @@ namespace Hypersonic.Core.Services.Lyrics;
 
 /// <summary>
 /// DI-populated <see cref="ILyricsParserRegistry"/>. Indexes the registered parsers by their
-/// <see cref="ILyricsPayloadParser.FormatTag"/> so a stored payload's format tag selects its
+/// <see cref="ILyricsPayloadParser.Format"/> so a stored payload's format selects its
 /// parser independently of which provider originally fetched it.
 /// </summary>
 public sealed class LyricsParserRegistry : ILyricsParserRegistry
 {
-    private readonly Dictionary<string, ILyricsPayloadParser> _parsers;
+    private readonly Dictionary<LyricsFormat, ILyricsPayloadParser> _parsers;
     private readonly ILogger _log;
 
     public LyricsParserRegistry(IEnumerable<ILyricsPayloadParser> parsers, ILoggingService logService)
     {
-        _parsers = new Dictionary<string, ILyricsPayloadParser>(StringComparer.Ordinal);
+        _parsers = new Dictionary<LyricsFormat, ILyricsPayloadParser>();
         foreach (var parser in parsers)
         {
-            _parsers[parser.FormatTag] = parser;
+            _parsers[parser.Format] = parser;
         }
 
         _log = logService.GetLogger(nameof(LyricsParserRegistry));
     }
 
-    public LyricsDocument? Parse(string formatTag, ReadOnlyMemory<byte> payload)
+    public LyricsDocument? Parse(LyricsFormat format, ReadOnlyMemory<byte> payload)
     {
-        if (string.IsNullOrEmpty(formatTag) || !_parsers.TryGetValue(formatTag, out var parser))
+        if (!_parsers.TryGetValue(format, out var parser))
         {
-            _log.Warning("No lyrics parser registered for format tag", new { FormatTag = formatTag });
+            _log.Warning("No lyrics parser registered for format", new { Format = format });
             return null;
         }
 

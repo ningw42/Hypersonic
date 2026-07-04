@@ -19,7 +19,7 @@ public sealed class LrcSyncedLyricsParser : ILyricsPayloadParser
     public LrcSyncedLyricsParser(ILoggingService logService)
         => _log = logService.GetLogger(nameof(LrcSyncedLyricsParser));
 
-    public string FormatTag => LrcLibLyricsConstants.SyncedFormat;
+    public LyricsFormat Format => LyricsFormat.Lrc;
 
     public LyricsDocument? Parse(ReadOnlyMemory<byte> payload)
     {
@@ -38,8 +38,8 @@ public sealed class LrcSyncedLyricsParser : ILyricsPayloadParser
         var document = new LyricsDocument
         {
             SyncKind = LyricsSyncKind.Line,
+            Format = LyricsFormat.Lrc,
             Lines = lines,
-            SourceProvider = LrcLibLyricsConstants.ProviderId,
             LanguageCode = null,
             OffsetMs = parsed.OffsetMs,
         };

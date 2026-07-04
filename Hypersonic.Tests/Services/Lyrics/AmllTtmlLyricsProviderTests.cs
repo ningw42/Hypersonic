@@ -44,8 +44,23 @@ public class AmllTtmlLyricsProviderTests
         var r = await p.FetchAsync(Query, CancellationToken.None);
         Assert.AreEqual(LyricsOutcomeKind.Content, r.Kind);
         Assert.AreEqual(LyricsSyncKind.Word, r.Document!.SyncKind);
-        Assert.AreEqual("ttml", r.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.Ttml, r.Format);
         Assert.IsTrue(r.Definitive);
+    }
+
+    [TestMethod]
+    public async Task FetchAsync_Content_StampsAmllProviderIdAndTtmlFormat()
+    {
+        // The point of the ownership shift: AMLL's returned document is attributed to the provider
+        // (identity), not to the format. Reuses the success-path fixture from the content test above.
+        var p = Provider(new FakeIndex { Ready = true, File = "idol.ttml" },
+            new StubHandler { Response = Ok(Ttml) });
+
+        var result = await p.FetchAsync(Query, CancellationToken.None);
+
+        Assert.AreEqual(LyricsOutcomeKind.Content, result.Kind);
+        Assert.AreEqual("amll-ttml-db", result.Document!.SourceProvider); // identity, not "ttml"
+        Assert.AreEqual(LyricsFormat.Ttml, result.Document!.Format);
     }
 
     [TestMethod]

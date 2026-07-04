@@ -62,7 +62,7 @@ public sealed class LocalFileLyricsSource : ILocalLyricsOverrideSource
         try
         {
             var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
-            var document = _registry.Parse(TtmlLyricsConstants.Format, bytes);
+            var document = _registry.Parse(LyricsFormat.Ttml, bytes);
             if (document is null)
             {
                 _log.Warning("Lyrics override file failed to parse; ignoring", new { SongId = songId });

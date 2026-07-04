@@ -30,7 +30,7 @@ public class LyricifyLyricsProviderTests
     {
         var log = new LoggingService();
         var registry = new LyricsParserRegistry(
-            [new LyricifyWordLyricsParser(QQLyricsConstants.QrcFormat, QQLyricsConstants.ProviderId, LyricsRawTypes.Qrc, log)],
+            [new LyricifyWordLyricsParser(LyricsFormat.Qrc, LyricsRawTypes.Qrc, log)],
             log);
         var client = new FakeClient();
         var options = Options.Create(new QQLyricsOptions { Enabled = enabled, MatchThreshold = threshold });
@@ -63,7 +63,7 @@ public class LyricifyLyricsProviderTests
     public async Task BelowThreshold_ReturnsDefinitiveEmpty()
     {
         var (provider, client) = NewProvider(threshold: 90);
-        client.Result = new LyricifyLyricsResult(QrcSample, "qrc",
+        client.Result = new LyricifyLyricsResult(QrcSample, LyricsFormat.Qrc,
             new LyricsCandidate("Totally Different Song", "Other Artist", "Other", 12));
         var r = await provider.FetchAsync(Query, CancellationToken.None);
         Assert.AreEqual(LyricsOutcomeKind.DefinitiveEmpty, r.Kind);
@@ -73,12 +73,13 @@ public class LyricifyLyricsProviderTests
     public async Task GoodMatch_ReturnsWordContent()
     {
         var (provider, client) = NewProvider(threshold: 55);
-        client.Result = new LyricifyLyricsResult(QrcSample, "qrc",
+        client.Result = new LyricifyLyricsResult(QrcSample, LyricsFormat.Qrc,
             new LyricsCandidate("Blinding Lights", "The Weeknd", "After Hours", 200));
         var r = await provider.FetchAsync(Query, CancellationToken.None);
         Assert.AreEqual(LyricsOutcomeKind.Content, r.Kind);
         Assert.AreEqual(LyricsSyncKind.Word, r.Document!.SyncKind);
-        Assert.AreEqual("qrc", r.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.Qrc, r.Format);
+        Assert.AreEqual("qq", r.Document!.SourceProvider);
         Assert.IsTrue(r.Definitive);
     }
 

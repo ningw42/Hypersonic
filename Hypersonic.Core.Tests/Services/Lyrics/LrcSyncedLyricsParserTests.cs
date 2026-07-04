@@ -14,7 +14,7 @@ public class LrcSyncedLyricsParserTests
 
     [TestMethod]
     public void FormatTag_IsLrclibSynced()
-        => Assert.AreEqual("lrclib-synced", Parser().FormatTag);
+        => Assert.AreEqual(LyricsFormat.Lrc, Parser().Format);
 
     [TestMethod]
     public void Synced_ProducesLineDocument_WithSourceAndNullLanguage()
@@ -22,7 +22,7 @@ public class LrcSyncedLyricsParserTests
         var doc = Parse("[00:17.12] first\n[00:20.00] second");
         Assert.IsNotNull(doc);
         Assert.AreEqual(LyricsSyncKind.Line, doc!.SyncKind);
-        Assert.AreEqual("lrclib", doc.SourceProvider);
+        Assert.AreEqual(LyricsFormat.Lrc, doc.Format);
         Assert.IsNull(doc.LanguageCode);
         Assert.AreEqual(2, doc.Lines.Count);
         Assert.AreEqual(17_120, doc.Lines[0].StartMs);

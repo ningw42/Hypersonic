@@ -1,4 +1,4 @@
-using Hypersonic.Core.Services.Lyrics;
+using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Services;
 
 namespace Hypersonic.Tests.Services.Lyrics;
@@ -9,10 +9,10 @@ public class LyricsCacheFormatTests
     [TestMethod]
     public void ExtensionForFormat_MapsNewTags()
     {
-        Assert.AreEqual(".qrc", LyricsService.ExtensionForFormat(QQLyricsConstants.QrcFormat));
-        Assert.AreEqual(".krc", LyricsService.ExtensionForFormat(KugouLyricsConstants.KrcFormat));
-        Assert.AreEqual(".yrc", LyricsService.ExtensionForFormat(NeteaseLyricsConstants.YrcFormat));
-        Assert.AreEqual(".lrc", LyricsService.ExtensionForFormat(NeteaseLyricsConstants.LrcFormat));
+        Assert.AreEqual(".qrc", LyricsService.ExtensionForFormat(LyricsFormat.Qrc));
+        Assert.AreEqual(".krc", LyricsService.ExtensionForFormat(LyricsFormat.Krc));
+        Assert.AreEqual(".yrc", LyricsService.ExtensionForFormat(LyricsFormat.Yrc));
+        Assert.AreEqual(".lrc", LyricsService.ExtensionForFormat(LyricsFormat.Lrc));
     }
 
     [TestMethod]

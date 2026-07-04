@@ -62,16 +62,16 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
             result.Title, result.Artist, result.Album,
             result.DurationMs > 0 ? result.DurationMs / 1000 : null);
 
-        var (rawText, formatTag) = await FetchRawAsync(platform, result, cancellationToken).ConfigureAwait(false);
+        var (rawText, format) = await FetchRawAsync(platform, result, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(rawText))
         {
             return null;
         }
 
-        return new LyricifyLyricsResult(rawText!, formatTag, candidate);
+        return new LyricifyLyricsResult(rawText!, format, candidate);
     }
 
-    private async Task<(string? Raw, string FormatTag)> FetchRawAsync(
+    private async Task<(string? Raw, LyricsFormat Format)> FetchRawAsync(
         LyricifyPlatform platform, ISearchResult result, CancellationToken cancellationToken)
     {
         switch (platform)
@@ -81,7 +81,7 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
                 var response = await ProviderHelper.QQMusicApi.GetLyricsAsync(qq.Id)
                     .WaitAsync(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-                return (response?.Lyrics, QQLyricsConstants.QrcFormat);
+                return (response?.Lyrics, LyricsFormat.Qrc);
             }
             case LyricifyPlatform.Netease when result is NeteaseSearchResult ne:
             {
@@ -93,8 +93,8 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
                 cancellationToken.ThrowIfCancellationRequested();
                 var yrc = response?.Yrc?.Lyric;
                 return !string.IsNullOrWhiteSpace(yrc)
-                    ? (yrc, NeteaseLyricsConstants.YrcFormat)
-                    : (response?.Lrc?.Lyric, NeteaseLyricsConstants.LrcFormat);
+                    ? (yrc, LyricsFormat.Yrc)
+                    : (response?.Lrc?.Lyric, LyricsFormat.Lrc);
             }
             case LyricifyPlatform.Kugou when result is KugouSearchResult kg:
             {
@@ -106,14 +106,14 @@ internal sealed class LyricifyLyricsClient : ILyricifyLyricsClient
                 {
                     // Legitimate "no lyrics for this hash" — a search hit with no lyric candidates.
                     _log.Debug("Kugou search hit had no lyric candidates");
-                    return (null, KugouLyricsConstants.KrcFormat);
+                    return (null, LyricsFormat.Krc);
                 }
 
                 var krc = await Lyricify.Lyrics.Decrypter.Krc.Helper
                     .GetLyricsAsync(candidate.Id, candidate.AccessKey)
                     .WaitAsync(cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-                return (krc, KugouLyricsConstants.KrcFormat);
+                return (krc, LyricsFormat.Krc);
             }
             default:
                 // The search result subtype doesn't match the requested platform — a shape the library

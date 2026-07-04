@@ -9,9 +9,7 @@ namespace Hypersonic.Core.Contracts.Lyrics;
 /// </summary>
 public interface ILyricsParserRegistry
 {
-    /// <summary>
-    /// Parses <paramref name="payload"/> with the parser registered for <paramref name="formatTag"/>.
-    /// Returns <c>null</c> when no parser matches the tag or the parser rejects the payload.
-    /// </summary>
-    LyricsDocument? Parse(string formatTag, ReadOnlyMemory<byte> payload);
+    /// <summary>Parses <paramref name="payload"/> with the parser registered for <paramref name="format"/>.
+    /// Returns <c>null</c> when no parser matches or the parser rejects the payload.</summary>
+    LyricsDocument? Parse(LyricsFormat format, ReadOnlyMemory<byte> payload);
 }

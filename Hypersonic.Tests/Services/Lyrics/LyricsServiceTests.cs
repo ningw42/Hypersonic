@@ -24,7 +24,7 @@ public class LyricsServiceTests
     private FakeLyricsCacheStore _store = null!;
     private FakeSubsonicClientService _clientService = null!;
     private LyricsParserRegistry _registry = null!;
-    private SubsonicLegacyLyricsParser _legacyParser = null!;
+    private LrcPlainLyricsParser _plainParser = null!;
 
     [TestInitialize]
     public void Setup()
@@ -37,8 +37,8 @@ public class LyricsServiceTests
             ActiveUserIdentity = "alice",
         };
         var log = new LoggingService();
-        _legacyParser = new SubsonicLegacyLyricsParser(log);
-        _registry = new LyricsParserRegistry([new SubsonicStructuredLyricsParser(log), _legacyParser], log);
+        _plainParser = new LrcPlainLyricsParser(log);
+        _registry = new LyricsParserRegistry([new SubsonicStructuredLyricsParser(log), _plainParser], log);
     }
 
     private LyricsService CreateService(LyricsCacheOptions? options, params ILyricsProvider[] providers)
@@ -62,8 +62,8 @@ public class LyricsServiceTests
     private LyricsProviderResult LegacyContent(string text, bool definitive = true)
     {
         var payload = Encoding.UTF8.GetBytes(text);
-        var doc = _legacyParser.Parse(payload)!;
-        return LyricsProviderResult.Content(doc, payload, SubsonicLyricsConstants.LegacyFormat, definitive);
+        var doc = _plainParser.Parse(payload)!;
+        return LyricsProviderResult.Content(doc, payload, LyricsFormat.PlainText, definitive);
     }
 
     private static LyricsQuery Query => new("song-1", Artist: "A", Title: "T");
@@ -235,7 +235,7 @@ public class LyricsServiceTests
             FileName = keyHash + ".x",
             Length = 1,
             SourceProvider = "lrclib",
-            PayloadFormat = "metadata-poor",
+            Format = LyricsFormat.Lrc,
             SyncKind = LyricsSyncKind.Plain,
             LanguageCode = "ja",
             OffsetMs = 500,
@@ -274,7 +274,7 @@ public class LyricsServiceTests
             FileName = keyHash + ".x",
             Length = 1,
             SourceProvider = "row-src",
-            PayloadFormat = "x",
+            Format = LyricsFormat.Lrc,
             SyncKind = LyricsSyncKind.Plain,
             LanguageCode = "row-lang",
             OffsetMs = 111,
@@ -312,7 +312,7 @@ public class LyricsServiceTests
             Lines = new[] { new LyricsLine { StartMs = 0, Text = "x" } },
             SourceProvider = source,
         };
-        return LyricsProviderResult.Content(doc, new byte[] { 1 }, LrcLibLyricsConstants.SyncedFormat, definitive: true);
+        return LyricsProviderResult.Content(doc, new byte[] { 1 }, LyricsFormat.Lrc, definitive: true);
     }
 
     private static LyricsProviderResult PlainContent(string source)
@@ -323,7 +323,7 @@ public class LyricsServiceTests
             Lines = new[] { new LyricsLine { StartMs = 0, Text = "x" } },
             SourceProvider = source,
         };
-        return LyricsProviderResult.Content(doc, new byte[] { 1 }, SubsonicLyricsConstants.LegacyFormat, definitive: true);
+        return LyricsProviderResult.Content(doc, new byte[] { 1 }, LyricsFormat.PlainText, definitive: true);
     }
 
     /// <summary>
@@ -509,7 +509,7 @@ public class LyricsServiceTests
                 },
             ],
         };
-        return LyricsProviderResult.Content(doc, payload, TtmlLyricsConstants.Format, definitive: true);
+        return LyricsProviderResult.Content(doc, payload, LyricsFormat.Ttml, definitive: true);
     }
 
     [TestMethod]
@@ -532,7 +532,7 @@ public class LyricsServiceTests
 
     [TestMethod]
     public void ExtensionForFormat_Ttml_MapsToTtml()
-        => Assert.AreEqual(".ttml", LyricsService.ExtensionForFormat("ttml"));
+        => Assert.AreEqual(".ttml", LyricsService.ExtensionForFormat(LyricsFormat.Ttml));
 
     // ---- Local override source (Phase 2) ----
 
@@ -618,7 +618,7 @@ public class LyricsServiceTests
 
         public StubRegistry(LyricsDocument? document) => _document = document;
 
-        public LyricsDocument? Parse(string formatTag, ReadOnlyMemory<byte> payload) => _document;
+        public LyricsDocument? Parse(LyricsFormat format, ReadOnlyMemory<byte> payload) => _document;
     }
 
     private sealed class FakeLyricsProvider : ILyricsProvider
@@ -629,6 +629,8 @@ public class LyricsServiceTests
         public FakeLyricsProvider(Func<LyricsQuery, LyricsProviderResult> handler) => _handler = handler;
 
         public string Id { get; set; } = "subsonic";
+
+        public string DisplayName => "subsonic";
 
         // Volatile-safe: the fan-out invokes FetchAsync on a pool thread while a test pump may read
         // CallCount on another thread to detect that the fan-out has started (the budget-timer arm proxy).

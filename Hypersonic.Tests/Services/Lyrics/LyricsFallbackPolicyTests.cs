@@ -12,7 +12,7 @@ public class LyricsFallbackPolicyTests
             ? Array.Empty<LyricsLine>()
             : new[] { new LyricsLine { StartMs = 0, Text = "x" } };
         var doc = new LyricsDocument { SyncKind = kind, Lines = lines, SourceProvider = source };
-        return LyricsProviderResult.Content(doc, new byte[] { 1 }, "fmt", definitive);
+        return LyricsProviderResult.Content(doc, new byte[] { 1 }, LyricsFormat.PlainText, definitive);
     }
 
     [TestMethod]

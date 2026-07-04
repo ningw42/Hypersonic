@@ -57,14 +57,19 @@ public class NowPlayingViewModelTests
         }).ToList(),
     };
 
+    private sealed class FakeSourceCatalog : ILyricsSourceCatalog
+    {
+        public string? DisplayNameFor(string? id) => id switch { "lrclib" => "LrcLib", _ => null };
+    }
+
     private static readonly IOptions<LyricsOrchestrationOptions> Opts =
         Options.Create(new LyricsOrchestrationOptions());
 
     private static NowPlayingViewModel Build(FakePlaybackService svc, Func<LyricsQuery, Task<LyricsDocument?>> handler, Action<Action>? enqueueOverride = null)
-        => new(svc, new FakeLyricsService(handler), Opts, new NullLoggingService(), synchronous: true, enqueueOverride: enqueueOverride);
+        => new(svc, new FakeLyricsService(handler), Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
 
     private static NowPlayingViewModel Build(FakePlaybackService svc, FakeLyricsService service, Action<Action>? enqueueOverride = null)
-        => new(svc, service, Opts, new NullLoggingService(), synchronous: true, enqueueOverride: enqueueOverride);
+        => new(svc, service, Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
 
     [TestMethod]
     public async Task NullTrack_OnNavigatedTo_LandsOnNoTrack()
@@ -241,7 +246,7 @@ public class NowPlayingViewModelTests
         var captured = new Queue<Action>();
         var service = new FakeLyricsService(_ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
         var svc = new FakePlaybackService { NowPlaying = T("a") };
-        var vm = new NowPlayingViewModel(svc, service, Opts, new NullLoggingService(), synchronous: false, enqueueOverride: a => captured.Enqueue(a));
+        var vm = new NowPlayingViewModel(svc, service, Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: false, enqueueOverride: a => captured.Enqueue(a));
 
         vm.OnNavigatedTo(null!);
         if (vm.PendingLyricsFetch != null) await vm.PendingLyricsFetch;
@@ -428,5 +433,38 @@ public class NowPlayingViewModelTests
 
         // The stale refresh result must not overwrite track b's state.
         Assert.AreEqual("b-text", vm.CurrentLyrics!.Lines[0].Text);
+    }
+
+    [TestMethod]
+    public void LyricsSource_LoadedWithKnownProvider_ExposesNameAndTooltip()
+    {
+        var vm = Build(new FakePlaybackService(), _ => Task.FromResult<LyricsDocument?>(null));
+        vm.CurrentLyrics = new LyricsDocument { SyncKind = LyricsSyncKind.Line, SourceProvider = "lrclib" };
+        vm.LyricsLoadState = LyricsLoadState.Loaded;
+
+        Assert.IsTrue(vm.HasLyricsSource);
+        Assert.AreEqual("LrcLib", vm.LyricsSourceName);
+        Assert.AreEqual("Lyrics from LrcLib", vm.LyricsSourceTooltip);
+    }
+
+    [TestMethod]
+    public void LyricsSource_Loading_IsHidden()
+    {
+        var vm = Build(new FakePlaybackService(), _ => Task.FromResult<LyricsDocument?>(null));
+        vm.CurrentLyrics = new LyricsDocument { SyncKind = LyricsSyncKind.Line, SourceProvider = "lrclib" };
+        vm.LyricsLoadState = LyricsLoadState.Loading;
+
+        Assert.IsFalse(vm.HasLyricsSource);
+        Assert.IsNull(vm.LyricsSourceTooltip);
+    }
+
+    [TestMethod]
+    public void LyricsSource_UnknownProvider_IsHidden()
+    {
+        var vm = Build(new FakePlaybackService(), _ => Task.FromResult<LyricsDocument?>(null));
+        vm.CurrentLyrics = new LyricsDocument { SyncKind = LyricsSyncKind.Word, SourceProvider = "ttml" };
+        vm.LyricsLoadState = LyricsLoadState.Loaded;
+
+        Assert.IsFalse(vm.HasLyricsSource); // unknown id (e.g. dev override) → nothing to attribute
     }
 }

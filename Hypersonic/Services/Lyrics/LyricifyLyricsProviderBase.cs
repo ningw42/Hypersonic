@@ -26,6 +26,7 @@ internal abstract class LyricifyLyricsProviderBase : ILyricsProvider
     }
 
     public abstract string Id { get; }
+    public abstract string DisplayName { get; }
     protected abstract LyricifyPlatform Platform { get; }
     protected abstract bool Enabled { get; }
     protected abstract int MatchThreshold { get; }
@@ -71,12 +72,12 @@ internal abstract class LyricifyLyricsProviderBase : ILyricsProvider
         }
 
         var bytes = Encoding.UTF8.GetBytes(result.RawText);
-        var document = _parserRegistry.Parse(result.FormatTag, bytes);
+        var document = _parserRegistry.Parse(result.Format, bytes);
         if (document is null)
         {
             return LyricsProviderResult.Transient; // present-but-unparseable → never assert "no lyrics"
         }
 
-        return LyricsProviderResult.Content(document, bytes, result.FormatTag, definitive: true);
+        return LyricsProviderResult.Content(document.WithSourceProvider(Id), bytes, result.Format, definitive: true);
     }
 }

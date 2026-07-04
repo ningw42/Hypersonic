@@ -12,6 +12,9 @@ public interface ILyricsProvider
     /// <summary>Stable identifier for this source (also the cached <c>SourceProvider</c>), e.g. <c>"subsonic"</c>.</summary>
     string Id { get; }
 
+    /// <summary>Human-facing brand name for this source (e.g. "LrcLib"). Not localized.</summary>
+    string DisplayName { get; }
+
     /// <summary>Resolves the source's best result for <paramref name="query"/>.</summary>
     Task<LyricsProviderResult> FetchAsync(LyricsQuery query, CancellationToken cancellationToken);
 }

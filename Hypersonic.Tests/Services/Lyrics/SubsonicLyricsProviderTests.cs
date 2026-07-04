@@ -17,7 +17,7 @@ public class SubsonicLyricsProviderTests
     {
         var log = new LoggingService();
         var registry = new LyricsParserRegistry(
-            [new SubsonicStructuredLyricsParser(log), new SubsonicLegacyLyricsParser(log)],
+            [new SubsonicStructuredLyricsParser(log), new LrcPlainLyricsParser(log)],
             log);
         var clientService = new FakeSubsonicClientService { Client = client };
         return new SubsonicLyricsProvider(clientService, registry, log);
@@ -27,7 +27,7 @@ public class SubsonicLyricsProviderTests
     {
         var log = new LoggingService();
         var registry = new LyricsParserRegistry(
-            [new SubsonicStructuredLyricsParser(log), new SubsonicLegacyLyricsParser(log)],
+            [new SubsonicStructuredLyricsParser(log), new LrcPlainLyricsParser(log)],
             log);
         return new SubsonicLyricsProvider(new FakeSubsonicClientService { Client = null }, registry, log);
     }
@@ -84,7 +84,8 @@ public class SubsonicLyricsProviderTests
 
         Assert.AreEqual(LyricsOutcomeKind.Content, result.Kind);
         Assert.IsTrue(result.Definitive);
-        Assert.AreEqual(SubsonicLyricsConstants.StructuredFormat, result.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.SubsonicStructured, result.Format);
+        Assert.AreEqual("subsonic", result.Document!.SourceProvider);
         Assert.AreEqual(LyricsSyncKind.Line, result.Document!.SyncKind);
         Assert.AreEqual(0, client.LegacyCallCount);
     }
@@ -139,7 +140,8 @@ public class SubsonicLyricsProviderTests
 
         Assert.AreEqual(LyricsOutcomeKind.Content, result.Kind);
         Assert.IsTrue(result.Definitive);
-        Assert.AreEqual(SubsonicLyricsConstants.LegacyFormat, result.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.PlainText, result.Format);
+        Assert.AreEqual("subsonic", result.Document!.SourceProvider);
         Assert.AreEqual("legacy text", Encoding.UTF8.GetString(result.RawPayload.Span));
         Assert.AreEqual(LyricsSyncKind.Plain, result.Document!.SyncKind);
     }
@@ -252,7 +254,7 @@ public class SubsonicLyricsProviderTests
         var result = await Provider(client).FetchAsync(Query, CancellationToken.None);
 
         Assert.AreEqual(LyricsOutcomeKind.Content, result.Kind);
-        Assert.AreEqual(SubsonicLyricsConstants.LegacyFormat, result.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.PlainText, result.Format);
         Assert.IsTrue(result.Definitive);
         Assert.AreEqual(1, client.LegacyCallCount);
     }

@@ -12,7 +12,7 @@ namespace Hypersonic.Services.Lyrics;
 /// </summary>
 internal static class LyricifySyllableMapper
 {
-    public static LyricsDocument? ToWordDocument(IReadOnlyList<ILineInfo> lines, string sourceId)
+    public static LyricsDocument? ToWordDocument(IReadOnlyList<ILineInfo> lines, LyricsFormat format)
     {
         var outLines = new List<LyricsLine>(lines.Count);
 
@@ -66,8 +66,8 @@ internal static class LyricifySyllableMapper
         return new LyricsDocument
         {
             SyncKind = LyricsSyncKind.Word,
+            Format = format,
             Lines = outLines,
-            SourceProvider = sourceId,
         };
     }
 

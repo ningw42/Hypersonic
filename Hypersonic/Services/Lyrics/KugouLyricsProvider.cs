@@ -18,6 +18,7 @@ internal sealed class KugouLyricsProvider : LyricifyLyricsProviderBase
         => _options = options.Value;
 
     public override string Id => KugouLyricsConstants.ProviderId;
+    public override string DisplayName => "Kugou";
     protected override LyricifyPlatform Platform => LyricifyPlatform.Kugou;
     protected override bool Enabled => _options.Enabled;
     protected override int MatchThreshold => _options.MatchThreshold;

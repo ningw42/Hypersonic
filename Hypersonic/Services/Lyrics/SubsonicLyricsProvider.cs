@@ -36,6 +36,8 @@ internal sealed class SubsonicLyricsProvider : ILyricsProvider
 
     public string Id => SubsonicLyricsConstants.ProviderId;
 
+    public string DisplayName => "Subsonic";
+
     public async Task<LyricsProviderResult> FetchAsync(LyricsQuery query, CancellationToken cancellationToken)
     {
         // Honor cancellation before any work — the provider contract must not hit an endpoint or
@@ -101,7 +103,7 @@ internal sealed class SubsonicLyricsProvider : ILyricsProvider
             }
 
             var content = LyricsProviderResult.Content(
-                best.Value.Document, best.Value.Payload, SubsonicLyricsConstants.StructuredFormat, definitive: true);
+                best.Value.Document.WithSourceProvider(Id), best.Value.Payload, LyricsFormat.SubsonicStructured, definitive: true);
             return (content, LyricsOutcomeKind.Content);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -143,7 +145,7 @@ internal sealed class SubsonicLyricsProvider : ILyricsProvider
             }
 
             var payload = Encoding.UTF8.GetBytes(text);
-            var document = _parserRegistry.Parse(SubsonicLyricsConstants.LegacyFormat, payload);
+            var document = _parserRegistry.Parse(LyricsFormat.PlainText, payload);
             if (document is null)
             {
                 return (null, LyricsOutcomeKind.DefinitiveEmpty);
@@ -152,7 +154,7 @@ internal sealed class SubsonicLyricsProvider : ILyricsProvider
             // Legacy content is cacheable only when structured was definitive (a transient structured
             // result might have produced a better answer once it clears).
             var content = LyricsProviderResult.Content(
-                document, payload, SubsonicLyricsConstants.LegacyFormat, definitive: structuredDefinitive);
+                document.WithSourceProvider(Id), payload, LyricsFormat.PlainText, definitive: structuredDefinitive);
             return (content, LyricsOutcomeKind.Content);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -195,7 +197,7 @@ internal sealed class SubsonicLyricsProvider : ILyricsProvider
             }
 
             var payload = JsonSerializer.SerializeToUtf8Bytes(entry, Json.CompactOptions);
-            var document = _parserRegistry.Parse(SubsonicLyricsConstants.StructuredFormat, payload);
+            var document = _parserRegistry.Parse(LyricsFormat.SubsonicStructured, payload);
             if (document is null)
             {
                 continue;

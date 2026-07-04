@@ -15,17 +15,11 @@ public class SubsonicLyricsParsersTests
     private static SubsonicStructuredLyricsParser StructuredParser()
         => new(new LoggingService());
 
-    private static SubsonicLegacyLyricsParser LegacyParser()
-        => new(new LoggingService());
-
     private static byte[] SerializeStructured(StructuredLyrics entry)
         => JsonSerializer.SerializeToUtf8Bytes(entry, Json.CompactOptions);
 
     private static LyricsDocument? ParseStructured(byte[] payload)
         => StructuredParser().Parse(payload);
-
-    private static LyricsDocument? ParseLegacy(string text)
-        => LegacyParser().Parse(Encoding.UTF8.GetBytes(text));
 
     // ---- Structured: synced -> Line ----
 
@@ -50,7 +44,7 @@ public class SubsonicLyricsParsersTests
         Assert.AreEqual(LyricsSyncKind.Line, doc!.SyncKind);
         Assert.AreEqual("en", doc.LanguageCode);
         Assert.AreEqual(-250, doc.OffsetMs);
-        Assert.AreEqual("subsonic", doc.SourceProvider);
+        Assert.AreEqual(LyricsFormat.SubsonicStructured, doc.Format);
         Assert.AreEqual(2, doc.Lines.Count);
         Assert.AreEqual(0, doc.Lines[0].StartMs);
         Assert.AreEqual("first", doc.Lines[0].Text);
@@ -243,29 +237,5 @@ public class SubsonicLyricsParsersTests
         Assert.AreEqual("ja", doc.LanguageCode);
         Assert.AreEqual("い", doc.Lines[0].Text);
         Assert.AreEqual(200, doc.Lines[1].StartMs);
-    }
-
-    // ---- Legacy: text -> Plain ----
-
-    [TestMethod]
-    public void Legacy_Text_ProducesPlainOneLinePerTextLine()
-    {
-        var doc = ParseLegacy("line one\r\nline two\n\nline four\n");
-
-        Assert.IsNotNull(doc);
-        Assert.AreEqual(LyricsSyncKind.Plain, doc!.SyncKind);
-        Assert.AreEqual("subsonic", doc.SourceProvider);
-        Assert.AreEqual(4, doc.Lines.Count);
-        Assert.AreEqual("line one", doc.Lines[0].Text);
-        Assert.AreEqual("line two", doc.Lines[1].Text);
-        Assert.AreEqual("", doc.Lines[2].Text, "internal blank line is kept as a stanza break");
-        Assert.AreEqual("line four", doc.Lines[3].Text);
-        Assert.IsTrue(doc.Lines.All(l => l.StartMs == 0));
-    }
-
-    [TestMethod]
-    public void Legacy_BlankText_ReturnsNull()
-    {
-        Assert.IsNull(ParseLegacy("   \n  \n"));
     }
 }

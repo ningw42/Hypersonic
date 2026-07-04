@@ -37,7 +37,8 @@ public class LrcLibLyricsProviderTests
         var r = await p.FetchAsync(Query, CancellationToken.None);
         Assert.AreEqual(LyricsOutcomeKind.Content, r.Kind);
         Assert.AreEqual(LyricsSyncKind.Line, r.Document!.SyncKind);
-        Assert.AreEqual("lrclib-synced", r.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.Lrc, r.Format);
+        Assert.AreEqual("lrclib", r.Document!.SourceProvider);
         Assert.IsTrue(r.Definitive);
     }
 
@@ -48,7 +49,8 @@ public class LrcLibLyricsProviderTests
             """{"trackName":"T","artistName":"A","duration":200,"instrumental":false,"plainLyrics":"hello","syncedLyrics":""}""") });
         var r = await p.FetchAsync(Query, CancellationToken.None);
         Assert.AreEqual(LyricsSyncKind.Plain, r.Document!.SyncKind);
-        Assert.AreEqual("lrclib-plain", r.PayloadFormat);
+        Assert.AreEqual(LyricsFormat.PlainText, r.Format);
+        Assert.AreEqual("lrclib", r.Document!.SourceProvider);
     }
 
     [TestMethod]

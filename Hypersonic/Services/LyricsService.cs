@@ -335,10 +335,10 @@ public sealed class LyricsService : ILyricsService, IDisposable
 
             var entry = new LyricsCacheEntry
             {
-                FileName = keyHash + ExtensionForFormat(winner.PayloadFormat!),
+                FileName = keyHash + ExtensionForFormat(winner.Format),
                 Length = winner.RawPayload.Length,
                 SourceProvider = document.SourceProvider ?? string.Empty,
-                PayloadFormat = winner.PayloadFormat!,
+                Format = winner.Format,
                 SyncKind = document.SyncKind,
                 LanguageCode = document.LanguageCode,
                 OffsetMs = document.OffsetMs,
@@ -374,7 +374,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
                 FileName = string.Empty,
                 Length = 0,
                 SourceProvider = _providers.Length > 0 ? _providers[0].Id : string.Empty,
-                PayloadFormat = string.Empty,
+                Format = LyricsFormat.Unknown,
                 SyncKind = LyricsSyncKind.None,
                 LanguageCode = null,
                 OffsetMs = null,
@@ -429,11 +429,11 @@ public sealed class LyricsService : ILyricsService, IDisposable
             return (false, null);
         }
 
-        var document = _parserRegistry.Parse(payload.Entry.PayloadFormat, payload.Bytes);
+        var document = _parserRegistry.Parse(payload.Entry.Format, payload.Bytes);
         if (document is null)
         {
             // Corrupt payload — degrade to a miss so a fresh fetch can replace it.
-            _log.Warning("Cached lyrics payload failed to parse; treating as miss", new { KeyHash = keyHash, payload.Entry.PayloadFormat });
+            _log.Warning("Cached lyrics payload failed to parse; treating as miss", new { KeyHash = keyHash, payload.Entry.Format });
             return (false, null);
         }
 
@@ -464,6 +464,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
         return new LyricsDocument
         {
             SyncKind = document.SyncKind,
+            Format = document.Format,
             Lines = document.Lines,
             SourceProvider = source,
             LanguageCode = language,
@@ -471,18 +472,16 @@ public sealed class LyricsService : ILyricsService, IDisposable
         };
     }
 
-    /// <summary>Maps a payload format tag to the file extension its cached payload uses.</summary>
-    internal static string ExtensionForFormat(string formatTag) => formatTag switch
+    /// <summary>Maps a payload format to the file extension its cached payload uses.</summary>
+    internal static string ExtensionForFormat(LyricsFormat format) => format switch
     {
-        SubsonicLyricsConstants.StructuredFormat => ".json",
-        SubsonicLyricsConstants.LegacyFormat => ".txt",
-        LrcLibLyricsConstants.SyncedFormat => ".lrc",
-        LrcLibLyricsConstants.PlainFormat => ".txt",
-        TtmlLyricsConstants.Format => ".ttml",
-        QQLyricsConstants.QrcFormat => ".qrc",
-        KugouLyricsConstants.KrcFormat => ".krc",
-        NeteaseLyricsConstants.YrcFormat => ".yrc",
-        NeteaseLyricsConstants.LrcFormat => ".lrc",
+        LyricsFormat.SubsonicStructured => ".json",
+        LyricsFormat.PlainText => ".txt",
+        LyricsFormat.Lrc => ".lrc",
+        LyricsFormat.Ttml => ".ttml",
+        LyricsFormat.Qrc => ".qrc",
+        LyricsFormat.Krc => ".krc",
+        LyricsFormat.Yrc => ".yrc",
         _ => ".txt",
     };
 

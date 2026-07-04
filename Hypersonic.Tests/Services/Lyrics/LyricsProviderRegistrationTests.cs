@@ -1,5 +1,6 @@
 using Hypersonic.Core.Contracts.Lyrics;
 using Hypersonic.Core.Contracts.Services;
+using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Core.Services;
 using Hypersonic.Core.Services.Lyrics;
 using Hypersonic.Models;
@@ -18,17 +19,18 @@ public class LyricsProviderRegistrationTests
         services.AddSingleton<ILoggingService, LoggingService>();
         services.AddSingleton<ILyricsParserRegistry, LyricsParserRegistry>();
 
-        // The CN word parsers + Netease LRC parser (the subset added by this feature).
+        // The CN word parsers (the subset added by this feature).
         services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
-            QQLyricsConstants.QrcFormat, QQLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Qrc,
+            LyricsFormat.Qrc, Lyricify.Lyrics.Models.LyricsRawTypes.Qrc,
             sp.GetRequiredService<ILoggingService>()));
         services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
-            KugouLyricsConstants.KrcFormat, KugouLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Krc,
+            LyricsFormat.Krc, Lyricify.Lyrics.Models.LyricsRawTypes.Krc,
             sp.GetRequiredService<ILoggingService>()));
         services.AddSingleton<ILyricsPayloadParser>(sp => new LyricifyWordLyricsParser(
-            NeteaseLyricsConstants.YrcFormat, NeteaseLyricsConstants.ProviderId, Lyricify.Lyrics.Models.LyricsRawTypes.Yrc,
+            LyricsFormat.Yrc, Lyricify.Lyrics.Models.LyricsRawTypes.Yrc,
             sp.GetRequiredService<ILoggingService>()));
-        services.AddSingleton<ILyricsPayloadParser, NeteaseLrcLyricsParser>();
+        // The shared LRC parser (serves LyricsFormat.Lrc), so the registry can resolve line-tier payloads.
+        services.AddSingleton<ILyricsPayloadParser, LrcSyncedLyricsParser>();
 
         services.AddSingleton<ILyricifyLyricsClient, LyricifyLyricsClient>();
         services.Configure<QQLyricsOptions>(_ => { });
@@ -56,12 +58,11 @@ public class LyricsProviderRegistrationTests
     {
         using var sp = BuildLyricsSubset();
         var registry = sp.GetRequiredService<ILyricsParserRegistry>();
-        // A tag with no parser logs + returns null; a registered tag must at least not be "unregistered".
-        // Feed empty payload: registered parsers return null (empty), unregistered also null — so assert via
-        // a valid netease-lrc payload which only resolves if the parser is registered.
-        var doc = registry.Parse(NeteaseLyricsConstants.LrcFormat,
+        // A format with no parser logs + returns null; a registered format must resolve. Feed a valid
+        // LRC payload, which only produces a Line document if the shared LRC parser is registered.
+        var doc = registry.Parse(LyricsFormat.Lrc,
             System.Text.Encoding.UTF8.GetBytes("[00:01.00]hi"));
         Assert.IsNotNull(doc);
-        Assert.AreEqual("netease", doc!.SourceProvider);
+        Assert.AreEqual(LyricsSyncKind.Line, doc!.SyncKind);
     }
 }

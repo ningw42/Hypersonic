@@ -19,8 +19,8 @@ public sealed class LyricsCacheEntry : ICacheEntry
     /// <summary>Id of the provider that produced this entry (e.g. <c>"subsonic"</c>).</summary>
     public string SourceProvider { get; set; } = string.Empty;
 
-    /// <summary>Format tag selecting the read-time parser; empty for negative rows.</summary>
-    public string PayloadFormat { get; set; } = string.Empty;
+    /// <summary>Wire format selecting the read-time parser; <see cref="LyricsFormat.Unknown"/> for negative rows.</summary>
+    public LyricsFormat Format { get; set; } = LyricsFormat.Unknown;
 
     public LyricsSyncKind SyncKind { get; set; }
 
@@ -39,7 +39,7 @@ public sealed class LyricsCacheEntry : ICacheEntry
         FileName = FileName,
         Length = Length,
         SourceProvider = SourceProvider,
-        PayloadFormat = PayloadFormat,
+        Format = Format,
         SyncKind = SyncKind,
         LanguageCode = LanguageCode,
         OffsetMs = OffsetMs,

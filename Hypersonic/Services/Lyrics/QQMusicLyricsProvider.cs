@@ -18,6 +18,7 @@ internal sealed class QQMusicLyricsProvider : LyricifyLyricsProviderBase
         => _options = options.Value;
 
     public override string Id => QQLyricsConstants.ProviderId;
+    public override string DisplayName => "QQ Music";
     protected override LyricifyPlatform Platform => LyricifyPlatform.QQMusic;
     protected override bool Enabled => _options.Enabled;
     protected override int MatchThreshold => _options.MatchThreshold;

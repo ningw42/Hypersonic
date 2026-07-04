@@ -38,6 +38,8 @@ internal sealed class AmllTtmlLyricsProvider : ILyricsProvider
 
     public string Id => AmllLyricsConstants.ProviderId;
 
+    public string DisplayName => "AMLL";
+
     public async Task<LyricsProviderResult> FetchAsync(LyricsQuery query, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -75,14 +77,14 @@ internal sealed class AmllTtmlLyricsProvider : ILyricsProvider
             }
 
             var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-            var document = _parserRegistry.Parse(TtmlLyricsConstants.Format, bytes);
+            var document = _parserRegistry.Parse(LyricsFormat.Ttml, bytes);
             if (document is null)
             {
                 // Present-but-unparseable payload → parse failure → Transient (never assert "no lyrics").
                 return LyricsProviderResult.Transient;
             }
 
-            return LyricsProviderResult.Content(document, bytes, TtmlLyricsConstants.Format, definitive: true);
+            return LyricsProviderResult.Content(document.WithSourceProvider(Id), bytes, LyricsFormat.Ttml, definitive: true);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
