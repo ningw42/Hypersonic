@@ -321,7 +321,7 @@ In `Hypersonic.Core/Models/Lyrics/LyricsProviderResult.cs`: change the ctor para
         Document = document;
         RawPayload = rawPayload;
         Format = format;
-        definitive_ = definitive; // (leave the existing `Definitive` assignment as-is)
+        Definitive = definitive;
     }
 ```
 
@@ -348,8 +348,6 @@ Update the factories (pass `LyricsFormat.Unknown` where the old code passed `nul
     public static readonly LyricsProviderResult Transient =
         new(LyricsOutcomeKind.Transient, null, default, LyricsFormat.Unknown, definitive: false);
 ```
-
-(Note: the ctor `definitive_` line above is shorthand — keep the file's real `Definitive = definitive;` assignment.)
 
 - [ ] **Step 3.4: `LyricsCacheEntry` — `PayloadFormat`(string)→`Format`(enum)**
 
@@ -579,23 +577,40 @@ Replace the three `LyricifyWordLyricsParser` factory registrations with (drop `s
 ```
 Add `using Hypersonic.Core.Models.Lyrics;` to `App.xaml.cs` if not present.
 
-- [ ] **Step 3.13: Update the affected tests**
+- [ ] **Step 3.13: Update the affected tests (exhaustive)**
 
-Apply the transformation rule: **parser tests assert `Format` (and no longer `SourceProvider`); provider tests assert the provider stamps `SourceProvider`; every `Content(...)`/`LyricsCacheEntry`/`Parse(...)` call passes a `LyricsFormat`.**
+Apply the rule: **parser tests assert `Format` (never `SourceProvider`, which the parser no longer stamps); provider tests assert the provider stamps `SourceProvider`; every `Content(...)` / `LyricsCacheEntry` / `Parse(...)` / `ExtensionForFormat(...)` reference passes a `LyricsFormat`; fakes implementing `ILyricsPayloadParser`/`ILyricsParserRegistry` adopt the enum signatures.** Add `using Hypersonic.Core.Models.Lyrics;` wherever `LyricsFormat` is newly referenced.
 
-- `Hypersonic.Core.Tests/Services/Lyrics/LrcSyncedLyricsParserTests.cs`: replace `Assert.AreEqual("lrclib", doc.SourceProvider)` → `Assert.AreEqual(LyricsFormat.Lrc, doc.Format)`.
-- `Hypersonic.Core.Tests/Services/Lyrics/LrcPlainLyricsParserTests.cs`: `"lrclib"`/`SourceProvider` → `Assert.AreEqual(LyricsFormat.PlainText, doc.Format)`.
-- `Hypersonic.Core.Tests/Services/Lyrics/TtmlLyricsParserTests.cs`: change `SourceProvider_IsTtml` to `Format_IsTtml` asserting `Assert.AreEqual(LyricsFormat.Ttml, Parse(TwoLineWordSynced)!.Format)`.
-- **Delete** `Hypersonic.Core.Tests/Services/Lyrics/NeteaseLrcLyricsParserTests.cs`.
-- `Hypersonic.Core.Tests/Services/Lyrics/LyricsParserRegistryTests.cs`: change any `Parse("some-tag", …)` to `Parse(LyricsFormat.X, …)` and any fake parser's `FormatTag` to `Format`.
-- `Hypersonic.Tests/Services/Lyrics/SubsonicLyricsParsersTests.cs`: drop the legacy-parser tests (parser deleted); for structured tests replace `Assert.AreEqual("subsonic", doc.SourceProvider)` → `Assert.AreEqual(LyricsFormat.SubsonicStructured, doc.Format)`.
-- `Hypersonic.Tests/Services/Lyrics/LyricifyWordLyricsParserTests.cs`: construct the parser with `new LyricifyWordLyricsParser(LyricsFormat.Qrc, LyricsRawTypes.Qrc, log)` (drop the id arg); replace `Assert.AreEqual("qq"/"netease", doc.SourceProvider)` → `Assert.AreEqual(LyricsFormat.Qrc/.Yrc, doc.Format)`.
-- `Hypersonic.Tests/Services/Lyrics/SubsonicLyricsProviderTests.cs`, `LyricsProviderRegistrationTests.cs`, `AmllTtmlLyricsProviderTests.cs`: these exercise providers; assert the **returned document** carries the right `SourceProvider` (e.g. `"subsonic"`, `"netease"`, and **`"amll-ttml-db"`** for AMLL) — add the AMLL assertion explicitly (see Step 3.14). Update any `LyricifyLyricsResult(…, "yrc", …)` fakes to `LyricifyLyricsResult(…, LyricsFormat.Yrc, …)`.
-- `Hypersonic.Tests/Services/Lyrics/LyricsServiceTests.cs`: replace `LyricsProviderResult.Content(doc, bytes, "lrclib-synced"/…, def)` fakes with the enum (`LyricsFormat.Lrc`, etc.); test docs built inline that set `SourceProvider` are unchanged; keep the winner/tiebreak `SourceProvider` assertions.
-- `Hypersonic.Tests/Services/Lyrics/SqliteLyricsCacheStoreTests.cs`: replace `PayloadFormat = "…"` on constructed `LyricsCacheEntry` with `Format = LyricsFormat.X`; update round-trip assertions to compare `Format`.
-- `Hypersonic.Tests/Services/Lyrics/LyricsFallbackPolicyTests.cs`: the helper `new LyricsDocument { …, SourceProvider = source }` is unaffected, but any `Content(…, "tag", …)` becomes the enum.
+**Core.Tests — parsers + registry:**
+- `Hypersonic.Core.Tests/Services/Lyrics/LrcSyncedLyricsParserTests.cs`: `FormatTag_IsLrclibSynced` (~:16) → assert `parser.Format == LyricsFormat.Lrc`; the doc test asserting `doc.SourceProvider == "lrclib"` (~:25) → assert `doc.Format == LyricsFormat.Lrc` and **remove** the `SourceProvider` assertion.
+- `LrcPlainLyricsParserTests.cs`: `FormatTag_IsLrclibPlain` (~:16) → `parser.Format == LyricsFormat.PlainText`; `SourceProvider` assert (~:25) → `doc.Format == LyricsFormat.PlainText`.
+- `TtmlLyricsParserTests.cs`: `FormatTag_IsTtml` (:35) → `parser.Format == LyricsFormat.Ttml`; rename `SourceProvider_IsTtml` (:67) → `Format_IsTtml` asserting `Parse(TwoLineWordSynced)!.Format == LyricsFormat.Ttml`.
+- **Delete** `NeteaseLrcLyricsParserTests.cs` (parser deleted; LRC-line coverage remains in `LrcSyncedLyricsParserTests`).
+- `LyricsParserRegistryTests.cs`: the inline `FakeParser` → `public LyricsFormat Format { get; }` (was `string FormatTag`) with a `LyricsFormat` ctor arg; every `registry.Parse("a"/"b"/…, …)` → `registry.Parse(LyricsFormat.X, …)`; **redesign** `Parse_EmptyFormatTag_ReturnsNull` (:55) — there is no empty enum, so rename to `Parse_UnregisteredFormat_ReturnsNull`, register a fake for one format (e.g. `LyricsFormat.Lrc`), then `Parse(LyricsFormat.Ttml, …)` and assert `null`.
 
-Add `using Hypersonic.Core.Models.Lyrics;` to any test file that now references `LyricsFormat`.
+**Hypersonic.Tests — parsers:**
+- `SubsonicLyricsParsersTests.cs`: **delete** the tests exercising the (deleted) `SubsonicLegacyLyricsParser`; for the structured parser replace `Assert.AreEqual("subsonic", doc.SourceProvider)` → `Assert.AreEqual(LyricsFormat.SubsonicStructured, doc.Format)`.
+- `LyricifyWordLyricsParserTests.cs`: construct via the new 3-arg ctor `new LyricifyWordLyricsParser(LyricsFormat.Qrc, LyricsRawTypes.Qrc, log)` (drop the id arg) — including the `QrcParser()` helper (~:22) and `FormatTag_IsQrc` (~:25 → `.Format == LyricsFormat.Qrc`); in `Qrc_ParsesToWordDocument` (~:35) **remove** the `doc.SourceProvider == "qq"` assertion (now null) and assert `doc.Format == LyricsFormat.Qrc`; **delete** `SourceId_FlowsThroughRegardlessOfFormat` (~:47) — the `sourceId` param it verifies no longer exists.
+
+**Hypersonic.Tests — providers (assert the provider stamps `SourceProvider`):**
+- `LrcLibLyricsProviderTests.cs`: `Assert.AreEqual("lrclib-synced"/"lrclib-plain", r.PayloadFormat)` (~:40/:51) → `Assert.AreEqual(LyricsFormat.Lrc / LyricsFormat.PlainText, r.Format)`; add `Assert.AreEqual("lrclib", r.Document!.SourceProvider)`.
+- `SubsonicLyricsProviderTests.cs`: it constructs `SubsonicLegacyLyricsParser` (~:20/:30, deleted) — repoint to `new LrcPlainLyricsParser(log)` (Core, `LyricsFormat.PlainText`); `r.PayloadFormat` asserts (~:87/:142/:255) → `r.Format`; keep/confirm `r.Document!.SourceProvider == "subsonic"`.
+- `AmllTtmlLyricsProviderTests.cs`: `Assert.AreEqual("ttml", r.PayloadFormat)` (~:47) → `Assert.AreEqual(LyricsFormat.Ttml, r.Format)`. (The new AMLL identity test is Step 3.14.)
+- `LyricifyLyricsProviderTests.cs`: the 4-arg `LyricifyWordLyricsParser` ctor (~:33) → 3-arg; `LyricifyLyricsResult(sample, "qrc", …)` fakes (~:66/:76) → `LyricifyLyricsResult(sample, LyricsFormat.Qrc, …)`; `r.PayloadFormat` (~:81) → `r.Format`; add `r.Document!.SourceProvider == "qq"` (provider now stamps identity).
+
+**Hypersonic.Tests — service + cache + registration:**
+- `LyricsServiceTests.cs`:
+  - Replace the `SubsonicLegacyLyricsParser _legacyParser` field + its construction (:27/:40, deleted class) with `LrcPlainLyricsParser _plainParser = new LrcPlainLyricsParser(log)`; update `_registry = new LyricsParserRegistry([new SubsonicStructuredLyricsParser(log), _plainParser], log)`.
+  - `LegacyContent(...)` helper (:62-67): `var doc = _plainParser.Parse(payload)!; return LyricsProviderResult.Content(doc, payload, LyricsFormat.PlainText, definitive);`.
+  - `ExtensionForFormat("ttml")` (:535) → `ExtensionForFormat(LyricsFormat.Ttml)`.
+  - `PayloadFormat = "metadata-poor"` (:238) / `PayloadFormat = "x"` (:277) on seeded `LyricsCacheEntry` → `Format = LyricsFormat.Lrc` (or `LyricsFormat.Unknown` if the seeded row is a negative/empty row).
+  - The `StubRegistry` fake (:615) — `public LyricsDocument? Parse(string formatTag, …)` → `Parse(LyricsFormat format, …)`; update its internal lookup to key on `LyricsFormat`.
+  - Any remaining `LyricsProviderResult.Content(doc, bytes, "…tag…", def)` (e.g. :315/:326/:512) → pass the matching `LyricsFormat`. Inline docs setting `SourceProvider` directly are unchanged; keep the winner/tiebreak `SourceProvider` assertions.
+- `SqliteLyricsCacheStoreTests.cs`: every `PayloadFormat = "<tag>"` on a constructed `LyricsCacheEntry` → `Format = LyricsFormat.<X>`; the negative-row `PayloadFormat = string.Empty` cases (~:173/:274) → `Format = LyricsFormat.Unknown`; round-trip assertions compare `read.Format`.
+- `LyricsCacheFormatTests.cs`: the `LyricsService.ExtensionForFormat(QQLyricsConstants.QrcFormat)` etc. calls (~:12-15) → `ExtensionForFormat(LyricsFormat.Qrc)` and the other enum values; update expected extensions if the file asserts them.
+- `LyricsProviderRegistrationTests.cs` (**updated here in Task 3** — it references deleted types): in `BuildLyricsSubset()` change the three `LyricifyWordLyricsParser` factories to the 3-arg enum ctor (`LyricsFormat.Qrc/.Krc/.Yrc`), **remove** the `NeteaseLrcLyricsParser` registration (:31, deleted) and instead register the shared LRC parser (`services.AddSingleton<ILyricsPayloadParser, LrcSyncedLyricsParser>();`) so the registry can resolve `LyricsFormat.Lrc`; rewrite `Registry_ResolvesNewFormatTags` (:54) to `registry.Parse(LyricsFormat.Lrc, Encoding.UTF8.GetBytes("[00:01.00]hi"))`, assert `doc is not null` and `doc.SyncKind == LyricsSyncKind.Line`, and **remove** the `SourceProvider == "netease"` assertion (the shared parser no longer stamps identity). `LyricifyProvider_ResolveInQQNeteaseKugouOrder` is unaffected.
+- `LyricsFallbackPolicyTests.cs`: the `new LyricsDocument { …, SourceProvider = source }` helper is unaffected; any `Content(…, "tag", …)` → the enum.
+- `Hypersonic.Tests/Fakes/FakeLyricsCacheStore.cs`: if it constructs/copies `LyricsCacheEntry.PayloadFormat`, change to `Format`; if it stores entries opaquely, no change.
 
 - [ ] **Step 3.14: Add the AMLL identity regression test**
 
@@ -644,64 +659,44 @@ git commit -m "refactor(lyrics): unify payload format into typed LyricsFormat; p
 - Consumes: `LyricsCacheEntry.Format` (Task 3), the base `MigrationStep(int TargetVersion, string Sql)` record.
 - Produces: cache DB schema `v2` with a `Format` column; a `v2` migration step that drops+recreates the table (existing rows discarded, re-fetched lazily).
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write the failing test**
 
-Append to `SqliteLyricsCacheStoreTests.cs` (follow the file's existing helpers for opening a store at a path):
+Append to `SqliteLyricsCacheStoreTests.cs`. The `Format` round-trip is already covered by the existing store tests once Step 3.13 updates their `PayloadFormat = "…"` seeds to `Format = LyricsFormat.X`; the new test here is the v1→v2 discard. The fixture's DB lives at `<_cacheRoot>/cache.db` (the store roots its cache folder at `_cacheParent` and appends the `"Lyrics"` subfolder, which is `_cacheRoot`), and `CreateStore()` is the fixture's store factory (verify both against the file's `Setup`/helpers).
 
 ```csharp
 [TestMethod]
-public async Task Format_RoundTripsThroughTheStore()
-{
-    var entry = new LyricsCacheEntry
-    {
-        FileName = "abc.lrc",
-        Length = 10,
-        SourceProvider = "lrclib",
-        Format = LyricsFormat.Lrc,
-        SyncKind = LyricsSyncKind.Line,
-        CreatedAtUtc = DateTimeOffset.UnixEpoch,
-        LastAccessUtc = DateTimeOffset.UnixEpoch,
-        ExpiresAtUtc = DateTimeOffset.UnixEpoch.AddDays(30),
-    };
-    await _store.WritePayloadAsync(_keyHash, new byte[] { 1, 2, 3 }, entry, CancellationToken.None);
-
-    var read = await _store.GetEntryAsync(_keyHash, CancellationToken.None);
-    Assert.AreEqual(LyricsFormat.Lrc, read!.Format);
-}
-
-[TestMethod]
 public async Task LegacyV1Row_IsDiscardedOnUpgrade()
 {
-    // Hand-craft a v1 DB with the old PayloadFormat column + a legacy tag row, then open the store.
-    await using (var connection = new SqliteConnection($"Data Source={_databasePath}"))
+    // Hand-craft a v1 DB (old PayloadFormat column + a legacy-tag row) where the store will open it.
+    var dbPath = Path.Combine(_cacheRoot, "cache.db");
+    await using (var connection = new SqliteConnection($"Data Source={dbPath}"))
     {
         await connection.OpenAsync();
-        await using (var create = connection.CreateCommand())
-        {
-            create.CommandText = """
-                CREATE TABLE Entries (
-                    KeyHash TEXT PRIMARY KEY NOT NULL, FileName TEXT NOT NULL, Length INTEGER NOT NULL,
-                    SourceProvider TEXT NOT NULL, PayloadFormat TEXT NOT NULL, SyncKind TEXT NOT NULL,
-                    LanguageCode TEXT, OffsetMs INTEGER, CreatedAtUtc INTEGER NOT NULL,
-                    LastAccessUtc INTEGER NOT NULL, ExpiresAtUtc INTEGER NOT NULL) WITHOUT ROWID;
-                INSERT INTO Entries VALUES ('deadbeef','x.lrc',3,'netease','netease-lrc','Line',NULL,NULL,0,0,999999999999);
-                PRAGMA user_version = 1;
-                """;
-            await create.ExecuteNonQueryAsync();
-        }
+        await using var create = connection.CreateCommand();
+        create.CommandText = """
+            CREATE TABLE Entries (
+                KeyHash TEXT PRIMARY KEY NOT NULL, FileName TEXT NOT NULL, Length INTEGER NOT NULL,
+                SourceProvider TEXT NOT NULL, PayloadFormat TEXT NOT NULL, SyncKind TEXT NOT NULL,
+                LanguageCode TEXT, OffsetMs INTEGER, CreatedAtUtc INTEGER NOT NULL,
+                LastAccessUtc INTEGER NOT NULL, ExpiresAtUtc INTEGER NOT NULL) WITHOUT ROWID;
+            INSERT INTO Entries VALUES ('deadbeef','x.lrc',3,'netease','netease-lrc','Line',NULL,NULL,0,0,999999999999);
+            PRAGMA user_version = 1;
+            """;
+        await create.ExecuteNonQueryAsync();
     }
+    SqliteConnection.ClearAllPools(); // release the handle so the store can reopen the file
 
-    // Opening the store triggers the v2 migration (drop + recreate).
-    var store = CreateStore(); // reuse the fixture's factory pointing at _databasePath
+    // Opening the store triggers the v1→v2 migration step (DROP + recreate).
+    var store = CreateStore();
     var read = await store.GetEntryAsync("deadbeef", CancellationToken.None);
-    Assert.IsNull(read); // discarded — re-fetch will repopulate under the new schema
+    Assert.IsNull(read); // discarded — a later fetch repopulates under the v2 schema
 }
 ```
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~SqliteLyricsCacheStoreTests"`
-Expected: FAIL — `LegacyV1Row_IsDiscardedOnUpgrade` fails (no migration; v1 table with old column trips a read error or returns the stale row).
+Run: `dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~LegacyV1Row_IsDiscardedOnUpgrade"`
+Expected: FAIL — with `CurrentSchemaVersion` still `1` and no `v2` step, the store leaves the v1 row intact, so `read` is non-null.
 
 - [ ] **Step 3: Bump the version, add the discard step, rename the column**
 
@@ -755,32 +750,67 @@ git commit -m "feat(lyrics): cache schema v2 — Format column + discard-on-upgr
 **Files:**
 - Modify: `Hypersonic.Core/Contracts/Lyrics/ILyricsProvider.cs`
 - Modify: `Hypersonic/Services/Lyrics/{SubsonicLyricsProvider,LrcLibLyricsProvider,AmllTtmlLyricsProvider,LyricifyLyricsProviderBase,QQMusicLyricsProvider,NeteaseLyricsProvider,KugouLyricsProvider}.cs`
-- Test: `Hypersonic.Tests/Services/Lyrics/LyricsProviderRegistrationTests.cs` (append)
+- Modify: `Hypersonic.Tests/Services/Lyrics/LyricsServiceTests.cs` (the `FakeLyricsProvider` fake gains `DisplayName`)
+- Create: `Hypersonic.Tests/Services/Lyrics/LyricsProviderDisplayNameTests.cs`
 
 **Interfaces:**
 - Produces: `string ILyricsProvider.DisplayName { get; }` — human brand name per provider.
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `LyricsProviderRegistrationTests.cs` (this test already resolves the registered `IEnumerable<ILyricsProvider>` — reuse that resolution):
+`DisplayName` is a dependency-free constant getter, so construct each provider directly (no DI graph): each ctor only dereferences `logService.GetLogger(...)` and, where present, `options.Value`, so a real `NullLoggingService` + real `Options.Create(...)` suffice and `null!` is safe for the deps the getter never touches.
 
 ```csharp
-[TestMethod]
-public void EveryProvider_HasExpectedDisplayName()
+// Hypersonic.Tests/Services/Lyrics/LyricsProviderDisplayNameTests.cs
+using Hypersonic.Models;
+using Hypersonic.Services.Lyrics;
+using Hypersonic.Tests.Fakes;
+
+using Microsoft.Extensions.Options;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace Hypersonic.Tests.Services.Lyrics;
+
+[TestClass]
+public class LyricsProviderDisplayNameTests
 {
-    var byId = ResolveProviders().ToDictionary(p => p.Id, p => p.DisplayName); // reuse existing resolver
-    Assert.AreEqual("Subsonic", byId["subsonic"]);
-    Assert.AreEqual("LrcLib", byId["lrclib"]);
-    Assert.AreEqual("AMLL", byId["amll-ttml-db"]);
-    Assert.AreEqual("QQ Music", byId["qq"]);
-    Assert.AreEqual("Netease", byId["netease"]);
-    Assert.AreEqual("Kugou", byId["kugou"]);
+    private static readonly NullLoggingService Log = new();
+
+    [TestMethod]
+    public void Subsonic_DisplayName()
+        => Assert.AreEqual("Subsonic", new SubsonicLyricsProvider(null!, null!, Log).DisplayName);
+
+    [TestMethod]
+    public void LrcLib_DisplayName()
+        => Assert.AreEqual("LrcLib", new LrcLibLyricsProvider(null!, null!, Log).DisplayName);
+
+    [TestMethod]
+    public void Amll_DisplayName()
+        => Assert.AreEqual("AMLL",
+            new AmllTtmlLyricsProvider(null!, null!, null!, Options.Create(new AmllLyricsOptions()), Log).DisplayName);
+
+    [TestMethod]
+    public void QQ_DisplayName()
+        => Assert.AreEqual("QQ Music",
+            new QQMusicLyricsProvider(null!, null!, Options.Create(new QQLyricsOptions()), Log).DisplayName);
+
+    [TestMethod]
+    public void Netease_DisplayName()
+        => Assert.AreEqual("Netease",
+            new NeteaseLyricsProvider(null!, null!, Options.Create(new NeteaseLyricsOptions()), Log).DisplayName);
+
+    [TestMethod]
+    public void Kugou_DisplayName()
+        => Assert.AreEqual("Kugou",
+            new KugouLyricsProvider(null!, null!, Options.Create(new KugouLyricsOptions()), Log).DisplayName);
 }
 ```
 
+(Confirm the exact ctor arg order against each provider file and adjust the `null!`/`Options.Create` slots accordingly.)
+
 - [ ] **Step 2: Run to verify failure**
 
-Run: `dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~LyricsProviderRegistrationTests"`
+Run: `dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~LyricsProviderDisplayNameTests"`
 Expected: FAIL (build error — `DisplayName` not on `ILyricsProvider`).
 
 - [ ] **Step 3: Add the interface member**
@@ -800,11 +830,12 @@ In `ILyricsProvider.cs`, add:
 - `QQMusicLyricsProvider.cs`: `public override string DisplayName => "QQ Music";`
 - `NeteaseLyricsProvider.cs`: `public override string DisplayName => "Netease";`
 - `KugouLyricsProvider.cs`: `public override string DisplayName => "Kugou";`
+- `Hypersonic.Tests/Services/Lyrics/LyricsServiceTests.cs` — the `FakeLyricsProvider` fake (~:624) implements only `Id` + `FetchAsync`; add `public string DisplayName => "subsonic";` (any value) so it still satisfies `ILyricsProvider`. (No other test-side `ILyricsProvider` fake exists; the `FakeProvider` in the catalog test already declares `DisplayName`.)
 
 - [ ] **Step 5: Run to verify pass**
 
-Run: `dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~LyricsProviderRegistrationTests"`
-Expected: PASS.
+Run: `dotnet test Hypersonic.Tests/Hypersonic.Tests.csproj -p:Platform=x64`
+Expected: PASS (the new `LyricsProviderDisplayNameTests`, plus the whole app suite — which also confirms `FakeLyricsProvider` still compiles).
 
 - [ ] **Step 6: Commit**
 
@@ -944,7 +975,7 @@ git commit -m "feat(lyrics): add ILyricsSourceCatalog resolving provider id to d
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `NowPlayingViewModelTests.cs`. The existing tests construct the VM via its internal (synchronous) constructor — add a fake catalog to those call sites and cover the new state. Use a minimal fake:
+Append to `NowPlayingViewModelTests.cs`. The file builds the VM through two static `Build(...)` overloads (both call the internal synchronous ctor); Step 4 threads the catalog through them. Add a minimal fake (needs `using Hypersonic.Contracts.Services;`):
 
 ```csharp
 private sealed class FakeSourceCatalog : ILyricsSourceCatalog
@@ -957,7 +988,7 @@ private sealed class FakeSourceCatalog : ILyricsSourceCatalog
 [TestMethod]
 public void LyricsSource_LoadedWithKnownProvider_ExposesNameAndTooltip()
 {
-    var vm = CreateViewModel(); // fixture helper — pass the FakeSourceCatalog (see Step 3 ctor change)
+    var vm = Build(new FakePlaybackService(), _ => Task.FromResult<LyricsDocument?>(null)); // fixture helper; Step 4 wires FakeSourceCatalog into Build
     vm.CurrentLyrics = new LyricsDocument { SyncKind = LyricsSyncKind.Line, SourceProvider = "lrclib" };
     vm.LyricsLoadState = LyricsLoadState.Loaded;
 
@@ -969,7 +1000,7 @@ public void LyricsSource_LoadedWithKnownProvider_ExposesNameAndTooltip()
 [TestMethod]
 public void LyricsSource_Loading_IsHidden()
 {
-    var vm = CreateViewModel();
+    var vm = Build(new FakePlaybackService(), _ => Task.FromResult<LyricsDocument?>(null));
     vm.CurrentLyrics = new LyricsDocument { SyncKind = LyricsSyncKind.Line, SourceProvider = "lrclib" };
     vm.LyricsLoadState = LyricsLoadState.Loading;
     Assert.IsFalse(vm.HasLyricsSource);
@@ -979,7 +1010,7 @@ public void LyricsSource_Loading_IsHidden()
 [TestMethod]
 public void LyricsSource_UnknownProvider_IsHidden()
 {
-    var vm = CreateViewModel();
+    var vm = Build(new FakePlaybackService(), _ => Task.FromResult<LyricsDocument?>(null));
     vm.CurrentLyrics = new LyricsDocument { SyncKind = LyricsSyncKind.Word, SourceProvider = "ttml" };
     vm.LyricsLoadState = LyricsLoadState.Loaded;
     Assert.IsFalse(vm.HasLyricsSource); // unknown id (e.g. dev override) → nothing to attribute
@@ -993,12 +1024,14 @@ Expected: FAIL (build error — ctor arg + members missing).
 
 - [ ] **Step 3: Inject the catalog and add the derived properties**
 
-In `NowPlayingViewModel.cs`, add the field and constructor parameter (both the public and the internal test constructors):
+In `NowPlayingViewModel.cs`, add the field and constructor parameter to **both** constructors, positioned **immediately after `ILoggingService logService`**:
 
 ```csharp
     private readonly ILyricsSourceCatalog _sourceCatalog;
 ```
-Public ctor — add `ILyricsSourceCatalog sourceCatalog` and assign `_sourceCatalog = sourceCatalog;`. Internal ctor — same. (Add `using Hypersonic.Contracts.Services;` if needed.)
+- Public ctor: append `, ILyricsSourceCatalog sourceCatalog` after `ILoggingService logService`; assign `_sourceCatalog = sourceCatalog;`.
+- Internal ctor: insert `ILyricsSourceCatalog sourceCatalog` after `ILoggingService logService` and **before** `bool synchronous`; assign `_sourceCatalog = sourceCatalog;`.
+- Add `using Hypersonic.Contracts.Services;` if not already present.
 
 Add `[NotifyPropertyChangedFor]` to the two source `[ObservableProperty]` declarations so the computed getters re-raise:
 
@@ -1030,9 +1063,19 @@ Add the computed properties (e.g. below `EnableKaraokeWipe`):
     public string? LyricsSourceTooltip => HasLyricsSource ? $"Lyrics from {LyricsSourceName}" : null;
 ```
 
-- [ ] **Step 4: Update existing VM construction sites**
+- [ ] **Step 4: Thread the catalog through the test `Build(...)` helpers**
 
-Add a `FakeSourceCatalog` argument to every place the tests build a `NowPlayingViewModel` (and to the DI resolution in the real app — the container supplies `ILyricsSourceCatalog` automatically once Task 6 is registered, so only the test fixture helper `CreateViewModel` needs the new arg).
+`NowPlayingViewModelTests` builds the VM via two static `Build(...)` overloads (both call the internal ctor). Add `new FakeSourceCatalog()` to each, positioned after `new NullLoggingService()` and before `synchronous: true` (matching the internal ctor's new param order):
+
+```csharp
+private static NowPlayingViewModel Build(FakePlaybackService svc, Func<LyricsQuery, Task<LyricsDocument?>> handler, Action<Action>? enqueueOverride = null)
+    => new(svc, new FakeLyricsService(handler), Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
+
+private static NowPlayingViewModel Build(FakePlaybackService svc, FakeLyricsService service, Action<Action>? enqueueOverride = null)
+    => new(svc, service, Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
+```
+
+The real app needs no change — the DI container supplies `ILyricsSourceCatalog` automatically once Task 6 registered it.
 
 - [ ] **Step 5: Run to verify pass**
 
@@ -1119,8 +1162,10 @@ git commit -m "feat(lyrics): show lyrics source info glyph on Now Playing"
 - Cache column rename + `v2` discard migration → Task 4.
 - `ILyricsProvider.DisplayName` → Task 5. Catalog → Task 6. VM derived props → Task 7. Info glyph → Task 8.
 
-**Placeholder scan** — no TBD/TODO; new code is complete; test-update steps name exact files + the exact assertion transformation. The one deliberately-open item (`SubsonicStructured` naming) was resolved with the user (kept).
+**Placeholder scan** — no TBD/TODO; new code is complete. Step 3.13 is an exhaustive per-file test-update list (derived from a full missed-caller audit). The `SubsonicStructured` naming was resolved with the user (kept).
 
 **Type consistency** — `LyricsFormat` member names are identical across Tasks 1/3/4/7; `Format` (not `FormatTag`/`PayloadFormat`) is used uniformly after Task 3; `WithSourceProvider` (Task 2) is the exact helper called by providers in Task 3.8; `DisplayNameFor` (Task 6) is the exact method used in Task 7.
 
 **Known atomicity note:** Task 3 is a single non-splittable compile unit (interface/model signature changes ripple through all implementors at once). Intermediate builds fail by design; only Step 3.15 must be green.
+
+**Post-review revisions (Opus review pass):** exhaustive Step 3.13 now covers `LyricsCacheFormatTests`, `LyricsServiceTests` (`ExtensionForFormat`/`PayloadFormat` seeds/`StubRegistry`/`_legacyParser`), `LrcLibLyricsProviderTests`, `LyricifyLyricsProviderTests`, the `FormatTag_Is*` parser tests, `LyricsParserRegistryTests` (`FakeParser` + `Parse_UnregisteredFormat` redesign), and `LyricsProviderRegistrationTests` (moved into Task 3 — it referenced the deleted `NeteaseLrcLyricsParser`). Task 5 adds `FakeLyricsProvider.DisplayName` and constructs providers directly (the assumed `ResolveProviders()` helper did not exist and wired only the CN trio). Task 7 uses the real `Build(...)` overloads (not the non-existent `CreateViewModel()`). Task 4's migration test uses the real fixture (`_cacheRoot`/`CreateStore()`). The `LyricsProviderResult` ctor placeholder was replaced with real code.
