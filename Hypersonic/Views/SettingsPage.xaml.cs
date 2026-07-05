@@ -23,6 +23,11 @@ public sealed partial class SettingsPage : Page
         get;
     }
 
+    public LyricsSettingsViewModel LyricsViewModel
+    {
+        get;
+    }
+
     /// <summary>
     /// Filtered list of font families shown in the UI font picker's autosuggest
     /// dropdown. Updated on each <see cref="TokenizingTextBox.TextChanged"/>.
@@ -38,6 +43,7 @@ public sealed partial class SettingsPage : Page
     public SettingsPage()
     {
         ViewModel = App.GetService<SettingsViewModel>();
+        LyricsViewModel = App.GetService<LyricsSettingsViewModel>();
         _fontCatalog = App.GetService<ISystemFontCatalog>();
         InitializeComponent();
 
@@ -52,6 +58,11 @@ public sealed partial class SettingsPage : Page
         ApplyResetButtonAccessibility(ResetUiFontsButton);
         ApplyResetButtonAccessibility(ResetLyricsFontsButton);
         ApplyResetButtonAccessibility(ResetUiScaleButton);
+        ApplyResetButtonAccessibility(ResetLyricsProvidersButton);
+        ApplyResetButtonAccessibility(ResetLyricsAutoLoadButton);
+        ApplyResetButtonAccessibility(ResetLyricsManualRefreshButton);
+
+        _ = LyricsViewModel.InitializeAsync();
     }
 
     private static void ApplyResetButtonAccessibility(Button button)

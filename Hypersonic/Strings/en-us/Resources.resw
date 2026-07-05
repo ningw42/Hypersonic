@@ -348,4 +348,25 @@
   <data name="Settings_ResetTooltip" xml:space="preserve">
     <value>Reset to default</value>
   </data>
+  <data name="Settings_Lyrics.Text" xml:space="preserve">
+    <value>Lyrics</value>
+  </data>
+  <data name="Settings_LyricsProvidersCard.Header" xml:space="preserve">
+    <value>Providers</value>
+  </data>
+  <data name="Settings_LyricsProvidersCard.Description" xml:space="preserve">
+    <value>Drag to set priority. The best-synced result wins; order breaks ties. Unchecked sources are skipped.</value>
+  </data>
+  <data name="Settings_LyricsExpander.Header" xml:space="preserve">
+    <value>Providers &amp; timing</value>
+  </data>
+  <data name="Settings_LyricsDisabledHeader.Text" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="Settings_LyricsAutoLoadCard.Header" xml:space="preserve">
+    <value>Auto-load wait</value>
+  </data>
+  <data name="Settings_LyricsManualRefreshCard.Header" xml:space="preserve">
+    <value>Manual refresh wait</value>
+  </data>
 </root>

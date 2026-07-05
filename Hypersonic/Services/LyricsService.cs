@@ -28,7 +28,8 @@ public sealed class LyricsService : ILyricsService, IDisposable
     private readonly ILyricsParserRegistry _parserRegistry;
     private readonly ILocalLyricsOverrideSource? _overrideSource;
     private readonly LyricsCacheOptions _options;
-    private readonly LyricsOrchestrationOptions _orchestrationOptions;
+    private readonly ILyricsPreferences _preferences;
+    private readonly Dictionary<string, ILyricsProvider> _providersById;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _log;
     private readonly CancellationTokenSource _disposeCts = new();
@@ -41,7 +42,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
         ILyricsCacheStore store,
         ILyricsParserRegistry parserRegistry,
         IOptions<LyricsCacheOptions> options,
-        IOptions<LyricsOrchestrationOptions> orchestrationOptions,
+        ILyricsPreferences preferences,
         TimeProvider timeProvider,
         ILoggingService logService,
         ILocalLyricsOverrideSource? overrideSource = null)
@@ -52,7 +53,8 @@ public sealed class LyricsService : ILyricsService, IDisposable
         _parserRegistry = parserRegistry;
         _overrideSource = overrideSource;
         _options = options.Value;
-        _orchestrationOptions = orchestrationOptions.Value;
+        _preferences = preferences;
+        _providersById = _providers.ToDictionary(p => p.Id, StringComparer.Ordinal);
         _timeProvider = timeProvider;
         _log = logService.GetLogger(nameof(LyricsService));
     }
@@ -75,6 +77,9 @@ public sealed class LyricsService : ILyricsService, IDisposable
 
         try
         {
+            await _preferences.EnsureLoadedAsync(token).ConfigureAwait(false);
+            var preferences = _preferences.GetSnapshot();
+
             // Local override wins outright (Phase 2 §3.8): a sideloaded <songId>.ttml takes hard
             // precedence over the cache and every provider — bypassing the cache read, the fan-out, and
             // any cache write. Absent → fall through to the unchanged cache → fan-out path. The check is
@@ -107,16 +112,15 @@ public sealed class LyricsService : ILyricsService, IDisposable
                 return null;
             }
 
-            var defaultBudgetMs = _orchestrationOptions.DefaultFanOutBudgetMs > 0 ? _orchestrationOptions.DefaultFanOutBudgetMs : 700;
-            var resolvedBudget = budget ?? TimeSpan.FromMilliseconds(defaultBudgetMs);
+            var resolvedBudget = budget ?? preferences.AutoLoadBudget;
             if (resolvedBudget < TimeSpan.Zero)
             {
                 // A caller-supplied negative budget (incl. the -1ms "infinite" sentinel) would throw in Task.Delay
-                // or disable truncation — fall back to the default wait window.
-                resolvedBudget = TimeSpan.FromMilliseconds(defaultBudgetMs);
+                // or disable truncation — fall back to the preferred wait window.
+                resolvedBudget = preferences.AutoLoadBudget;
             }
 
-            var fetchTask = _inFlightFetches.GetOrAdd(keyHash, _ => CreateInFlightFetchTask(query, keyHash, resolvedBudget));
+            var fetchTask = _inFlightFetches.GetOrAdd(keyHash, _ => CreateInFlightFetchTask(query, keyHash, resolvedBudget, preferences));
             return await fetchTask.WaitAsync(token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (IsDisposed)
@@ -185,9 +189,9 @@ public sealed class LyricsService : ILyricsService, IDisposable
         _disposeCts.Dispose();
     }
 
-    private Task<LyricsDocument?> CreateInFlightFetchTask(LyricsQuery query, string keyHash, TimeSpan budget)
+    private Task<LyricsDocument?> CreateInFlightFetchTask(LyricsQuery query, string keyHash, TimeSpan budget, LyricsPreferencesSnapshot preferences)
     {
-        var task = FetchAndStoreAsync(query, keyHash, budget, GetDisposeToken());
+        var task = FetchAndStoreAsync(query, keyHash, budget, preferences, GetDisposeToken());
         _ = task.ContinueWith(
             completed => _inFlightFetches.TryRemove(new KeyValuePair<string, Task<LyricsDocument?>>(keyHash, completed)),
             CancellationToken.None,
@@ -197,7 +201,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
         return task;
     }
 
-    private async Task<LyricsDocument?> FetchAndStoreAsync(LyricsQuery query, string keyHash, TimeSpan budget, CancellationToken cancellationToken)
+    private async Task<LyricsDocument?> FetchAndStoreAsync(LyricsQuery query, string keyHash, TimeSpan budget, LyricsPreferencesSnapshot preferences, CancellationToken cancellationToken)
     {
         // Yield so this task never completes synchronously inside the GetOrAdd factory — otherwise the
         // in-flight removal continuation could run before the entry is added, stranding a completed task
@@ -209,7 +213,8 @@ public sealed class LyricsService : ILyricsService, IDisposable
             return null;
         }
 
-        var (completed, anyTruncated) = await RunFanOutAsync(query, budget, cancellationToken).ConfigureAwait(false);
+        var activeProviders = BuildActiveProviders(preferences);
+        var (completed, anyTruncated) = await RunFanOutAsync(query, activeProviders, budget, cancellationToken).ConfigureAwait(false);
 
         if (cancellationToken.IsCancellationRequested || IsDisposed)
         {
@@ -222,7 +227,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
             // Eager-pin the winner at full TTL even if a peer was truncated.
             LyricsCacheAction.WritePositive => await WritePositiveAsync(keyHash, decision.Winner!, cancellationToken).ConfigureAwait(false),
             // Suppress the negative write when a peer was truncated/incomplete (it might have had content).
-            LyricsCacheAction.WriteNegative when !anyTruncated => await WriteNegativeAsync(keyHash, cancellationToken).ConfigureAwait(false),
+            LyricsCacheAction.WriteNegative when !anyTruncated => await WriteNegativeAsync(keyHash, activeProviders, cancellationToken).ConfigureAwait(false),
             LyricsCacheAction.WriteNegative => LyricsDocument.Empty(), // show "no lyrics" this attempt, do not pin
             _ when decision.Winner is not null => decision.Winner.Document, // non-definitive content: shown, not cached
             _ => (await TryReadCacheAsync(keyHash, allowStale: true, cancellationToken).ConfigureAwait(false)).Document,
@@ -230,16 +235,36 @@ public sealed class LyricsService : ILyricsService, IDisposable
     }
 
     /// <summary>
+    /// Projects the enabled/priority snapshot onto the registered provider instances: the returned array
+    /// contains only enabled providers (a disabled provider is never fetched), in preference order (which
+    /// then feeds the fallback policy's equal-tier tiebreak) — not DI registration order.
+    /// </summary>
+    private ILyricsProvider[] BuildActiveProviders(LyricsPreferencesSnapshot preferences)
+    {
+        var ids = preferences.EnabledProviderIds;
+        var active = new List<ILyricsProvider>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (_providersById.TryGetValue(id, out var provider))
+            {
+                active.Add(provider);
+            }
+        }
+
+        return active.ToArray();
+    }
+
+    /// <summary>
     /// Fires all providers concurrently under one linked CTS, bounded by <paramref name="budget"/>.
     /// Decides the moment all providers complete; if the budget elapses first, cancels the stragglers
     /// and decides on what completed. The returned list is
-    /// ordered by provider precedence (registration order), NOT completion order — load-bearing for the
+    /// ordered by provider precedence (preference order), NOT completion order — load-bearing for the
     /// policy's equal-tier tiebreak. <c>anyTruncated</c> is "any provider slot unfilled at decision time".
     /// </summary>
     private async Task<(IReadOnlyList<LyricsProviderResult> Completed, bool AnyTruncated)> RunFanOutAsync(
-        LyricsQuery query, TimeSpan budget, CancellationToken cancellationToken)
+        LyricsQuery query, ILyricsProvider[] providers, TimeSpan budget, CancellationToken cancellationToken)
     {
-        var n = _providers.Length;
+        var n = providers.Length;
         if (n == 0)
         {
             return (Array.Empty<LyricsProviderResult>(), false);
@@ -301,7 +326,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
             LyricsProviderResult? result = null;
             try
             {
-                result = await _providers[idx].FetchAsync(query, token).ConfigureAwait(false);
+                result = await providers[idx].FetchAsync(query, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -309,7 +334,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
             }
             catch (Exception ex)
             {
-                _log.Warning("Lyrics provider threw; treating as transient", new { _providers[idx].Id, query.SongId }, ex);
+                _log.Warning("Lyrics provider threw; treating as transient", new { providers[idx].Id, query.SongId }, ex);
                 result = LyricsProviderResult.Transient;
             }
 
@@ -362,7 +387,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
         }
     }
 
-    private async Task<LyricsDocument?> WriteNegativeAsync(string keyHash, CancellationToken cancellationToken)
+    private async Task<LyricsDocument?> WriteNegativeAsync(string keyHash, ILyricsProvider[] activeProviders, CancellationToken cancellationToken)
     {
         try
         {
@@ -373,7 +398,7 @@ public sealed class LyricsService : ILyricsService, IDisposable
             {
                 FileName = string.Empty,
                 Length = 0,
-                SourceProvider = _providers.Length > 0 ? _providers[0].Id : string.Empty,
+                SourceProvider = activeProviders.Length > 0 ? activeProviders[0].Id : string.Empty,
                 Format = LyricsFormat.Unknown,
                 SyncKind = LyricsSyncKind.None,
                 LanguageCode = null,

@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:vm="using:Hypersonic.ViewModels"
     mc:Ignorable="d">
     <Page.Resources>
         <!-- Kill the 8px reserved Header area at the top of TokenizingTextBox.
@@ -209,6 +210,128 @@
                             </Button>
                         </StackPanel>
                     </controls:SettingsCard>
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
+
+            <!-- Lyrics -->
+            <TextBlock x:Uid="Settings_Lyrics"
+                       Style="{ThemeResource SubtitleTextBlockStyle}"
+                       Margin="{StaticResource MediumTopMargin}" />
+
+            <controls:SettingsExpander
+                x:Uid="Settings_LyricsExpander"
+                Margin="{StaticResource XSmallTopMargin}"
+                IsExpanded="True">
+                <controls:SettingsExpander.HeaderIcon>
+                    <FontIcon Glyph="&#xE8D6;" />
+                </controls:SettingsExpander.HeaderIcon>
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard
+                        x:Uid="Settings_LyricsProvidersCard"
+                        ContentAlignment="Vertical">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <ListView
+                            x:Name="EnabledProvidersList"
+                            ItemsSource="{x:Bind LyricsViewModel.EnabledProviders, Mode=OneWay}"
+                            SelectionMode="None"
+                            CanReorderItems="True"
+                            AllowDrop="True"
+                            ReorderMode="Enabled">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Padding" Value="4,2" />
+                                    <Setter Property="MinHeight" Value="0" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LyricsProviderItem">
+                                    <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+                                        <FontIcon Grid.Column="0" Glyph="&#xE76F;" FontSize="14" Opacity="0.6" VerticalAlignment="Center" />
+                                        <CheckBox Grid.Column="1"
+                                                  MinWidth="0"
+                                                  IsChecked="{x:Bind IsEnabled, Mode=TwoWay}"
+                                                  IsEnabled="{x:Bind CanToggle, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind DisplayName}" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <TextBlock x:Uid="Settings_LyricsDisabledHeader"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                   Margin="4,4,0,0"
+                                   Visibility="{x:Bind LyricsViewModel.ShowDisabledDivider, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <ItemsControl ItemsSource="{x:Bind LyricsViewModel.DisabledProviders, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LyricsProviderItem">
+                                    <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10" Padding="4,4" Opacity="0.5">
+                                        <FontIcon Grid.Column="0" Glyph="&#xE76F;" FontSize="14" Opacity="0" VerticalAlignment="Center" />
+                                        <CheckBox Grid.Column="1"
+                                                  MinWidth="0"
+                                                  IsChecked="{x:Bind IsEnabled, Mode=TwoWay}"
+                                                  IsEnabled="{x:Bind CanToggle, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind DisplayName}" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <Button
+                        Grid.Column="1"
+                        x:Name="ResetLyricsProvidersButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Command="{x:Bind LyricsViewModel.ResetProvidersCommand}"
+                        VerticalAlignment="Top"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        MinHeight="0"
+                        MinWidth="32"
+                        Width="32"
+                        Height="32"
+                        Padding="0">
+                        <FontIcon Glyph="&#xE777;" FontSize="14" />
+                    </Button>
+                </Grid>
+            </controls:SettingsCard>
+
+            <controls:SettingsCard
+                x:Uid="Settings_LyricsAutoLoadCard"
+                Description="{x:Bind LyricsViewModel.AutoLoadText, Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Slider Minimum="0.3" Maximum="3.0" StepFrequency="0.1"
+                            Value="{x:Bind LyricsViewModel.AutoLoadSeconds, Mode=TwoWay}"
+                            Width="200" />
+                    <Button
+                        x:Name="ResetLyricsAutoLoadButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Command="{x:Bind LyricsViewModel.ResetAutoLoadCommand}"
+                        MinWidth="32" Width="32" Height="32" Padding="0">
+                        <FontIcon Glyph="&#xE777;" FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </controls:SettingsCard>
+
+            <controls:SettingsCard
+                x:Uid="Settings_LyricsManualRefreshCard"
+                Description="{x:Bind LyricsViewModel.ManualRefreshText, Mode=OneWay}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Slider Minimum="1.0" Maximum="15.0" StepFrequency="0.5"
+                            Value="{x:Bind LyricsViewModel.ManualRefreshSeconds, Mode=TwoWay}"
+                            Width="200" />
+                    <Button
+                        x:Name="ResetLyricsManualRefreshButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Command="{x:Bind LyricsViewModel.ResetManualRefreshCommand}"
+                        MinWidth="32" Width="32" Height="32" Padding="0">
+                        <FontIcon Glyph="&#xE777;" FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </controls:SettingsCard>
+
                 </controls:SettingsExpander.Items>
             </controls:SettingsExpander>
 

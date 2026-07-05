@@ -48,13 +48,19 @@ public class LyricsServiceTests
     {
         cacheOptions ??= new LyricsCacheOptions();
         orchestration ??= new LyricsOrchestrationOptions();
+        var prefs = new FakeLyricsPreferences
+        {
+            EnabledProviderIds = providers.Select(p => p.Id).ToArray(),
+            AutoLoadBudget = TimeSpan.FromMilliseconds(orchestration.DefaultFanOutBudgetMs),
+            ManualRefreshBudget = TimeSpan.FromMilliseconds(orchestration.ManualRefreshBudgetMs),
+        };
         return new LyricsService(
             _clientService,
             providers,
             _store,
             _registry,
             Options.Create(cacheOptions),
-            Options.Create(orchestration),
+            prefs,
             _time,
             new NullLoggingService());
     }
@@ -252,7 +258,7 @@ public class LyricsServiceTests
         });
         var service = new LyricsService(
             _clientService, Array.Empty<ILyricsProvider>(), _store, registry,
-            Options.Create(new LyricsCacheOptions()), Options.Create(new LyricsOrchestrationOptions()), _time, new NullLoggingService());
+            Options.Create(new LyricsCacheOptions()), new FakeLyricsPreferences(), _time, new NullLoggingService());
 
         var doc = await service.GetLyricsAsync(Query);
 
@@ -293,7 +299,7 @@ public class LyricsServiceTests
         });
         var service = new LyricsService(
             _clientService, Array.Empty<ILyricsProvider>(), _store, registry,
-            Options.Create(new LyricsCacheOptions()), Options.Create(new LyricsOrchestrationOptions()), _time, new NullLoggingService());
+            Options.Create(new LyricsCacheOptions()), new FakeLyricsPreferences(), _time, new NullLoggingService());
 
         var doc = await service.GetLyricsAsync(Query);
 
@@ -531,6 +537,53 @@ public class LyricsServiceTests
     }
 
     [TestMethod]
+    public async Task FanOut_DisabledProvider_IsNotFetched()
+    {
+        var subsonic = new FakeLyricsProvider(_ => PlainContent("subsonic")) { Id = "subsonic" };
+        var lrclib = new FakeLyricsProvider(_ => LineContent("lrclib")) { Id = "lrclib" };
+        var prefs = new FakeLyricsPreferences { EnabledProviderIds = ["lrclib"] }; // subsonic disabled
+        var service = new LyricsService(
+            _clientService, new ILyricsProvider[] { subsonic, lrclib }, _store, _registry,
+            Options.Create(new LyricsCacheOptions()), prefs, _time, new NullLoggingService());
+
+        var doc = await service.GetLyricsAsync(Query);
+
+        Assert.AreEqual("lrclib", doc!.SourceProvider);
+        Assert.AreEqual(0, subsonic.CallCount, "a disabled provider is never fetched");
+        Assert.AreEqual(1, lrclib.CallCount);
+    }
+
+    [TestMethod]
+    public async Task FanOut_Order_FollowsPreferences_NotRegistration()
+    {
+        // Equal tier → the earliest in preference order wins the tiebreak.
+        var subsonic = new FakeLyricsProvider(_ => LineContent("subsonic")) { Id = "subsonic" };
+        var lrclib = new FakeLyricsProvider(_ => LineContent("lrclib")) { Id = "lrclib" };
+        var prefs = new FakeLyricsPreferences { EnabledProviderIds = ["lrclib", "subsonic"] }; // lrclib first
+        var service = new LyricsService(
+            _clientService, new ILyricsProvider[] { subsonic, lrclib }, _store, _registry,
+            Options.Create(new LyricsCacheOptions()), prefs, _time, new NullLoggingService());
+
+        var doc = await service.GetLyricsAsync(Query);
+
+        Assert.AreEqual("lrclib", doc!.SourceProvider, "preference order decides the equal-tier tiebreak");
+    }
+
+    [TestMethod]
+    public async Task GetLyrics_AwaitsPreferencesLoad()
+    {
+        var provider = new FakeLyricsProvider(_ => LegacyContent("x")) { Id = "subsonic" };
+        var prefs = new FakeLyricsPreferences { EnabledProviderIds = ["subsonic"] };
+        var service = new LyricsService(
+            _clientService, new ILyricsProvider[] { provider }, _store, _registry,
+            Options.Create(new LyricsCacheOptions()), prefs, _time, new NullLoggingService());
+
+        await service.GetLyricsAsync(Query);
+
+        Assert.IsTrue(prefs.EnsureLoadedCount >= 1, "the service ensures preferences are loaded before fetching");
+    }
+
+    [TestMethod]
     public void ExtensionForFormat_Ttml_MapsToTtml()
         => Assert.AreEqual(".ttml", LyricsService.ExtensionForFormat(LyricsFormat.Ttml));
 
@@ -596,7 +649,7 @@ public class LyricsServiceTests
             _store,
             _registry,
             Options.Create(new LyricsCacheOptions()),
-            Options.Create(new LyricsOrchestrationOptions()),
+            new FakeLyricsPreferences { EnabledProviderIds = providers.Select(p => p.Id).ToArray() },
             _time,
             new NullLoggingService(),
             overrideSource);

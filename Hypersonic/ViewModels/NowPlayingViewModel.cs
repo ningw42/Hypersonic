@@ -7,9 +7,7 @@ using Hypersonic.Core.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Helpers;
-using Hypersonic.Models;
 
-using Microsoft.Extensions.Options;
 using Microsoft.UI.Dispatching;
 
 namespace Hypersonic.ViewModels;
@@ -25,7 +23,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
 {
     private readonly IReadOnlyPlaybackState _playbackService;
     private readonly ILyricsService _lyricsService;
-    private readonly LyricsOrchestrationOptions _orchestrationOptions;
+    private readonly ILyricsPreferences _preferences;
     private readonly ILogger _log;
     private readonly ILyricsSourceCatalog _sourceCatalog;
     private readonly DispatcherQueue? _vmDispatcher;
@@ -84,13 +82,13 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     public NowPlayingViewModel(
         IReadOnlyPlaybackState playbackService,
         ILyricsService lyricsService,
-        IOptions<LyricsOrchestrationOptions> orchestrationOptions,
+        ILyricsPreferences preferences,
         ILoggingService logService,
         ILyricsSourceCatalog sourceCatalog)
     {
         _playbackService = playbackService;
         _lyricsService = lyricsService;
-        _orchestrationOptions = orchestrationOptions.Value;
+        _preferences = preferences;
         _log = logService.GetLogger(nameof(NowPlayingViewModel));
         _sourceCatalog = sourceCatalog;
         _vmDispatcher = DispatcherQueue.GetForCurrentThread();
@@ -101,7 +99,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     internal NowPlayingViewModel(
         IReadOnlyPlaybackState playbackService,
         ILyricsService lyricsService,
-        IOptions<LyricsOrchestrationOptions> orchestrationOptions,
+        ILyricsPreferences preferences,
         ILoggingService logService,
         ILyricsSourceCatalog sourceCatalog,
         bool synchronous,
@@ -109,7 +107,7 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
     {
         _playbackService = playbackService;
         _lyricsService = lyricsService;
-        _orchestrationOptions = orchestrationOptions.Value;
+        _preferences = preferences;
         _log = logService.GetLogger(nameof(NowPlayingViewModel));
         _sourceCatalog = sourceCatalog;
         _vmDispatcher = null;
@@ -237,7 +235,8 @@ public partial class NowPlayingViewModel : ObservableRecipient, INavigationAware
         }
 
         var generation = Interlocked.Increment(ref _lyricsGeneration);
-        var budget = TimeSpan.FromMilliseconds(_orchestrationOptions.ManualRefreshBudgetMs);
+        await _preferences.EnsureLoadedAsync(CancellationToken.None);
+        var budget = _preferences.ManualRefreshBudget;
 
         try
         {

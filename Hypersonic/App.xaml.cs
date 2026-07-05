@@ -147,6 +147,7 @@ public partial class App : Application
             services.Configure<KugouLyricsOptions>(_ => { });
             // Local override source (NOT a fan-out provider): LyricsService consults it ahead of the cache.
             services.AddSingleton<ILocalLyricsOverrideSource, LocalFileLyricsSource>();
+            services.AddSingleton<ILyricsPreferences, LyricsPreferences>();
             services.AddSingleton<ILyricsService, LyricsService>();
             services.AddSingleton<ILyricsSourceCatalog, LyricsSourceCatalog>();
 
@@ -188,6 +189,7 @@ public partial class App : Application
             // Views and ViewModels
             services.AddSingleton<PlayerViewModel>();
             services.AddTransient<SettingsViewModel>();
+            services.AddTransient<LyricsSettingsViewModel>();
             services.AddTransient<SettingsPage>();
             services.AddTransient<MainViewModel>();
             services.AddTransient<MainPage>();

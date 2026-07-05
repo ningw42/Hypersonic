@@ -2,11 +2,8 @@ using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Models;
 using Hypersonic.Core.Models.Lyrics;
 using Hypersonic.Helpers;
-using Hypersonic.Models;
 using Hypersonic.Tests.Fakes;
 using Hypersonic.ViewModels;
-
-using Microsoft.Extensions.Options;
 
 namespace Hypersonic.Tests.ViewModels;
 
@@ -62,14 +59,17 @@ public class NowPlayingViewModelTests
         public string? DisplayNameFor(string? id) => id switch { "lrclib" => "LrcLib", _ => null };
     }
 
-    private static readonly IOptions<LyricsOrchestrationOptions> Opts =
-        Options.Create(new LyricsOrchestrationOptions());
+    private static readonly FakeLyricsPreferences Prefs = new()
+    {
+        AutoLoadBudget = TimeSpan.FromMilliseconds(700),
+        ManualRefreshBudget = TimeSpan.FromMilliseconds(5000),
+    };
 
     private static NowPlayingViewModel Build(FakePlaybackService svc, Func<LyricsQuery, Task<LyricsDocument?>> handler, Action<Action>? enqueueOverride = null)
-        => new(svc, new FakeLyricsService(handler), Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
+        => new(svc, new FakeLyricsService(handler), Prefs, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
 
     private static NowPlayingViewModel Build(FakePlaybackService svc, FakeLyricsService service, Action<Action>? enqueueOverride = null)
-        => new(svc, service, Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
+        => new(svc, service, Prefs, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
 
     [TestMethod]
     public async Task NullTrack_OnNavigatedTo_LandsOnNoTrack()
@@ -246,7 +246,7 @@ public class NowPlayingViewModelTests
         var captured = new Queue<Action>();
         var service = new FakeLyricsService(_ => Task.FromResult<LyricsDocument?>(LineDoc("x")));
         var svc = new FakePlaybackService { NowPlaying = T("a") };
-        var vm = new NowPlayingViewModel(svc, service, Opts, new NullLoggingService(), new FakeSourceCatalog(), synchronous: false, enqueueOverride: a => captured.Enqueue(a));
+        var vm = new NowPlayingViewModel(svc, service, Prefs, new NullLoggingService(), new FakeSourceCatalog(), synchronous: false, enqueueOverride: a => captured.Enqueue(a));
 
         vm.OnNavigatedTo(null!);
         if (vm.PendingLyricsFetch != null) await vm.PendingLyricsFetch;
@@ -378,7 +378,7 @@ public class NowPlayingViewModelTests
         await vm.RefreshLyricsCommand.ExecuteAsync(null);
 
         Assert.IsTrue(service.LastForceRefresh);
-        Assert.AreEqual(TimeSpan.FromMilliseconds(new LyricsOrchestrationOptions().ManualRefreshBudgetMs), service.LastBudget);
+        Assert.AreEqual(Prefs.ManualRefreshBudget, service.LastBudget);
         Assert.AreEqual("fresh", vm.CurrentLyrics!.Lines[0].Text);
     }
 
