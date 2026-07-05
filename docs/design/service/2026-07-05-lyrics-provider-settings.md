@@ -76,12 +76,12 @@ Until loaded, the service reports built-in defaults, so nothing ever reads unini
 The registered provider set can grow or shrink across app versions. On load, the pure reconcile function:
 
 1. Keeps persisted entries whose `Id` is **still registered**, in their saved order.
-2. **Appends** any registered provider absent from the persisted list at the end, **enabled** (a newly-shipped source is on by default, lowest priority).
+2. **Appends** any registered provider absent from the persisted list **at the end of the enabled run**, **enabled** (a newly-shipped source is on by default, lowest enabled priority).
 3. **Drops** persisted ids that no longer resolve to a registered provider.
 4. Enforces the **at-least-one-enabled invariant** — if reconciliation leaves zero enabled, it enables the first entry.
 5. **Clamps** each budget to its allowed range; a missing or out-of-range value falls back to the default.
 
-First run (no persisted state): every provider enabled, registration order, default budgets.
+First run (no persisted state): every provider enabled, in the **explicit canonical default order** (§Order is enabled-first), default budgets.
 
 ### At least one provider stays enabled — enforced at the edit, not just at load
 
@@ -97,14 +97,20 @@ The sliders expose **seconds**; the service stores and serves **milliseconds** (
 
 A disabled provider is skipped in fan-out, but **already-cached lyrics keep serving** — the cache is keyed by song and is source-agnostic (`LyricsService` reads the cache before any fan-out). A user who disables a source and wants its cached result gone hits the existing **manual refresh**, which re-runs the fan-out under the new enabled set and overwrites the entry. No cache sweep on toggle; no new invalidation surface.
 
+### Order is enabled-first, and "default" is an explicit constant
+
+The snapshot's ordered list keeps **all enabled entries first (in priority order), then all disabled** — the fan-out takes the leading enabled run. Toggling moves an entry across that boundary (disable → sink to the end; re-enable → join the end of the enabled run); dragging reorders only within the enabled run. The UI renders this as two stacked groups (§Settings UI).
+
+The **default order** is a canonical constant pinned in code — `Subsonic → LrcLib → AMLL → QQ → NetEase → Kugou` — **not** DI registration order. It matches today's registration order, but pinning it explicitly gives the inline resets and first-run seeding a stable, intentional meaning that can't silently drift if the DI registrations are reordered later.
+
 ---
 
 ## Contracts (conceptual)
 
 - **`ILyricsPreferences`**
   - `Task EnsureLoadedAsync(ct)` — idempotent load + reconcile.
-  - Reads (valid after load, synchronous): the **ordered enabled provider ids** (what `LyricsService` fans out over), `AutoLoadBudget` / `ManualRefreshBudget` (`TimeSpan`), and a **display list** of `(Id, DisplayName, Enabled)` for the UI.
-  - Mutations: `SetEnabled(id, enabled)`, `Reorder(orderedIds)`, `SetAutoLoadBudget`, `SetManualRefreshBudget` — each rebuilds and swaps the snapshot, then persists. Toggle/reorder persist immediately; slider writes are debounced (the existing `QueueFontSettingSave` serialized-write idiom).
+  - Reads (valid after load, synchronous): the **ordered enabled provider ids** (what `LyricsService` fans out over), `AutoLoadBudget` / `ManualRefreshBudget` (`TimeSpan`), and the reconciled **display list** of `(Id, DisplayName, Enabled)` in enabled-first order (the VM splits it into its enabled/disabled collections).
+  - Mutations: `SetEnabled(id, enabled)` (moves the entry across the enabled/disabled boundary — see §Order is enabled-first), `Reorder(orderedEnabledIds)` (within the enabled run), `SetAutoLoadBudget`, `SetManualRefreshBudget`, and `ResetProviders()` (→ all enabled in the default-order constant). Each rebuilds and swaps the snapshot, then persists. Toggle / reorder / reset persist immediately; slider writes are debounced (the existing `QueueFontSettingSave` serialized-write idiom). The two slider resets reuse the setters with the default values.
 - **Persisted state object** — a small record `{ Providers: [{ Id, Enabled }], AutoLoadBudgetMs, ManualRefreshBudgetMs }` (in `Hypersonic.Core`), stored under a single `ILocalSettingsService` key `"LyricsPreferences"`. One key = one atomic write, and the reconcile function is its only reader/validator. Absent key → reconcile produces the first-run defaults; no migration.
 - **`LyricsService`** — unchanged public contract. Internally, `RunFanOutAsync` builds its working array by projecting the injected `ILyricsProvider` instances through the snapshot's ordered-enabled id list (preserving "ordered by precedence" for the tiebreak); the resolved auto budget comes from the preferences service.
 - **`NowPlayingViewModel`** — unchanged public contract; the refresh command's budget now comes from `ILyricsPreferences.ManualRefreshBudget`.
@@ -113,13 +119,18 @@ A disabled provider is skipped in fan-out, but **already-cached lyrics keep serv
 
 ## Settings UI — a new "Lyrics" section
 
-A `SettingsExpander` matching the Scrobbling/Fonts sections, containing three cards:
+A `SettingsExpander` matching the Scrobbling/Fonts sections. **Each of the three controls owns an inline reset icon**, mirroring the UI-Fonts / Lyrics-Fonts / UI-Scale reset buttons already on this page (`SubtleButtonStyle`, 32 px, glyph `E777`, `CanReset…`-gated) — there is no section-wide reset.
 
-- **Provider list** — a `SettingsCard` (`ContentAlignment="Vertical"`) wrapping a reorderable `ListView` (`CanReorderItems` / `AllowDrop` / `ReorderMode`) bound to `ObservableCollection<LyricsProviderItem>`. Each row: a `CheckBox` (two-way to `IsEnabled`), the provider `DisplayName`, and a drag-handle glyph. A drag reorders the bound collection and raises `CollectionChanged (Move)` → the VM calls `Reorder` (the font-list `CollectionChanged`-driven save pattern, already in this VM).
-- **Two budget sliders** — each a `SettingsCard` with a `Slider` in seconds and a live value readout in the card `Description` (the scrobble-percentage-slider idiom).
-- **Reset to defaults** — a button mirroring the existing Reset buttons (re-enables all, restores registration order and default budgets).
+- **Provider list** — a `SettingsCard` (`ContentAlignment="Vertical"`) rendering the providers as **two stacked groups**:
+  - **Enabled group** — a reorderable `ListView` (`CanReorderItems` / `AllowDrop` / `ReorderMode`) bound to `ObservableCollection<LyricsProviderItem> EnabledProviders`, in priority order. Each row: a **grip glyph** (drag affordance), a `CheckBox`, and the provider `DisplayName`. A drag raises `CollectionChanged (Move)` → the VM calls `Reorder` (the font-list `CollectionChanged`-save idiom).
+  - a **"Disabled" divider**, shown only when the disabled group is non-empty.
+  - **Disabled group** — a non-reorderable list bound to `DisabledProviders`, rendered grayed, grip omitted (toggle only).
+  - an inline **reset icon** on the list → all enabled, default-order constant (`ResetProviders`).
+- **Two budget sliders** — each a `SettingsCard` with a `Slider` in seconds, a live value readout in the card `Description`, and its own inline reset icon (→ 0.7 s / 5.0 s).
 
-`LyricsProviderItem : ObservableObject { Id; DisplayName; IsEnabled; CanDisable }`. The **at-least-one-enabled** rule is expressed by binding each `CheckBox.IsEnabled` to `item.CanDisable`; the VM recomputes `CanDisable = enabledCount > 1` for every item whenever the enabled count changes, so the sole remaining enabled provider's checkbox locks. The VM projects the preferences display list into items in an async initializer (awaiting `EnsureLoadedAsync`), and localized strings are added to `Strings/en-us/Resources.resw`.
+**Toggle behavior (confirmed):** unchecking an enabled provider **moves it from `EnabledProviders` into `DisabledProviders`** — it sinks below the divider, graying and losing its handle. Re-checking a disabled provider **appends it to the end of `EnabledProviders`** (lowest priority, un-grayed, handle restored); the user drags it up to re-prioritize. Two collections rather than one grouped list keeps "enabled is reorderable, disabled is not" trivial and sidesteps cross-zone drag clamping.
+
+`LyricsProviderItem : ObservableObject { Id; DisplayName; IsEnabled; CanDisable }`. The **at-least-one-enabled** rule binds each enabled row's `CheckBox.IsEnabled` to `item.CanDisable`; the VM sets `CanDisable = EnabledProviders.Count > 1`, so the sole remaining enabled provider's checkbox locks. The VM builds both collections from the preferences display list in an async initializer (awaiting `EnsureLoadedAsync`); localized strings are added to `Strings/en-us/Resources.resw`.
 
 ---
 
@@ -140,7 +151,7 @@ A `SettingsExpander` matching the Scrobbling/Fonts sections, containing three ca
 - **Reconcile/clamp (pure, `Hypersonic.Core.Tests`)** — unknown-id drop, new-id append-enabled-lowest-priority, at-least-one-enforcement when a persisted set is emptied, budget clamping to range, first-run defaults, and a persisted→reconcile→persisted round-trip.
 - **`LyricsService` (`Hypersonic.Tests`)** — a disabled provider is never called; fan-out order follows the snapshot; the auto budget is sourced from the preferences service (verified via `FakeTimeProvider` as existing service tests do).
 - **`NowPlayingViewModel`** — refresh uses the manual budget from the preferences service (extends the existing `Refresh_ForceRefreshesWithManualBudget`).
-- **`SettingsViewModel`** — toggle and reorder persist through the service; the last-enabled `CanDisable` lock; slider debounce writes the clamped value.
+- **`SettingsViewModel`** — a toggle moves the item between the enabled/disabled collections (sink on disable; re-enable appends to the end of enabled); reorder persists; the last-enabled `CanDisable` lock; the three inline resets restore their defaults and are `CanReset`-gated; slider debounce writes the clamped value.
 - **`LyricsPreferences` service** — `EnsureLoadedAsync` idempotency; snapshot swap visibility; mutation-refuses-zero-enabled invariant.
 
 ---
@@ -157,7 +168,7 @@ A `SettingsExpander` matching the Scrobbling/Fonts sections, containing three ca
 ## Risks / open questions
 
 - **Load-race hardening** — awaiting `EnsureLoadedAsync` inside `GetLyricsAsync` adds one await to the lyrics hot path; after first load it resolves synchronously, but the await must be placed before the snapshot is read, not after.
-- **Reorder + checkbox in one `ListView`** — a checkbox inside a drag-reorderable row can swallow the pointer intended for the drag handle. The drag handle glyph should be the reorder affordance; verify checkbox taps and drags don't interfere (a known WinUI `ListView` reorder nuance).
+- **Reorder mechanics** — enabled rows live in a reorderable `ListView`; disabled rows in a separate non-reorderable list, so "disabled can't be dragged" needs no per-item drag gating. The grip is the visual drag affordance; WinUI's built-in reorder drags the whole row while the `CheckBox` handles its own taps — verify a checkbox tap never initiates a reorder, and constrain drag initiation to the handle (via `DragItemsStarting`) if it does.
 - **Provider `DisplayName` source** — the UI shows `ILyricsProvider.DisplayName`; the preferences service enumerates the injected providers to build the display list, so a provider missing from DI simply drops out of the list (consistent with reconcile step 3).
 
 ---
