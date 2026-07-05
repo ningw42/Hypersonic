@@ -79,7 +79,7 @@ The registered provider set can grow or shrink across app versions. On load, the
 2. **Appends** any registered provider absent from the persisted list **at the end of the enabled run**, **enabled** (a newly-shipped source is on by default, lowest enabled priority).
 3. **Drops** persisted ids that no longer resolve to a registered provider.
 4. Enforces the **at-least-one-enabled invariant** — if reconciliation leaves zero enabled, it enables the first entry.
-5. **Clamps** each budget to its allowed range; a missing or out-of-range value falls back to the default.
+5. **Budgets:** a missing value (null/zero) falls back to the default; a present but out-of-range value is **clamped** into range (a slider can't produce one, so this only guards a hand-edited/corrupt record).
 
 First run (no persisted state): every provider enabled, in the **explicit canonical default order** (§Order is enabled-first), default budgets.
 
@@ -110,7 +110,7 @@ The **default order** is a canonical constant pinned in code — `Subsonic → L
 - **`ILyricsPreferences`**
   - `Task EnsureLoadedAsync(ct)` — idempotent load + reconcile.
   - Reads (valid after load, synchronous): the **ordered enabled provider ids** (what `LyricsService` fans out over), `AutoLoadBudget` / `ManualRefreshBudget` (`TimeSpan`), and the reconciled **display list** of `(Id, DisplayName, Enabled)` in enabled-first order (the VM splits it into its enabled/disabled collections).
-  - Mutations: `SetEnabled(id, enabled)` (moves the entry across the enabled/disabled boundary — see §Order is enabled-first), `Reorder(orderedEnabledIds)` (within the enabled run), `SetAutoLoadBudget`, `SetManualRefreshBudget`, and `ResetProviders()` (→ all enabled in the default-order constant). Each rebuilds and swaps the snapshot, then persists. Toggle / reorder / reset persist immediately; slider writes are debounced (the existing `QueueFontSettingSave` serialized-write idiom). The two slider resets reuse the setters with the default values.
+  - Mutations: `SetEnabled(id, enabled)` (moves the entry across the enabled/disabled boundary — see §Order is enabled-first), `Reorder(orderedEnabledIds)` (within the enabled run), `SetAutoLoadBudget`, `SetManualRefreshBudget`, and `ResetProviders()` (→ all enabled in the default-order constant). Each rebuilds and swaps the snapshot, then persists. Every mutation persists immediately through one serialized write queue (the existing `QueueFontSettingSave` idiom); slider changes write on each step — matching the scrobble-percentage-slider precedent already in this page — rather than via a separate debounce. The two slider resets reuse the setters with the default values.
 - **Persisted state object** — a small record `{ Providers: [{ Id, Enabled }], AutoLoadBudgetMs, ManualRefreshBudgetMs }` (in `Hypersonic.Core`), stored under a single `ILocalSettingsService` key `"LyricsPreferences"`. One key = one atomic write, and the reconcile function is its only reader/validator. Absent key → reconcile produces the first-run defaults; no migration.
 - **`LyricsService`** — unchanged public contract. Internally, `RunFanOutAsync` builds its working array by projecting the injected `ILyricsProvider` instances through the snapshot's ordered-enabled id list (preserving "ordered by precedence" for the tiebreak); the resolved auto budget comes from the preferences service.
 - **`NowPlayingViewModel`** — unchanged public contract; the refresh command's budget now comes from `ILyricsPreferences.ManualRefreshBudget`.
@@ -130,7 +130,7 @@ A `SettingsExpander` matching the Scrobbling/Fonts sections. **Each of the three
 
 **Toggle behavior (confirmed):** unchecking an enabled provider **moves it from `EnabledProviders` into `DisabledProviders`** — it sinks below the divider, graying and losing its handle. Re-checking a disabled provider **appends it to the end of `EnabledProviders`** (lowest priority, un-grayed, handle restored); the user drags it up to re-prioritize. Two collections rather than one grouped list keeps "enabled is reorderable, disabled is not" trivial and sidesteps cross-zone drag clamping.
 
-`LyricsProviderItem : ObservableObject { Id; DisplayName; IsEnabled; CanDisable }`. The **at-least-one-enabled** rule binds each enabled row's `CheckBox.IsEnabled` to `item.CanDisable`; the VM sets `CanDisable = EnabledProviders.Count > 1`, so the sole remaining enabled provider's checkbox locks. The VM builds both collections from the preferences display list in an async initializer (awaiting `EnsureLoadedAsync`); localized strings are added to `Strings/en-us/Resources.resw`.
+`LyricsProviderItem : ObservableObject { Id; DisplayName; IsEnabled; CanToggle }`. The **at-least-one-enabled** rule binds each row's `CheckBox.IsEnabled` to `item.CanToggle`; the VM sets `CanToggle = EnabledProviders.Count > 1` for enabled rows (disabled rows stay toggle-able so they can be re-enabled), so the sole remaining enabled provider's checkbox locks. The VM builds both collections from the preferences display list in an async initializer (awaiting `EnsureLoadedAsync`); localized strings are added to `Strings/en-us/Resources.resw`.
 
 ---
 
@@ -151,7 +151,7 @@ A `SettingsExpander` matching the Scrobbling/Fonts sections. **Each of the three
 - **Reconcile/clamp (pure, `Hypersonic.Core.Tests`)** — unknown-id drop, new-id append-enabled-lowest-priority, at-least-one-enforcement when a persisted set is emptied, budget clamping to range, first-run defaults, and a persisted→reconcile→persisted round-trip.
 - **`LyricsService` (`Hypersonic.Tests`)** — a disabled provider is never called; fan-out order follows the snapshot; the auto budget is sourced from the preferences service (verified via `FakeTimeProvider` as existing service tests do).
 - **`NowPlayingViewModel`** — refresh uses the manual budget from the preferences service (extends the existing `Refresh_ForceRefreshesWithManualBudget`).
-- **`SettingsViewModel`** — a toggle moves the item between the enabled/disabled collections (sink on disable; re-enable appends to the end of enabled); reorder persists; the last-enabled `CanDisable` lock; the three inline resets restore their defaults and are `CanReset`-gated; slider debounce writes the clamped value.
+- **`SettingsViewModel`** — a toggle moves the item between the enabled/disabled collections (sink on disable; re-enable appends to the end of enabled); reorder persists; the last-enabled `CanToggle` lock; the three inline resets restore their defaults and are `CanReset`-gated; the budget setters clamp to range (clamping verified at the service level).
 - **`LyricsPreferences` service** — `EnsureLoadedAsync` idempotency; snapshot swap visibility; mutation-refuses-zero-enabled invariant.
 
 ---

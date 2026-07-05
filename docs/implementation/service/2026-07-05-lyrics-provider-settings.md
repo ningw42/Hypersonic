@@ -1286,7 +1286,9 @@ Read the manual budget from `ILyricsPreferences` instead of `IOptions<LyricsOrch
 
 - [ ] **Step 1: Update the failing test**
 
-In `Hypersonic.Tests/ViewModels/NowPlayingViewModelTests.cs`, add `using Hypersonic.Tests.Fakes;` (present) and replace the `Opts` field and `Build` helper:
+In `Hypersonic.Tests/ViewModels/NowPlayingViewModelTests.cs`, add `using Hypersonic.Tests.Fakes;` (present) and replace the `Opts` field with a `Prefs` field, then migrate **all three** construction sites off `Opts` — both `Build` overloads (the `Func<…>`-handler one at ~line 68 and the `FakeLyricsService`-instance one at ~line 71) and the inline `new NowPlayingViewModel(...)` in `LateEnqueue_AfterOnNavigatedFrom_DoesNotStartFetch` (~line 249). Each currently passes `Opts` as the 3rd ctor argument, so missing one is a compile break.
+
+Replace the `Opts` field + both `Build` overloads with:
 
 ```csharp
     private static readonly FakeLyricsPreferences Prefs = new()
@@ -1297,8 +1299,13 @@ In `Hypersonic.Tests/ViewModels/NowPlayingViewModelTests.cs`, add `using Hyperso
 
     private static NowPlayingViewModel Build(FakePlaybackService svc, Func<LyricsQuery, Task<LyricsDocument?>> handler, Action<Action>? enqueueOverride = null)
         => new(svc, new FakeLyricsService(handler), Prefs, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
+
+    private static NowPlayingViewModel Build(FakePlaybackService svc, FakeLyricsService service, Action<Action>? enqueueOverride = null)
+        => new(svc, service, Prefs, new NullLoggingService(), new FakeSourceCatalog(), synchronous: true, enqueueOverride: enqueueOverride);
 ```
 
+Then in `LateEnqueue_AfterOnNavigatedFrom_DoesNotStartFetch` (~line 249), replace the `Opts` argument in the inline `new NowPlayingViewModel(...)` with `Prefs`.
+```
 Remove the now-unused `using Microsoft.Extensions.Options;`. Then update `Refresh_ForceRefreshesWithManualBudget` — replace the budget assertion:
 
 ```csharp
