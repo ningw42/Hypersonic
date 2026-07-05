@@ -372,6 +372,17 @@ namespace Hypersonic.Contracts.Services;
 public sealed record LyricsProviderView(string Id, string DisplayName, bool Enabled);
 
 /// <summary>
+/// Immutable, point-in-time view of the preferences. A new instance is built and swapped behind a
+/// <c>volatile</c> reference on every mutation; a reader captures it once via
+/// <see cref="ILyricsPreferences.GetSnapshot"/> and uses it consistently for the duration of one fetch.
+/// </summary>
+public sealed record LyricsPreferencesSnapshot(
+    IReadOnlyList<LyricsProviderView> Providers,
+    IReadOnlyList<string> EnabledProviderIds,
+    TimeSpan AutoLoadBudget,
+    TimeSpan ManualRefreshBudget);
+
+/// <summary>
 /// Single source of truth for the user's lyrics provider preferences (enabled set + priority order)
 /// and the two fan-out budgets. Consulted live by <c>LyricsService</c> and <c>NowPlayingViewModel</c>;
 /// bound by the lyrics settings UI. Persists itself via <c>ILocalSettingsService</c>.
@@ -381,7 +392,11 @@ public interface ILyricsPreferences
     /// <summary>Idempotent load + reconcile against the registered providers. Cheap after first call.</summary>
     Task EnsureLoadedAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Enabled provider ids in priority order — the fan-out set.</summary>
+    /// <summary>The current immutable snapshot. Consumers needing several fields consistently (the fan-out
+    /// reads both the budget and the enabled set) capture this once rather than reading granular members.</summary>
+    LyricsPreferencesSnapshot GetSnapshot();
+
+    /// <summary>Enabled provider ids in priority order — the fan-out set. (Projects from the snapshot.)</summary>
     IReadOnlyList<string> EnabledProviderIds { get; }
 
     TimeSpan AutoLoadBudget { get; }
@@ -621,7 +636,7 @@ public sealed class LyricsPreferences : ILyricsPreferences
     private readonly ILogger _log;
     private readonly object _loadLock = new();
 
-    private volatile LyricsPreferencesState _snapshot;
+    private volatile LyricsPreferencesSnapshot _snapshot;
     private Task? _loadTask;
 
     public LyricsPreferences(
@@ -642,7 +657,7 @@ public sealed class LyricsPreferences : ILyricsPreferences
             .ToArray();
 
         // Defaults snapshot so reads never see uninitialized state before EnsureLoadedAsync.
-        _snapshot = LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs);
+        _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs));
     }
 
     public Task EnsureLoadedAsync(CancellationToken cancellationToken = default)
@@ -658,29 +673,41 @@ public sealed class LyricsPreferences : ILyricsPreferences
         try
         {
             var persisted = await _settings.ReadSettingAsync<LyricsPreferencesState>(SettingsKey).ConfigureAwait(false);
-            _snapshot = LyricsPreferencesReconciler.Reconcile(persisted, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs);
+            _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(persisted, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs));
         }
         catch (Exception ex)
         {
             _log.Warning("Failed to load lyrics preferences; using defaults", exception: ex);
-            _snapshot = LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs);
+            _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs));
         }
     }
 
-    public IReadOnlyList<string> EnabledProviderIds
-        => _snapshot.Providers.Where(p => p.Enabled).Select(p => p.Id).ToArray();
+    public LyricsPreferencesSnapshot GetSnapshot() => _snapshot;
 
-    public TimeSpan AutoLoadBudget => TimeSpan.FromMilliseconds(_snapshot.AutoLoadBudgetMs);
-    public TimeSpan ManualRefreshBudget => TimeSpan.FromMilliseconds(_snapshot.ManualRefreshBudgetMs);
+    public IReadOnlyList<string> EnabledProviderIds => _snapshot.EnabledProviderIds;
+    public TimeSpan AutoLoadBudget => _snapshot.AutoLoadBudget;
+    public TimeSpan ManualRefreshBudget => _snapshot.ManualRefreshBudget;
 
     public IReadOnlyList<string> DefaultProviderOrder => _registeredInDefaultOrder;
     public TimeSpan DefaultAutoLoadBudget => TimeSpan.FromMilliseconds(_defaultAutoMs);
     public TimeSpan DefaultManualRefreshBudget => TimeSpan.FromMilliseconds(_defaultManualMs);
 
-    public IReadOnlyList<LyricsProviderView> GetProviders()
-        => _snapshot.Providers
+    public IReadOnlyList<LyricsProviderView> GetProviders() => _snapshot.Providers;
+
+    /// <summary>Maps a reconciled persisted state to the immutable runtime snapshot — adds display names and
+    /// precomputes the enabled-id list. This is the only place the snapshot is constructed.</summary>
+    private LyricsPreferencesSnapshot BuildSnapshot(LyricsPreferencesState state)
+    {
+        var providers = state.Providers
             .Select(p => new LyricsProviderView(p.Id, _displayNames.GetValueOrDefault(p.Id, p.Id), p.Enabled))
             .ToArray();
+        var enabledIds = providers.Where(p => p.Enabled).Select(p => p.Id).ToArray();
+        return new LyricsPreferencesSnapshot(
+            providers,
+            enabledIds,
+            TimeSpan.FromMilliseconds(state.AutoLoadBudgetMs),
+            TimeSpan.FromMilliseconds(state.ManualRefreshBudgetMs));
+    }
 
     // Mutations — implemented in Task 3.
     public void SetEnabled(string id, bool enabled) => throw new NotSupportedException();
@@ -853,7 +880,7 @@ Replace the five stubbed mutation methods with:
 ```csharp
     public void SetEnabled(string id, bool enabled)
     {
-        var providers = Clone(_snapshot.Providers);
+        var providers = CurrentRows();
         var index = providers.FindIndex(p => p.Id == id);
         if (index < 0 || providers[index].Enabled == enabled)
         {
@@ -878,13 +905,13 @@ Replace the five stubbed mutation methods with:
             providers.Add(item); // sink to the bottom
         }
 
-        Publish(providers, _snapshot.AutoLoadBudgetMs, _snapshot.ManualRefreshBudgetMs);
+        Publish(providers);
     }
 
     public void Reorder(IReadOnlyList<string> orderedEnabledIds)
     {
-        var current = _snapshot;
-        var byId = current.Providers.ToDictionary(p => p.Id, StringComparer.Ordinal);
+        var providers = CurrentRows();
+        var byId = providers.ToDictionary(p => p.Id, StringComparer.Ordinal);
         var enabled = new List<LyricsProviderPreference>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
@@ -897,7 +924,7 @@ Replace the five stubbed mutation methods with:
         }
 
         // Safety: any enabled provider missing from the requested order keeps its place at the end.
-        foreach (var p in current.Providers.Where(p => p.Enabled))
+        foreach (var p in providers.Where(p => p.Enabled))
         {
             if (seen.Add(p.Id))
             {
@@ -905,21 +932,20 @@ Replace the five stubbed mutation methods with:
             }
         }
 
-        var disabled = current.Providers.Where(p => !p.Enabled);
-        var providers = Clone(enabled.Concat(disabled).ToList());
-        Publish(providers, current.AutoLoadBudgetMs, current.ManualRefreshBudgetMs);
+        var disabled = providers.Where(p => !p.Enabled);
+        Publish(enabled.Concat(disabled).ToList());
     }
 
     public void SetAutoLoadBudget(TimeSpan value)
     {
         var ms = Math.Clamp((int)value.TotalMilliseconds, LyricsPreferencesReconciler.AutoLoadMinMs, LyricsPreferencesReconciler.AutoLoadMaxMs);
-        Publish(Clone(_snapshot.Providers), ms, _snapshot.ManualRefreshBudgetMs);
+        Publish(CurrentRows(), autoMs: ms);
     }
 
     public void SetManualRefreshBudget(TimeSpan value)
     {
         var ms = Math.Clamp((int)value.TotalMilliseconds, LyricsPreferencesReconciler.ManualRefreshMinMs, LyricsPreferencesReconciler.ManualRefreshMaxMs);
-        Publish(Clone(_snapshot.Providers), _snapshot.AutoLoadBudgetMs, ms);
+        Publish(CurrentRows(), manualMs: ms);
     }
 
     public void ResetProviders()
@@ -927,22 +953,26 @@ Replace the five stubbed mutation methods with:
         var providers = _registeredInDefaultOrder
             .Select(id => new LyricsProviderPreference { Id = id, Enabled = true })
             .ToList();
-        Publish(providers, _snapshot.AutoLoadBudgetMs, _snapshot.ManualRefreshBudgetMs);
+        Publish(providers);
     }
 
-    private static List<LyricsProviderPreference> Clone(IEnumerable<LyricsProviderPreference> source)
-        => source.Select(p => new LyricsProviderPreference { Id = p.Id, Enabled = p.Enabled }).ToList();
+    /// <summary>Current provider rows as a mutable working copy, derived from the immutable snapshot.</summary>
+    private List<LyricsProviderPreference> CurrentRows()
+        => _snapshot.Providers.Select(v => new LyricsProviderPreference { Id = v.Id, Enabled = v.Enabled }).ToList();
 
-    private void Publish(List<LyricsProviderPreference> providers, int autoMs, int manualMs)
+    /// <summary>Rebuilds the immutable snapshot from the given rows — budgets default to the current
+    /// snapshot's unless overridden — and persists the derived state.</summary>
+    private void Publish(List<LyricsProviderPreference> providers, int? autoMs = null, int? manualMs = null)
     {
-        _snapshot = new LyricsPreferencesState
+        var state = new LyricsPreferencesState
         {
             Providers = providers,
-            AutoLoadBudgetMs = autoMs,
-            ManualRefreshBudgetMs = manualMs,
+            AutoLoadBudgetMs = autoMs ?? (int)_snapshot.AutoLoadBudget.TotalMilliseconds,
+            ManualRefreshBudgetMs = manualMs ?? (int)_snapshot.ManualRefreshBudget.TotalMilliseconds,
         };
 
-        var state = _snapshot;
+        _snapshot = BuildSnapshot(state);
+
         lock (_saveLock)
         {
             _saveQueue = SaveAfterPreviousAsync(_saveQueue, state);
@@ -1040,6 +1070,9 @@ public sealed class FakeLyricsPreferences : ILyricsPreferences
     }
 
     public IReadOnlyList<LyricsProviderView> GetProviders() => Providers;
+
+    public LyricsPreferencesSnapshot GetSnapshot()
+        => new(Providers, EnabledProviderIds, AutoLoadBudget, ManualRefreshBudget);
 
     public void SetEnabled(string id, bool enabled) => SetEnabledCalls.Add((id, enabled));
     public void Reorder(IReadOnlyList<string> orderedEnabledIds) => ReorderCalls.Add(orderedEnabledIds);
@@ -1161,10 +1194,11 @@ Change the constructor signature — replace the parameter `IOptions<LyricsOrche
 
 (Remove the now-unused `using Microsoft.Extensions.Options;` only if nothing else needs it — `IOptions<LyricsCacheOptions>` is still a parameter, so keep the using.)
 
-In `GetLyricsAsync`, right after `var token = linkedCts.Token;` and inside the `try`, add:
+In `GetLyricsAsync`, right after `var token = linkedCts.Token;` and inside the `try`, ensure preferences are loaded and capture a **single** snapshot for the whole fetch:
 
 ```csharp
             await _preferences.EnsureLoadedAsync(token).ConfigureAwait(false);
+            var preferences = _preferences.GetSnapshot();
 ```
 
 Then replace the budget-resolution block:
@@ -1180,19 +1214,36 @@ Then replace the budget-resolution block:
             }
 ```
 
-with:
+with (the budget now comes from the captured snapshot, not a fresh read):
 
 ```csharp
-            var resolvedBudget = budget ?? _preferences.AutoLoadBudget;
+            var resolvedBudget = budget ?? preferences.AutoLoadBudget;
             if (resolvedBudget < TimeSpan.Zero)
             {
                 // A caller-supplied negative budget (incl. the -1ms "infinite" sentinel) would throw in Task.Delay
                 // or disable truncation — fall back to the preferred wait window.
-                resolvedBudget = _preferences.AutoLoadBudget;
+                resolvedBudget = preferences.AutoLoadBudget;
             }
 ```
 
-In `FetchAndStoreAsync`, build the active provider set once and thread it through. Replace the body from the fan-out call onward:
+Thread that same snapshot into the in-flight fetch so the fan-out uses the *same* snapshot the budget came from. Change the existing in-flight creation call:
+
+```csharp
+            var fetchTask = _inFlightFetches.GetOrAdd(keyHash, _ => CreateInFlightFetchTask(query, keyHash, resolvedBudget, preferences));
+```
+
+(from `... CreateInFlightFetchTask(query, keyHash, resolvedBudget)`), and add a `LyricsPreferencesSnapshot preferences` parameter to `CreateInFlightFetchTask` (which forwards it) and to `FetchAndStoreAsync`:
+
+```csharp
+    private Task<LyricsDocument?> CreateInFlightFetchTask(LyricsQuery query, string keyHash, TimeSpan budget, LyricsPreferencesSnapshot preferences)
+    // ... unchanged body, but forward it: FetchAndStoreAsync(query, keyHash, budget, preferences, GetDisposeToken()) ...
+
+    private async Task<LyricsDocument?> FetchAndStoreAsync(LyricsQuery query, string keyHash, TimeSpan budget, LyricsPreferencesSnapshot preferences, CancellationToken cancellationToken)
+```
+
+Both method bodies are otherwise unchanged except the fan-out call below.
+
+In `FetchAndStoreAsync`, build the active provider set from the threaded snapshot. Replace the fan-out call:
 
 ```csharp
         var (completed, anyTruncated) = await RunFanOutAsync(query, budget, cancellationToken).ConfigureAwait(false);
@@ -1201,7 +1252,7 @@ In `FetchAndStoreAsync`, build the active provider set once and thread it throug
 with:
 
 ```csharp
-        var activeProviders = BuildActiveProviders();
+        var activeProviders = BuildActiveProviders(preferences);
         var (completed, anyTruncated) = await RunFanOutAsync(query, activeProviders, budget, cancellationToken).ConfigureAwait(false);
 ```
 
@@ -1220,9 +1271,9 @@ with:
 Add the helper (near the other private methods):
 
 ```csharp
-    private ILyricsProvider[] BuildActiveProviders()
+    private ILyricsProvider[] BuildActiveProviders(LyricsPreferencesSnapshot preferences)
     {
-        var ids = _preferences.EnabledProviderIds;
+        var ids = preferences.EnabledProviderIds;
         var active = new List<ILyricsProvider>(ids.Count);
         foreach (var id in ids)
         {
@@ -2060,6 +2111,6 @@ git commit -m "feat(lyrics): add Lyrics provider settings section to Settings pa
 - At-least-one-enabled → Tasks 1 (reconcile), 3 (`SetEnabled` guard), 6 (`CanToggle` lock). ✅
 - Reconcile robustness (drop unknown, append new) → Task 1. ✅
 
-**Type consistency:** `ILyricsPreferences` members (`EnsureLoadedAsync`, `EnabledProviderIds`, `AutoLoadBudget`, `ManualRefreshBudget`, `DefaultProviderOrder`, `DefaultAutoLoadBudget`, `DefaultManualRefreshBudget`, `GetProviders`, `SetEnabled`, `Reorder`, `SetAutoLoadBudget`, `SetManualRefreshBudget`, `ResetProviders`) match across the contract (Task 2), the service (Tasks 2–3), the fake (Task 4), and both consumers (Tasks 4–6). `LyricsProviderItem` members (`Id`, `DisplayName`, `IsEnabled`, `CanToggle`) match between Task 6's model, VM, and Task 7's `x:Bind`. `Reconcile` signature matches between Task 1's definition and Task 2's two call sites.
+**Type consistency:** `ILyricsPreferences` members (`EnsureLoadedAsync`, `GetSnapshot`, `EnabledProviderIds`, `AutoLoadBudget`, `ManualRefreshBudget`, `DefaultProviderOrder`, `DefaultAutoLoadBudget`, `DefaultManualRefreshBudget`, `GetProviders`, `SetEnabled`, `Reorder`, `SetAutoLoadBudget`, `SetManualRefreshBudget`, `ResetProviders`) match across the contract (Task 2), the service (Tasks 2–3), the fake (Task 4), and both consumers (Tasks 4–6). The immutable `LyricsPreferencesSnapshot` record is constructed only in `BuildSnapshot` (Task 2), swapped behind the `volatile` field on every mutation (Task 3), and captured once per fetch by `LyricsService` via `GetSnapshot()` (Task 4) — the single-snapshot-per-fetch property the design requires. `LyricsProviderItem` members (`Id`, `DisplayName`, `IsEnabled`, `CanToggle`) match between Task 6's model, VM, and Task 7's `x:Bind`. `Reconcile` signature matches between Task 1's definition and Task 2's two call sites.
 
 **Note on the design doc:** the design said "SettingsViewModel extended"; this plan instead adds a focused `LyricsSettingsViewModel` resolved by `SettingsPage` (Task 6–7), preserving the design intent (a bound "Lyrics" section) while keeping the already-large `SettingsViewModel` and its three test files untouched.
