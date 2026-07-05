@@ -43,7 +43,7 @@ The lyrics stack already splits pure logic (`Hypersonic.Core`) from app plumbing
 - **`ILyricsPreferences` / `LyricsPreferences` (singleton)** — the single source of truth for the enabled set, the order, and both budgets. The lyrics analog of `IScrobblingService`: one service that the Settings ViewModel binds to, the runtime reads from, and that persists its own state. Lives beside `LyricsService`.
 - **`LyricsService` (rewired)** — orders + filters its injected provider set through the preferences snapshot at fetch time, and reads the auto budget from it.
 - **`NowPlayingViewModel` (rewired)** — reads the manual-refresh budget from the preferences service.
-- **`SettingsViewModel` / `SettingsPage.xaml` (extended)** — a new "Lyrics" section binding to the preferences service.
+- **`LyricsSettingsViewModel` + `SettingsPage.xaml` (new + extended)** — a **dedicated** view model for the "Lyrics" section, resolved by `SettingsPage` alongside its existing `ViewModel` and bound as `LyricsViewModel.*`. Keeping the section in its own VM leaves the already-large `SettingsViewModel` (and its three test files) untouched, and lets the section's logic be tested in isolation against a fake `ILyricsPreferences`.
 
 **`Hypersonic.Core` — the reconcile/clamp logic and the persisted state record:**
 

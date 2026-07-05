@@ -1845,24 +1845,21 @@ In `Hypersonic/Strings/en-us/Resources.resw`, add these `<data>` entries (anywhe
   <data name="Settings_LyricsProvidersCard.Description" xml:space="preserve">
     <value>Drag to set priority. The best-synced result wins; order breaks ties. Unchecked sources are skipped.</value>
   </data>
+  <data name="Settings_LyricsExpander.Header" xml:space="preserve">
+    <value>Providers &amp; timing</value>
+  </data>
   <data name="Settings_LyricsDisabledHeader.Text" xml:space="preserve">
     <value>Disabled</value>
   </data>
   <data name="Settings_LyricsAutoLoadCard.Header" xml:space="preserve">
     <value>Auto-load wait</value>
   </data>
-  <data name="Settings_LyricsAutoLoadCard.Description" xml:space="preserve">
-    <value>How long a track change waits for lyrics before deciding.</value>
-  </data>
   <data name="Settings_LyricsManualRefreshCard.Header" xml:space="preserve">
     <value>Manual refresh wait</value>
   </data>
-  <data name="Settings_LyricsManualRefreshCard.Description" xml:space="preserve">
-    <value>The longer window used when you press refresh.</value>
-  </data>
 ```
 
-(The reset buttons reuse the existing `Settings_ResetTooltip` string via code-behind.)
+(The reset buttons reuse the existing `Settings_ResetTooltip` string via code-behind. The two budget cards intentionally have **no** `.Description` resw entry — their `Description` is the live "x.x s" readout bound in XAML, matching the existing scrobble-percentage card. Adding a resw `.Description` alongside an `x:Uid` would collide with that binding.)
 
 - [ ] **Step 2: Add the section XAML**
 
@@ -1874,13 +1871,17 @@ In `Hypersonic/Views/SettingsPage.xaml`, add `xmlns:vm="using:Hypersonic.ViewMod
                        Style="{ThemeResource SubtitleTextBlockStyle}"
                        Margin="{StaticResource MediumTopMargin}" />
 
-            <controls:SettingsCard
-                x:Uid="Settings_LyricsProvidersCard"
-                ContentAlignment="Vertical"
-                Margin="{StaticResource XSmallTopMargin}">
-                <controls:SettingsCard.HeaderIcon>
+            <controls:SettingsExpander
+                x:Uid="Settings_LyricsExpander"
+                Margin="{StaticResource XSmallTopMargin}"
+                IsExpanded="True">
+                <controls:SettingsExpander.HeaderIcon>
                     <FontIcon Glyph="&#xE8D6;" />
-                </controls:SettingsCard.HeaderIcon>
+                </controls:SettingsExpander.HeaderIcon>
+                <controls:SettingsExpander.Items>
+                    <controls:SettingsCard
+                        x:Uid="Settings_LyricsProvidersCard"
+                        ContentAlignment="Vertical">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <ListView
@@ -1983,6 +1984,9 @@ In `Hypersonic/Views/SettingsPage.xaml`, add `xmlns:vm="using:Hypersonic.ViewMod
                     </Button>
                 </StackPanel>
             </controls:SettingsCard>
+
+                </controls:SettingsExpander.Items>
+            </controls:SettingsExpander>
 ```
 
 - [ ] **Step 3: Wire the view model into the page**
@@ -2026,6 +2030,7 @@ Expected: PASS (all tests, including the earlier tasks').
 
 Launch the app (Visual Studio F5 or deploy the MSIX), open **Settings → Lyrics**, and confirm:
 - Six providers listed, all enabled, in canonical order; drag by the grip reorders them.
+- **Tapping a checkbox toggles it *without* starting a reorder** (WinUI's built-in reorder is whole-row; the `CheckBox` should capture its own taps). If a checkbox tap ever initiates a drag, constrain the reorder before shipping — cancel it in a `DragItemsStarting` handler when the drag began on the checkbox, or drive the drag from the grip's pointer events.
 - Unchecking a provider sinks it below the "Disabled" divider (grayed); its checkbox stays usable; re-checking returns it to the bottom of the enabled group.
 - With one provider left enabled, its checkbox is locked.
 - The two sliders show a live "x.x s" readout; each reset icon restores its default and disables when already at default.
@@ -2049,7 +2054,7 @@ git commit -m "feat(lyrics): add Lyrics provider settings section to Settings pa
 - Persistence (MSIX + unpackaged, key `"LyricsPreferences"`) → Tasks 2–3 (`ILocalSettingsService`). ✅
 - Live apply → Tasks 4–5 (per-fetch snapshot read). ✅
 - Priority = tiebreak (policy untouched) → Task 4 (order feeds existing `LyricsFallbackPolicy`); no policy edit anywhere. ✅
-- Sink-to-bottom disabled + handle-only affordance → Tasks 6 (two collections), 7 (grip + separate lists). ✅
+- Sink-to-bottom disabled + grip affordance → Tasks 6 (two collections), 7 (grip glyph + separate lists; whole-row reorder with a checkbox-tap-doesn't-reorder verification, plus a `DragItemsStarting` guard if the check fails). ✅
 - Three inline per-control resets → Tasks 6 (commands + `CanReset`), 7 (three reset buttons). ✅
 - Explicit canonical default order → Tasks 2 (`CanonicalOrder`), 3 (`ResetProviders`). ✅
 - At-least-one-enabled → Tasks 1 (reconcile), 3 (`SetEnabled` guard), 6 (`CanToggle` lock). ✅
