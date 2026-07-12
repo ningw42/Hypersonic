@@ -330,6 +330,9 @@
   <data name="Settings_FontPicker.PlaceholderText" xml:space="preserve">
     <value>Type a font name…</value>
   </data>
+  <data name="Settings_LyricsProviderPicker.PlaceholderText" xml:space="preserve">
+    <value>Type to add a provider…</value>
+  </data>
   <data name="Settings_UiScale.Header" xml:space="preserve">
     <value>UI scale</value>
   </data>
@@ -355,7 +358,7 @@
     <value>Providers</value>
   </data>
   <data name="Settings_LyricsProvidersCard.Description" xml:space="preserve">
-    <value>Drag to set priority. The best-synced result wins; order breaks ties. Unchecked sources are skipped.</value>
+    <value>Drag to set priority. The best-synced result wins; order breaks ties. Remove providers to skip them.</value>
   </data>
   <data name="Settings_LyricsExpander.Header" xml:space="preserve">
     <value>Providers &amp; timing</value>

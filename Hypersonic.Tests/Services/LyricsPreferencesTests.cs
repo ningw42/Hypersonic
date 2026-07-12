@@ -27,26 +27,24 @@ public class LyricsPreferencesTests
         => new(settings, providers, Opts, new NullLoggingService());
 
     [TestMethod]
-    public void BeforeLoad_ReportsAllEnabledDefaults()
+    public void BeforeLoad_ReportsDefaultEnabledSet()
     {
         var prefs = Create(new FakeLocalSettingsService(), AllProviders());
 
-        CollectionAssert.AreEqual(
-            new[] { "subsonic", "lrclib", "amll-ttml-db", "qq", "netease", "kugou" },
-            prefs.EnabledProviderIds.ToArray());
+        CollectionAssert.AreEqual(new[] { "qq", "subsonic", "lrclib" }, prefs.EnabledProviderIds.ToArray());
         Assert.AreEqual(TimeSpan.FromMilliseconds(700), prefs.AutoLoadBudget);
         Assert.AreEqual(TimeSpan.FromMilliseconds(5000), prefs.ManualRefreshBudget);
     }
 
     [TestMethod]
-    public async Task Load_FirstRun_SeedsAllEnabledInDefaultOrder()
+    public async Task Load_FirstRun_SeedsDefaultEnabledSet_InPriorityOrder()
     {
         var prefs = Create(new FakeLocalSettingsService(), AllProviders());
 
         await prefs.EnsureLoadedAsync();
 
-        Assert.AreEqual(6, prefs.EnabledProviderIds.Count);
-        CollectionAssert.AreEqual(prefs.DefaultProviderOrder.ToArray(), prefs.EnabledProviderIds.ToArray());
+        CollectionAssert.AreEqual(new[] { "qq", "subsonic", "lrclib" }, prefs.EnabledProviderIds.ToArray());
+        CollectionAssert.AreEqual(new[] { "qq", "subsonic", "lrclib" }, prefs.DefaultEnabledProviderIds.ToArray());
     }
 
     [TestMethod]
@@ -191,18 +189,34 @@ public class LyricsPreferencesTests
     }
 
     [TestMethod]
-    public async Task ResetProviders_RestoresAllEnabledDefaultOrder_KeepsBudgets()
+    public async Task ResetProviders_RestoresDefaultEnabledSet_KeepsBudgets()
     {
         var prefs = Create(new FakeLocalSettingsService(), AllProviders());
         await prefs.EnsureLoadedAsync();
-        prefs.SetEnabled("subsonic", false);
-        prefs.Reorder(["lrclib", "amll-ttml-db", "qq", "netease", "kugou"]);
-        prefs.SetAutoLoadBudget(TimeSpan.FromSeconds(2));
+        prefs.SetEnabled("amll-ttml-db", true);            // dirty the enabled set
+        prefs.SetAutoLoadBudget(TimeSpan.FromSeconds(2));  // dirty a budget
 
         prefs.ResetProviders();
 
-        CollectionAssert.AreEqual(prefs.DefaultProviderOrder.ToArray(), prefs.EnabledProviderIds.ToArray());
-        Assert.AreEqual(6, prefs.EnabledProviderIds.Count);
+        CollectionAssert.AreEqual(new[] { "qq", "subsonic", "lrclib" }, prefs.EnabledProviderIds.ToArray());
+        Assert.AreEqual(TimeSpan.FromSeconds(2), prefs.AutoLoadBudget, "reset providers leaves budgets alone");
+    }
+
+    [TestMethod]
+    public async Task ResetProviders_WithoutRegisteredDefaults_EnablesFirstProviderAndKeepsBudgets()
+    {
+        var prefs = Create(
+            new FakeLocalSettingsService(),
+            new StubLyricsProvider("custom-first", "Custom First"),
+            new StubLyricsProvider("custom-second", "Custom Second"));
+        await prefs.EnsureLoadedAsync();
+        prefs.SetAutoLoadBudget(TimeSpan.FromSeconds(2));
+
+        CollectionAssert.AreEqual(new[] { "custom-first" }, prefs.DefaultEnabledProviderIds.ToArray());
+
+        prefs.ResetProviders();
+
+        CollectionAssert.AreEqual(new[] { "custom-first" }, prefs.EnabledProviderIds.ToArray());
         Assert.AreEqual(TimeSpan.FromSeconds(2), prefs.AutoLoadBudget, "reset providers leaves budgets alone");
     }
 }

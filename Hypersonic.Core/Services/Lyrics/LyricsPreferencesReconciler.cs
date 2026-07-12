@@ -14,11 +14,14 @@ public static class LyricsPreferencesReconciler
     public const int ManualRefreshMaxMs = 15000;
 
     /// <param name="persisted">Loaded state, or null on first run.</param>
-    /// <param name="registeredIdsInDefaultOrder">Registered provider ids in canonical default order
-    /// (known-canonical first, then any extras). Doubles as the membership set.</param>
+    /// <param name="registeredIdsInDefaultOrder">Registered provider ids in canonical membership order
+    /// (known-canonical first, then extras). Doubles as the membership set for placing disabled providers.</param>
+    /// <param name="defaultEnabledInPriorityOrder">Ids enabled by default, in priority order — applied only
+    /// when <paramref name="persisted"/> is null. Missing ids append disabled when persisted state exists.</param>
     public static LyricsPreferencesState Reconcile(
         LyricsPreferencesState? persisted,
         IReadOnlyList<string> registeredIdsInDefaultOrder,
+        IReadOnlyList<string> defaultEnabledInPriorityOrder,
         int defaultAutoLoadMs,
         int defaultManualRefreshMs)
     {
@@ -40,12 +43,25 @@ public static class LyricsPreferencesReconciler
             }
         }
 
-        // 2. Append registered ids missing from the persisted list, enabled, in canonical order.
+        // 2a. On first run, append default-enabled ids in priority order, enabled.
+        if (persisted is null)
+        {
+            foreach (var id in defaultEnabledInPriorityOrder)
+            {
+                if (registered.Contains(id) && seen.Add(id))
+                {
+                    rows.Add(new LyricsProviderPreference { Id = id, Enabled = true });
+                }
+            }
+        }
+
+        // 2b. Append any remaining registered ids, in canonical order, disabled by default
+        //     (a new/opinionated-off provider appears but stays out of the fan-out until the user enables it).
         foreach (var id in registeredIdsInDefaultOrder)
         {
             if (seen.Add(id))
             {
-                rows.Add(new LyricsProviderPreference { Id = id, Enabled = true });
+                rows.Add(new LyricsProviderPreference { Id = id, Enabled = false });
             }
         }
 

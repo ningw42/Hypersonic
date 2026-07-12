@@ -1,26 +1,14 @@
-using CommunityToolkit.Mvvm.ComponentModel;
-
 namespace Hypersonic.ViewModels;
 
-/// <summary>One row in the lyrics provider settings list.</summary>
-public partial class LyricsProviderItem : ObservableObject
+/// <summary>A lyrics provider as shown in the settings tokenizing box: a stable id plus its brand display name.</summary>
+public sealed class LyricsProviderItem
 {
     public string Id { get; }
     public string DisplayName { get; }
 
-    /// <summary>Two-way bound to the row checkbox.</summary>
-    [ObservableProperty]
-    public partial bool IsEnabled { get; set; }
-
-    /// <summary>False locks the checkbox — used to forbid disabling the last enabled provider.</summary>
-    [ObservableProperty]
-    public partial bool CanToggle { get; set; }
-
-    public LyricsProviderItem(string id, string displayName, bool isEnabled)
+    public LyricsProviderItem(string id, string displayName)
     {
         Id = id;
         DisplayName = displayName;
-        IsEnabled = isEnabled;
-        CanToggle = true;
     }
 }

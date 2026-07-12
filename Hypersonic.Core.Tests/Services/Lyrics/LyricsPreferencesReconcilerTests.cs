@@ -7,17 +7,23 @@ namespace Hypersonic.Core.Tests.Services.Lyrics;
 public class LyricsPreferencesReconcilerTests
 {
     private static readonly string[] Registered = ["subsonic", "lrclib", "amll-ttml-db", "qq", "netease", "kugou"];
+    private static readonly string[] DefaultEnabled = ["qq", "subsonic", "lrclib"];
 
     private static LyricsPreferencesState Reconcile(LyricsPreferencesState? persisted)
-        => LyricsPreferencesReconciler.Reconcile(persisted, Registered, defaultAutoLoadMs: 700, defaultManualRefreshMs: 5000);
+        => LyricsPreferencesReconciler.Reconcile(persisted, Registered, DefaultEnabled, defaultAutoLoadMs: 700, defaultManualRefreshMs: 5000);
 
     [TestMethod]
-    public void FirstRun_AllEnabled_DefaultOrder_DefaultBudgets()
+    public void FirstRun_SeedsDefaultEnabledSet_InPriorityOrder_RestDisabled()
     {
         var state = Reconcile(null);
 
-        CollectionAssert.AreEqual(Registered, state.Providers.Select(p => p.Id).ToArray());
-        Assert.IsTrue(state.Providers.All(p => p.Enabled));
+        CollectionAssert.AreEqual(
+            new[] { "qq", "subsonic", "lrclib" },
+            state.Providers.Where(p => p.Enabled).Select(p => p.Id).ToArray());
+        CollectionAssert.AreEquivalent(
+            new[] { "amll-ttml-db", "netease", "kugou" },
+            state.Providers.Where(p => !p.Enabled).Select(p => p.Id).ToArray());
+        Assert.IsTrue(state.Providers.Take(3).All(p => p.Enabled)); // enabled-first
         Assert.AreEqual(700, state.AutoLoadBudgetMs);
         Assert.AreEqual(5000, state.ManualRefreshBudgetMs);
     }
@@ -38,24 +44,44 @@ public class LyricsPreferencesReconcilerTests
     }
 
     [TestMethod]
-    public void NewRegistered_Ids_Appended_Enabled_InCanonicalOrder()
+    public void NewRegistered_Ids_AppendedDisabled_WhenPersistedExists()
     {
-        // Persisted knows only the two original providers; the four newer ones must be appended, enabled.
+        // Persisted knows only subsonic (enabled). Every missing provider is appended disabled,
+        // including qq/lrclib from the fresh-install default set.
         var persisted = new LyricsPreferencesState
         {
-            Providers = [new() { Id = "subsonic", Enabled = true }, new() { Id = "lrclib", Enabled = false }],
+            Providers = [new() { Id = "subsonic", Enabled = true }],
             AutoLoadBudgetMs = 700,
             ManualRefreshBudgetMs = 5000,
         };
 
         var state = Reconcile(persisted);
 
-        // subsonic (enabled) first; the appended new ids are enabled; lrclib (disabled) sinks to the end.
-        Assert.AreEqual("subsonic", state.Providers[0].Id);
-        Assert.IsTrue(state.Providers.Single(p => p.Id == "amll-ttml-db").Enabled);
-        Assert.IsTrue(state.Providers.Single(p => p.Id == "qq").Enabled);
-        Assert.AreEqual("lrclib", state.Providers[^1].Id);
-        Assert.IsFalse(state.Providers[^1].Enabled);
+        Assert.IsTrue(state.Providers.Single(p => p.Id == "subsonic").Enabled);
+        Assert.IsFalse(state.Providers.Single(p => p.Id == "qq").Enabled);
+        Assert.IsFalse(state.Providers.Single(p => p.Id == "lrclib").Enabled);
+        Assert.IsFalse(state.Providers.Single(p => p.Id == "amll-ttml-db").Enabled);
+        Assert.IsFalse(state.Providers.Single(p => p.Id == "netease").Enabled);
+        Assert.IsFalse(state.Providers.Single(p => p.Id == "kugou").Enabled);
+        CollectionAssert.AreEqual(Registered, state.Providers.Select(p => p.Id).ToArray());
+    }
+
+    [TestMethod]
+    public void ExistingAllEnabled_PersistedState_Preserved()
+    {
+        // Old installs that persisted all six enabled keep every provider enabled, in saved order —
+        // the leaner default only applies to a fresh install or explicit reset (design §Companion change).
+        var persisted = new LyricsPreferencesState
+        {
+            Providers = Registered.Select(id => new LyricsProviderPreference { Id = id, Enabled = true }).ToList(),
+            AutoLoadBudgetMs = 700,
+            ManualRefreshBudgetMs = 5000,
+        };
+
+        var state = Reconcile(persisted);
+
+        Assert.IsTrue(state.Providers.All(p => p.Enabled));
+        CollectionAssert.AreEqual(Registered, state.Providers.Select(p => p.Id).ToArray());
     }
 
     [TestMethod]

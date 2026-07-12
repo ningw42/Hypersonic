@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Linq;
 
 using CommunityToolkit.WinUI.Controls;
 
@@ -120,6 +121,59 @@ public sealed partial class SettingsPage : Page
         {
             args.Cancel = true;
         }
+    }
+
+    private void OnLyricsProviderTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    {
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
+        {
+            return;
+        }
+
+        LyricsViewModel.FilterSuggestions(sender.Text);
+    }
+
+    private void OnLyricsProviderTokenAdding(TokenizingTextBox sender, TokenItemAddingEventArgs args)
+    {
+        // Resolve the typed text to a stable provider item; reject unknown/already-enabled text.
+        var item = LyricsViewModel.ResolveCandidate(args.TokenText);
+        if (item is null)
+        {
+            args.Cancel = true;
+        }
+        else
+        {
+            args.Item = item; // TTB adds this object instead of the raw string
+        }
+    }
+
+    private void OnLyricsProviderTokenAdded(TokenizingTextBox sender, object data)
+    {
+        if (data is LyricsProviderItem item)
+        {
+            LyricsViewModel.EnableProvider(item);
+        }
+    }
+
+    private void OnLyricsProviderTokenRemoving(TokenizingTextBox sender, TokenItemRemovingEventArgs args)
+    {
+        if (!LyricsViewModel.CanRemove)
+        {
+            args.Cancel = true; // never remove the sole remaining enabled provider
+        }
+    }
+
+    private void OnLyricsProviderTokenRemoved(TokenizingTextBox sender, object data)
+    {
+        if (data is LyricsProviderItem item)
+        {
+            LyricsViewModel.DisableProvider(item);
+        }
+    }
+
+    private void OnLyricsProviderItemsReordered(Controls.ReorderableTokenizingTextBox sender, IReadOnlyList<object> newOrder)
+    {
+        LyricsViewModel.CommitReorder(newOrder.Cast<LyricsProviderItem>().ToList());
     }
 
     private async void OnRestartAppClicked(object sender, RoutedEventArgs e)

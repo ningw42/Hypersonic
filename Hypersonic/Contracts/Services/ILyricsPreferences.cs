@@ -34,8 +34,12 @@ public interface ILyricsPreferences
     TimeSpan AutoLoadBudget { get; }
     TimeSpan ManualRefreshBudget { get; }
 
-    /// <summary>Registered providers in the canonical default order (all-enabled baseline for reset).</summary>
+    /// <summary>Registered provider ids in canonical membership order. See
+    /// <see cref="DefaultEnabledProviderIds"/> for the providers enabled by reset.</summary>
     IReadOnlyList<string> DefaultProviderOrder { get; }
+    /// <summary>The effective provider reset target in priority order: registered preferred defaults when
+    /// available, otherwise the first registered provider; empty only when no providers are registered.</summary>
+    IReadOnlyList<string> DefaultEnabledProviderIds { get; }
     TimeSpan DefaultAutoLoadBudget { get; }
     TimeSpan DefaultManualRefreshBudget { get; }
 

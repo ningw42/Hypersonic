@@ -29,6 +29,14 @@ public sealed class LyricsPreferences : ILyricsPreferences
         Hypersonic.Core.Services.Lyrics.KugouLyricsConstants.ProviderId,
     ];
 
+    // Providers enabled by default, in priority order (QQ word-synced first; own server before community LrcLib).
+    private static readonly string[] DefaultEnabledOrder =
+    [
+        Hypersonic.Core.Services.Lyrics.QQLyricsConstants.ProviderId,
+        Hypersonic.Services.Lyrics.SubsonicLyricsConstants.ProviderId,
+        Hypersonic.Core.Services.Lyrics.LrcLibLyricsConstants.ProviderId,
+    ];
+
     private readonly ILocalSettingsService _settings;
     private readonly Dictionary<string, string> _displayNames;
     private readonly string[] _registeredInDefaultOrder;
@@ -58,9 +66,13 @@ public sealed class LyricsPreferences : ILyricsPreferences
         _registeredInDefaultOrder = CanonicalOrder.Where(_displayNames.ContainsKey)
             .Concat(_displayNames.Keys.Where(id => !canonicalSet.Contains(id)))
             .ToArray();
+        var registeredPreferredDefaults = DefaultEnabledOrder.Where(_displayNames.ContainsKey).ToArray();
+        DefaultEnabledProviderIds = registeredPreferredDefaults.Length > 0
+            ? registeredPreferredDefaults
+            : _registeredInDefaultOrder.Take(1).ToArray();
 
         // Defaults snapshot so reads never see uninitialized state before EnsureLoadedAsync.
-        _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs));
+        _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, DefaultEnabledProviderIds, _defaultAutoMs, _defaultManualMs));
     }
 
     public Task EnsureLoadedAsync(CancellationToken cancellationToken = default)
@@ -76,12 +88,12 @@ public sealed class LyricsPreferences : ILyricsPreferences
         try
         {
             var persisted = await _settings.ReadSettingAsync<LyricsPreferencesState>(SettingsKey).ConfigureAwait(false);
-            _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(persisted, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs));
+            _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(persisted, _registeredInDefaultOrder, DefaultEnabledProviderIds, _defaultAutoMs, _defaultManualMs));
         }
         catch (Exception ex)
         {
             _log.Warning("Failed to load lyrics preferences; using defaults", exception: ex);
-            _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, _defaultAutoMs, _defaultManualMs));
+            _snapshot = BuildSnapshot(LyricsPreferencesReconciler.Reconcile(null, _registeredInDefaultOrder, DefaultEnabledProviderIds, _defaultAutoMs, _defaultManualMs));
         }
     }
 
@@ -92,6 +104,7 @@ public sealed class LyricsPreferences : ILyricsPreferences
     public TimeSpan ManualRefreshBudget => _snapshot.ManualRefreshBudget;
 
     public IReadOnlyList<string> DefaultProviderOrder => _registeredInDefaultOrder;
+    public IReadOnlyList<string> DefaultEnabledProviderIds { get; }
     public TimeSpan DefaultAutoLoadBudget => TimeSpan.FromMilliseconds(_defaultAutoMs);
     public TimeSpan DefaultManualRefreshBudget => TimeSpan.FromMilliseconds(_defaultManualMs);
 
@@ -185,10 +198,13 @@ public sealed class LyricsPreferences : ILyricsPreferences
 
     public void ResetProviders()
     {
-        var providers = _registeredInDefaultOrder
-            .Select(id => new LyricsProviderPreference { Id = id, Enabled = true })
-            .ToList();
-        Publish(providers);
+        var enabledSet = new HashSet<string>(DefaultEnabledProviderIds, StringComparer.Ordinal);
+        var enabled = DefaultEnabledProviderIds
+            .Select(id => new LyricsProviderPreference { Id = id, Enabled = true });
+        var disabled = _registeredInDefaultOrder
+            .Where(id => !enabledSet.Contains(id))
+            .Select(id => new LyricsProviderPreference { Id = id, Enabled = false });
+        Publish(enabled.Concat(disabled).ToList());
     }
 
     /// <summary>Current provider rows as a mutable working copy, derived from the immutable snapshot.</summary>
