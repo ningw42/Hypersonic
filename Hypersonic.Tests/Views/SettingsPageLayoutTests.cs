@@ -21,6 +21,19 @@ public class SettingsPageLayoutTests
             providerBox.Attribute("ReorderItemsSource")?.Value);
     }
 
+    [TestMethod]
+    public void LyricsProviderBox_UsesTwoPixelTokenSpacing()
+    {
+        var xaml = XDocument.Load(FindRepositoryFile("Hypersonic", "Views", "SettingsPage.xaml"));
+        var xamlNamespace = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+
+        var providerBox = xaml
+            .Descendants()
+            .Single(e => e.Attribute(xamlNamespace + "Name")?.Value == "LyricsProviderBox");
+
+        Assert.AreEqual("2", providerBox.Attribute("TokenSpacing")?.Value);
+    }
+
     private static string FindRepositoryFile(params string[] pathParts)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

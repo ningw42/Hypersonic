@@ -236,6 +236,7 @@
                         x:Name="LyricsProviderBox"
                         x:Uid="Settings_LyricsProviderPicker"
                         TokenDelimiter=","
+                        TokenSpacing="2"
                         ItemsSource="{x:Bind LyricsViewModel.EnabledProviders, Mode=OneWay}"
                         ReorderItemsSource="{x:Bind LyricsViewModel.EnabledProviders, Mode=OneWay}"
                         SuggestedItemsSource="{x:Bind LyricsViewModel.ProviderSuggestions, Mode=OneWay}"
