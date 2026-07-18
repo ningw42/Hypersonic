@@ -26,6 +26,7 @@ The design decision is to restore WinUIEx as the sole owner of window-placement 
 - WinUIEx may use an opaque Base64 representation of monitor data and `WINDOWPLACEMENT`.
 - A crash or force quit may lose the latest placement.
 - A canceled close or minimize-to-tray operation does not have to flush placement immediately; a later real window close does.
+- A minimized window never reopens minimized. A window minimized from its normal state reopens normal at its saved restore bounds; a window minimized from maximized reopens maximized.
 - Changing monitor count, resolution, or arrangement invalidates the placement and uses Windows' safe default.
 - The first launch after migrating to this design may use the safe default placement.
 
@@ -140,6 +141,8 @@ The placement remains nested under the `Window` section of `AppState`, preservin
 ### Hide-to-tray
 
 A canceled close or minimize-to-tray transition does not cause WinUIEx to save. If the user later chooses Exit, the real close captures the current placement. If the process is killed while hidden, placement changes made since the previous real close may be lost; this is accepted behavior.
+
+Minimized state is deliberately normalized during restoration rather than treated as a startup state. WinUIEx restores a window minimized from normal as normal and a window minimized from maximized as maximized. Hypersonic must therefore never appear to launch invisibly merely because the previous session ended while minimized.
 
 ## Migration
 
