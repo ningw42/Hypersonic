@@ -62,8 +62,6 @@ public class AppStateService : IAppStateService
 
     public Task SavePlaybackAsync() => WriteStateAsync();
 
-    public Task SaveWindowAsync() => WriteStateAsync();
-
     public Task SaveNavigationAsync() => WriteStateAsync();
 
     public Task SaveGeneralAsync() => WriteStateAsync();

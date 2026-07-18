@@ -74,7 +74,6 @@ public class PlayerViewModelToggleTests
             return Task.CompletedTask;
         }
 
-        public Task SaveWindowAsync() => Task.CompletedTask;
         public Task SaveNavigationAsync() => Task.CompletedTask;
         public Task SaveGeneralAsync() => Task.CompletedTask;
         public void SaveSync() { }

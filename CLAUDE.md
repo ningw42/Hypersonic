@@ -97,7 +97,7 @@ Services are split between Hypersonic.Core (platform-independent) and Hypersonic
 |---|---|
 | **IPlaybackService** | Audio playback contract: queue, now-playing, position, volume, shuffle, repeat. |
 | **ILoggingService** | Custom sink-based logging. Category-scoped loggers via `GetLogger(name)`. |
-| **IAppStateService** | Persists runtime state (playback prefs, window geometry, last page) to `AppState.json`. |
+| **IAppStateService** | Persists runtime state (playback prefs, opaque WinUIEx window placement, last page) to `AppState.json`. |
 | **ICredentialService** | Manages server accounts list and passwords. |
 | **IFileService** | Generic file read/write/delete using JSON serialization. |
 | **ILocalSettingsService** | Key-value persistence contract. |
@@ -191,13 +191,14 @@ Stored via `ILocalSettingsService` (MSIX → `ApplicationData`; unpackaged → `
 
 Passwords are stored in Windows Credential Manager (`PasswordVault`) under resource key `Hypersonic:<serverUrl>`, not in settings.
 
-Runtime state (volume, mute, shuffle, repeat, window geometry, last page) is stored separately in `AppState.json` via `IAppStateService`. The state model has three nested sections: `PlaybackState` (volume, mute, shuffle, repeat), `WindowState` (size, position, maximized), `NavigationState` (last page).
+Runtime state (volume, mute, shuffle, repeat, WinUIEx window placement, last page) is stored separately in `AppState.json` via `IAppStateService`. Its relevant sections are `PlaybackState` (volume, mute, shuffle, repeat), `WindowState` (`Placement`, an opaque nullable string), and `NavigationState` (last page).
 
 ### Persistence patterns
 
 - **External update guard**: `PlayerViewModel._isSavingFromExternal` flag prevents redundant saves when hydrating ViewModel properties from service state (e.g., on startup or playback state change events).
-- **Debounced saves**: 1-second non-repeating `DispatcherQueueTimer` in `PlayerViewModel` (volume changes) and `MainWindow` (window geometry). Batches rapid changes to avoid excessive disk writes.
-- **Synchronous close flush**: `MainWindow_Closed` sets `_isClosing = true`, stops timers, calls `SaveWindowState(sync: true)` and `PlayerViewModel.FlushPendingSaves()`, then `AppStateService.SaveSync()` — all synchronous to avoid races with process exit.
+- **Player-only debounce**: `PlayerViewModel` uses a 1-second non-repeating `DispatcherQueueTimer` to batch rapid volume changes. Window placement has no application-owned debounce.
+- **Window placement ownership**: WinUIEx owns placement capture, validation, and restore through the shared `PersistenceId`. `AppStateWindowPersistenceStorage` bridges WinUIEx's property bag to `AppState.Window.Placement`; when WinUIEx writes placement on a real close, the adapter synchronously persists the complete state document through `AppStateService.SaveSync()`.
+- **Tray lifecycle**: Minimize-to-tray and close-to-tray only hide the live window in-session and do not read or flush placement. A later explicit tray Exit performs a real close, allowing WinUIEx to save placement; `MainWindow_Closed` separately flushes only pending `PlayerViewModel` volume state before shutdown cleanup.
 
 ## MVP Roadmap
 

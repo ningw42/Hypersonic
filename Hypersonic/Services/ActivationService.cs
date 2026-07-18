@@ -1,12 +1,10 @@
 using Hypersonic.Activation;
 using Hypersonic.Contracts.Services;
 using Hypersonic.Core.Contracts.Services;
-using Hypersonic.Core.Models;
 using Hypersonic.Views;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Windowing;
 
 namespace Hypersonic.Services;
 
@@ -48,13 +46,15 @@ public class ActivationService : IActivationService
         // Execute tasks before activation.
         await InitializeAsync();
 
+        // WinUIEx reads this lazily on the first WM_SHOWWINDOW. AppState must
+        // already be loaded, and the adapter must be installed before Activate().
+        WinUIEx.WindowManager.PersistenceStorage =
+            new AppStateWindowPersistenceStorage(_appStateService);
+
         // Initialize scrobbling after app state is loaded.
         // Must run on the UI thread (not inside InitializeAsync which
         // uses ConfigureAwait(false) and may resume on a thread pool thread).
         await App.GetService<IScrobblingService>().InitializeAsync();
-
-        // Restore window geometry from saved state.
-        RestoreWindowState();
 
         // Check credentials and set appropriate content.
         if (App.MainWindow.Content == null)
@@ -177,63 +177,4 @@ public class ActivationService : IActivationService
         await Task.CompletedTask;
     }
 
-    private void RestoreWindowState()
-    {
-        var windowState = _appStateService.State.Window;
-        var window = App.MainWindow;
-
-        // Always apply saved normal bounds first, so the window's restore-size
-        // is correct regardless of whether we then maximize.
-        if (windowState.Width.HasValue && windowState.Height.HasValue)
-        {
-            window.Width = windowState.Width.Value;
-            window.Height = windowState.Height.Value;
-        }
-
-        if (windowState.X.HasValue && windowState.Y.HasValue)
-        {
-            if (IsPositionOnScreen(windowState.X.Value, windowState.Y.Value))
-            {
-                window.AppWindow.Move(new Windows.Graphics.PointInt32(windowState.X.Value, windowState.Y.Value));
-                _log.Debug("Window position restored", new { windowState.X, windowState.Y });
-            }
-            else
-            {
-                _log.Debug("Saved window position is off-screen, using OS default");
-            }
-        }
-
-        if (windowState.IsMaximized)
-        {
-            if (window.AppWindow.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.Maximize();
-            }
-            _log.Debug("Window restored to maximized state");
-        }
-    }
-
-    private static bool IsPositionOnScreen(int x, int y)
-    {
-        try
-        {
-            var areas = DisplayArea.FindAll();
-            foreach (var area in areas)
-            {
-                var bounds = area.WorkArea;
-                if (x >= bounds.X && x < bounds.X + bounds.Width &&
-                    y >= bounds.Y && y < bounds.Y + bounds.Height)
-                {
-                    return true;
-                }
-            }
-        }
-        catch
-        {
-            // If we can't enumerate displays, allow the position.
-            return true;
-        }
-
-        return false;
-    }
 }

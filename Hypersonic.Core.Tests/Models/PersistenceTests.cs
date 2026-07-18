@@ -85,11 +85,7 @@ public class PersistenceTests
         Assert.IsFalse(state.Playback.ShuffleEnabled);
         Assert.AreEqual(RepeatMode.Off, state.Playback.RepeatMode);
 
-        Assert.IsNull(state.Window.Width);
-        Assert.IsNull(state.Window.Height);
-        Assert.IsNull(state.Window.X);
-        Assert.IsNull(state.Window.Y);
-        Assert.IsFalse(state.Window.IsMaximized);
+        Assert.IsNull(state.Window.Placement);
 
         Assert.IsNull(state.Navigation.LastPage);
 
@@ -111,11 +107,7 @@ public class PersistenceTests
             },
             Window = new WindowState
             {
-                Width = 1200,
-                Height = 800,
-                X = 100,
-                Y = 200,
-                IsMaximized = false,
+                Placement = "AQIDBAUG==",
             },
             Navigation = new NavigationState
             {
@@ -140,16 +132,58 @@ public class PersistenceTests
         Assert.IsTrue(deserialized.Playback.ShuffleEnabled);
         Assert.AreEqual(RepeatMode.All, deserialized.Playback.RepeatMode);
 
-        Assert.AreEqual(1200, deserialized.Window.Width);
-        Assert.AreEqual(800, deserialized.Window.Height);
-        Assert.AreEqual(100, deserialized.Window.X);
-        Assert.AreEqual(200, deserialized.Window.Y);
-        Assert.IsFalse(deserialized.Window.IsMaximized);
+        Assert.AreEqual("AQIDBAUG==", deserialized.Window.Placement);
 
         Assert.AreEqual("Hypersonic.ViewModels.AlbumsViewModel", deserialized.Navigation.LastPage);
-
         Assert.IsTrue(deserialized.General.MinimizeToTray);
         Assert.IsTrue(deserialized.General.CloseToTray);
+    }
+
+    [TestMethod]
+    public void AppState_LegacyWindowGeometry_IsIgnored()
+    {
+        var legacyJson = """
+            {
+              "Playback": {
+                "Volume": 42,
+                "IsMuted": true,
+                "ShuffleEnabled": false,
+                "RepeatMode": "One"
+              },
+              "Window": {
+                "Width": 1200,
+                "Height": 800,
+                "X": 100,
+                "Y": 200,
+                "IsMaximized": true
+              },
+              "Navigation": {
+                "LastPage": "Hypersonic.ViewModels.TracksViewModel"
+              },
+              "General": {
+                "MinimizeToTray": true,
+                "CloseToTray": false
+              }
+            }
+            """;
+
+        var deserialized = JsonSerializer.Deserialize<AppState>(legacyJson, Json.Options);
+
+        Assert.IsNotNull(deserialized);
+        Assert.IsNull(deserialized!.Window.Placement);
+        Assert.AreEqual(42, deserialized.Playback.Volume);
+        Assert.IsTrue(deserialized.Playback.IsMuted);
+        Assert.AreEqual(RepeatMode.One, deserialized.Playback.RepeatMode);
+        Assert.AreEqual("Hypersonic.ViewModels.TracksViewModel", deserialized.Navigation.LastPage);
+        Assert.IsTrue(deserialized.General.MinimizeToTray);
+        Assert.IsFalse(deserialized.General.CloseToTray);
+
+        var migratedJson = JsonSerializer.Serialize(deserialized, Json.Options);
+        Assert.IsFalse(migratedJson.Contains("\"Width\"", StringComparison.Ordinal));
+        Assert.IsFalse(migratedJson.Contains("\"Height\"", StringComparison.Ordinal));
+        Assert.IsFalse(migratedJson.Contains("\"X\"", StringComparison.Ordinal));
+        Assert.IsFalse(migratedJson.Contains("\"Y\"", StringComparison.Ordinal));
+        Assert.IsFalse(migratedJson.Contains("\"IsMaximized\"", StringComparison.Ordinal));
     }
 
     [TestMethod]

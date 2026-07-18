@@ -15,7 +15,6 @@ internal sealed class FakeAppStateService : IAppStateService
     public Task InitializeAsync() => Task.CompletedTask;
     public Task SaveAsync() => Task.CompletedTask;
     public Task SavePlaybackAsync() => Task.CompletedTask;
-    public Task SaveWindowAsync() => Task.CompletedTask;
     public Task SaveNavigationAsync() => Task.CompletedTask;
 
     public Task SaveGeneralAsync()
