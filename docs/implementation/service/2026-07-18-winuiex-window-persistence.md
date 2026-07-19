@@ -43,7 +43,7 @@
 | `Hypersonic/MainWindow.xaml` | Remove the stale manual-persistence comment while preserving minimum dimensions. |
 | `Hypersonic/MainWindow.xaml.cs` | Assign the shared persistence ID and remove manual geometry capture/save code without changing tray or shutdown behavior. |
 | Eight `Hypersonic.Tests/ViewModels/*Tests.cs` test-double files listed in Task 4 | Track the `IAppStateService` contract removal. |
-| `window-persistence.md` | Convert the root decision brief into a resolved record pointing at the approved design. |
+| Temporary root decision brief | Remove after the approved design and implementation preserve the resolved decision. |
 
 ---
 
@@ -1042,64 +1042,18 @@ rtk git commit -m "refactor(window): remove manual geometry state"
 
 ---
 
-### Task 5: Resolve the Decision Record and Complete End-to-End Verification
+### Task 5: Retire the Decision Brief and Complete End-to-End Verification
 
 **Files:**
-- Modify: `window-persistence.md:1-158`
+- Delete the temporary root decision brief.
 
 **Interfaces:**
 - Consumes: The completed model, adapter, activation order, and tray lifecycle from Tasks 1-4.
-- Produces: A resolved root decision record and verification evidence for packaged and unpackaged builds.
+- Produces: A single durable decision record in the approved design and verification evidence for packaged and unpackaged builds.
 
-- [ ] **Step 1: Replace the open decision brief with the resolved record**
+- [ ] **Step 1: Remove the superseded root decision brief**
 
-Replace `window-persistence.md` with:
-
-```markdown
-# Window Placement Persistence — Resolved Decision
-
-> **Status:** Resolved on 2026-07-18.
->
-> **Detailed design:** [WinUIEx-Backed Window Persistence Design](docs/design/service/2026-07-18-winuiex-window-persistence-design.md)
-
-## Decision
-
-Hypersonic uses WinUIEx `PersistenceId` as the sole owner of main-window placement semantics. WinUIEx captures and restores the opaque monitor-topology plus `WINDOWPLACEMENT` blob; Hypersonic does not decode or modify it.
-
-Hypersonic retains `AppStateService` as the sole owner of durable application-state storage. An app-layer `AppStateWindowPersistenceStorage` adapter exposes WinUIEx's `IDictionary<string, object>` protocol and maps `WindowPersistance_MainWindow` to `AppState.Window.Placement` in `AppState.json`.
-
-This is the approved hybrid from the former decision brief: WinUIEx supplies DPI-, monitor-, normal-bounds-, and show-state-aware placement behavior, while the existing app-state document remains the only durable store in both MSIX-packaged and unpackaged builds.
-
-## Ownership
-
-| Concern | Owner |
-|---|---|
-| Interpret, validate, capture, and restore placement | WinUIEx |
-| Persist the opaque placement string | `AppStateService` |
-| Bridge WinUIEx's key/value protocol to app state | `AppStateWindowPersistenceStorage` |
-| Install storage after app-state load and before activation | `ActivationService` |
-| Assign the shared `PersistenceId` and preserve tray behavior | `MainWindow` |
-
-The shared ID is `MainWindow`. WinUIEx's storage key is `WindowPersistance_MainWindow`; the misspelling is part of WinUIEx's protocol.
-
-## Lifecycle
-
-- Startup loads `AppState.json`, assigns `WindowManager.PersistenceStorage`, and then activates the main window. WinUIEx reads placement on the first `WM_SHOWWINDOW`.
-- A real close lets WinUIEx capture placement. The adapter writes `AppState.Window.Placement` and synchronously saves the complete state document.
-- Minimize-to-tray and close-to-tray keep the live window in-process and do not read or flush placement. A later explicit tray Exit performs a real close and saves placement.
-- Missing, corrupt, or monitor-incompatible placement falls back to Windows' safe default.
-- A minimized window never launches minimized; WinUIEx restores its normal or maximized restore state.
-
-## Migration
-
-The former `Width`, `Height`, `X`, `Y`, and `IsMaximized` fields are not converted. System.Text.Json ignores them, `Placement` defaults to null, and the first launch after upgrade uses Windows' safe default. The first real close writes a WinUIEx placement blob.
-
-The custom storage adapter is always installed, so packaged builds do not read stale WinUIEx data from `ApplicationData.LocalSettings`.
-
-## Superseded Implementation
-
-The manual capture/restore path in `MainWindow` and `ActivationService` was removed. It mixed DIP dimensions with physical-pixel positions and restored while the hidden window was associated with the wrong DPI. The detailed design linked above records the accepted behavior, failure handling, alternatives, and validation matrix.
-```
+Remove the temporary brief now that the approved design records the decision and the implementation embodies it.
 
 - [ ] **Step 2: Run all Core tests**
 
@@ -1177,11 +1131,11 @@ For both packaging modes, close the app, first remove `Window.Placement` from `A
 
 Expected: both launches succeed with a visible safe default. The app neither throws during startup nor attempts application-side blob repair.
 
-- [ ] **Step 10: Commit the resolved record**
+- [ ] **Step 10: Commit the documentation cleanup**
 
 ```powershell
-rtk git add window-persistence.md
-rtk git commit -m "docs(window): resolve persistence ownership"
+rtk git add docs/design/service/2026-07-18-winuiex-window-persistence-design.md docs/implementation/service/2026-07-18-winuiex-window-persistence.md
+rtk git commit -am "docs(window): retire persistence decision brief"
 ```
 
 ---
@@ -1194,7 +1148,7 @@ rtk git commit -m "docs(window): resolve persistence ownership"
 - Known-key reads/writes, exactly one sync save, ignored writes, unsupported dictionary operations, shared ID, and key spelling are covered by Task 2.
 - Required activation order, code-behind `PersistenceId`, packaged/unpackaged custom storage, removal of manual restoration/capture/debounce/geometry flushes, and preservation of tray/shutdown behavior are covered by Task 3.
 - Final removal of the five geometry properties, legacy-field migration, and removal of `SaveWindowAsync()` from production plus every current test double are covered by Task 4.
-- Resolution of the root decision brief, full automated verification, and every item in the manual validation matrix are covered by Task 5.
+- Retirement of the root decision brief, full automated verification, and every item in the manual validation matrix are covered by Task 5.
 - Non-goals remain absent: no snap-group, virtual-desktop, fullscreen, compact-overlay, cross-package sharing, readable blob, or settings-service consolidation work is introduced.
 
 **Type consistency:**

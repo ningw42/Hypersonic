@@ -203,7 +203,7 @@ The implementation removes the obsolete manual path:
 - `IAppStateService.SaveWindowAsync()` and its implementation/test-double members.
 - The five typed geometry properties in `WindowState`.
 
-`window-persistence.md` should be updated from an open decision brief to a resolved record that points to this design and states that WinUIEx owns placement semantics through an AppState-backed `PersistenceStorage` adapter.
+The temporary root decision brief was retired after implementation. This design remains the durable record that WinUIEx owns placement semantics through an AppState-backed `PersistenceStorage` adapter.
 
 ## Verification
 
